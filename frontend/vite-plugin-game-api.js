@@ -2,7 +2,6 @@
 let gameState = {
   board: [],
   viewportCenter: { row: 7, col: 7 },
-  pendingMoves: [], // Store moves from mobile to be processed
   player1: {
     playerName: 'Player 1',
     rack: [],
@@ -70,39 +69,27 @@ export function gameApiPlugin() {
           req.on('end', () => {
             try {
               const data = JSON.parse(body);
-              // Store the pending move
-              gameState.pendingMoves.push(data);
+              const { playerId, letter, rackIndex, row, col } = data;
               
-              // Apply the move to the board immediately for mobile view
-              const { row, col, letter, playerId } = data;
-              if (gameState.board[row] && gameState.board[row][col]) {
+              // Place tile on board
+              if (gameState.board && gameState.board[row] && gameState.board[row][col]) {
                 gameState.board[row][col].letter = letter;
                 gameState.board[row][col].isNew = true;
-                gameState.board[row][col].locked = false;
               }
               
-              // Remove from player rack
-              const playerKey = playerId === '1' ? 'player1' : 'player2';
-              if (gameState[playerKey] && data.rackIndex !== undefined) {
-                gameState[playerKey].rack[data.rackIndex] = null;
+              // Remove tile from player's rack
+              const player = playerId === '1' ? gameState.player1 : gameState.player2;
+              if (player.rack && player.rack.length > rackIndex) {
+                player.rack.splice(rackIndex, 1);
               }
               
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ success: true, message: 'Tile placed' }));
+              res.end(JSON.stringify({ success: true, message: 'Tile placed successfully' }));
             } catch (e) {
               res.statusCode = 400;
               res.end(JSON.stringify({ error: 'Invalid JSON' }));
             }
           });
-          return;
-        } else if (req.url === '/api/pending-moves' && req.method === 'GET') {
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ moves: gameState.pendingMoves }));
-          return;
-        } else if (req.url === '/api/clear-pending-moves' && req.method === 'POST') {
-          gameState.pendingMoves = [];
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ success: true }));
           return;
         }
         next();

@@ -49,8 +49,12 @@
           v-for="(letter, index) in rack" 
           :key="index" 
           class="tile"
+          :class="{ dragging: draggedIndex === index }"
           draggable="true"
           @dragstart="onTileDragStart($event, letter, index)"
+          @dragover="onRackDragOver($event, index)"
+          @drop="onRackDrop($event, index)"
+          @dragend="onDragEnd"
         >
           <span class="letter">{{ (letter || '★').toUpperCase() }}</span>
           <span class="value">{{ getLetterValue(letter) }}</span>
@@ -88,7 +92,8 @@ export default {
       board: [],
       viewportCenter: { row: 7, col: 7 }, // Center of the 15x15 board
       draggedLetter: null,
-      draggedIndex: null
+      draggedIndex: null,
+      dragSource: null // 'rack' or 'board'
     };
   },
   mounted() {
@@ -173,8 +178,24 @@ export default {
     onTileDragStart(event, letter, index) {
       this.draggedLetter = letter;
       this.draggedIndex = index;
+      this.dragSource = 'rack';
       event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', letter);
+      event.dataTransfer.setData('text/plain', JSON.stringify({ letter, index }));
+    },
+    onRackDragOver(event, targetIndex) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    onRackDrop(event, targetIndex) {
+      event.preventDefault();
+      
+      if (this.dragSource === 'rack' && this.draggedIndex !== null && this.draggedIndex !== targetIndex) {
+        // Reorder tiles in rack
+        const newRack = [...this.rack];
+        const [draggedItem] = newRack.splice(this.draggedIndex, 1);
+        newRack.splice(targetIndex, 0, draggedItem);
+        this.rack = newRack;
+      }
     },
     onBoardDragOver(event) {
       event.preventDefault();
@@ -187,7 +208,7 @@ export default {
         return; // Only allow drops on your turn
       }
       
-      if (this.draggedLetter && cell.letter === null && !cell.locked) {
+      if (this.dragSource === 'rack' && this.draggedLetter !== null && cell.letter === null && !cell.locked) {
         // Send the move to the server
         try {
           await fetch('/api/place-tile', {
@@ -202,15 +223,24 @@ export default {
             })
           });
           
-          // Refresh immediately
+          // Remove tile from local rack immediately for better UX
+          const newRack = [...this.rack];
+          newRack.splice(this.draggedIndex, 1);
+          this.rack = newRack;
+          
+          // Then fetch updated data from server
           await this.fetchRackData();
         } catch (error) {
           console.error('Failed to place tile:', error);
+          // Refresh to get correct state
+          await this.fetchRackData();
         }
       }
-      
+    },
+    onDragEnd() {
       this.draggedLetter = null;
       this.draggedIndex = null;
+      this.dragSource = null;
     },
     getSquareClass(square) {
       const classes = ['board-square'];
@@ -433,6 +463,11 @@ export default {
 
 .tile:active {
   cursor: grabbing;
+}
+
+.tile.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
 }
 
 .tile .letter {
