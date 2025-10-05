@@ -1,5 +1,21 @@
 <template>
   <div class="mobile-rack-view">
+    <!-- Debug Console Overlay -->
+    <div v-if="showDebugConsole" class="debug-console">
+      <div class="debug-header">
+        <span>🐛 Debug Console</span>
+        <button @click="showDebugConsole = false" class="close-debug">✕</button>
+        <button @click="debugLogs = []" class="clear-debug">Clear</button>
+      </div>
+      <div class="debug-logs">
+        <div v-for="(log, index) in debugLogs" :key="index" :class="['debug-log', log.type]">
+          <span class="log-time">{{ log.time }}</span>
+          <span class="log-message">{{ log.message }}</span>
+        </div>
+      </div>
+    </div>
+    <button v-else @click="showDebugConsole = true" class="debug-toggle">🐛</button>
+    
     <div class="rack-container">
       <div class="refresh-info">
         <p>💡 Drag tiles from your rack onto the board</p>
@@ -29,8 +45,9 @@
               v-for="(square, colIndex) in row"
               :key="colIndex"
               :class="getSquareClass(square)"
-              @dragover="onBoardDragOver"
-              @drop="onBoardDrop($event, square)"
+              :data-board-row="square.actualRow"
+              :data-board-col="square.actualCol"
+              class="board-square drop-zone"
             >
               <span v-if="square.letter" class="board-letter" :class="{ locked: square.locked }">
                 {{ square.letter.toUpperCase() }}
@@ -49,16 +66,22 @@
           v-for="(letter, index) in rack" 
           :key="index" 
           class="tile"
-          :class="{ dragging: draggedIndex === index }"
-          draggable="true"
-          @dragstart="onTileDragStart($event, letter, index)"
-          @dragover="onRackDragOver($event, index)"
-          @drop="onRackDrop($event, index)"
-          @dragend="onDragEnd"
+          :class="{ dragging: draggedIndex === index && isDragging }"
+          :data-index="index"
+          :data-letter="letter"
+          @touchstart="onTileTouchStart($event, letter, index)"
+          @touchmove.prevent="onTouchMove"
+          @touchend="onTouchEnd"
         >
           <span class="letter">{{ (letter || '★').toUpperCase() }}</span>
           <span class="value">{{ getLetterValue(letter) }}</span>
         </div>
+      </div>
+      
+      <!-- Ghost tile that follows finger during drag -->
+      <div v-if="isDragging" class="ghost-tile" :style="ghostTileStyle">
+        {{ (draggedLetter || '★').toUpperCase() }}
+        <span class="ghost-value">{{ getLetterValue(draggedLetter) }}</span>
       </div>
       
       <div class="refresh-info">
@@ -90,14 +113,64 @@ export default {
       gameId: '',
       pollInterval: null,
       board: [],
-      viewportCenter: { row: 7, col: 7 }, // Center of the 15x15 board
+      viewportCenter: { row: 7, col: 7 },
       draggedLetter: null,
       draggedIndex: null,
-      dragSource: null // 'rack' or 'board'
+      dragSource: null,
+      // Touch-based drag state
+      isDragging: false,
+      touchStartX: 0,
+      touchStartY: 0,
+      currentTouchX: 0,
+      currentTouchY: 0,
+      draggedElement: null,
+      dropTarget: null,
+      // Debug console
+      showDebugConsole: false,
+      debugLogs: []
     };
+  
+  },
+  computed: {
+    ghostTileStyle() {
+      if (!this.isDragging) return {};
+      return {
+        position: 'fixed',
+        left: `${this.currentTouchX - 25}px`,
+        top: `${this.currentTouchY - 25}px`,
+        width: '50px',
+        height: '50px',
+        pointerEvents: 'none',
+        zIndex: 9999
+      };
+    }
   },
   mounted() {
-    this.startPolling();
+    // Override console.log to capture logs
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    console.log = (...args) => {
+      this.addDebugLog('log', args.join(' '));
+      originalLog.apply(console, args);
+    };
+    
+    console.error = (...args) => {
+      this.addDebugLog('error', args.join(' '));
+      originalError.apply(console, args);
+    };
+    
+    console.warn = (...args) => {
+      this.addDebugLog('warn', args.join(' '));
+      originalWarn.apply(console, args);
+    };
+    
+    this.fetchRackData();
+    // Poll for updates every 2 seconds
+    this.pollInterval = setInterval(() => {
+      this.fetchRackData();
+    }, 2000);
   },
   beforeUnmount() {
     if (this.pollInterval) {
@@ -105,6 +178,15 @@ export default {
     }
   },
   methods: {
+    addDebugLog(type, message) {
+      const now = new Date();
+      const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      this.debugLogs.push({ type, message, time });
+      // Keep only last 50 logs
+      if (this.debugLogs.length > 50) {
+        this.debugLogs.shift();
+      }
+    },
     getLetterValue(letter) {
       const values = {
         'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
@@ -129,6 +211,13 @@ export default {
           this.score = data.score;
           this.isCurrentPlayer = data.isCurrentPlayer;
           this.board = data.board || [];
+          
+          // Log a sample square to see its structure
+          if (this.board.length > 7 && this.board[7].length > 7) {
+            const centerSquare = this.board[7][7];
+            console.log('[Fetch] Center square (7,7): letter=' + centerSquare.letter + ', locked=' + centerSquare.locked + ', type=' + centerSquare.type);
+          }
+          
           if (data.viewportCenter) {
             this.viewportCenter = data.viewportCenter;
           }
@@ -175,72 +264,149 @@ export default {
       }
       return result;
     },
-    onTileDragStart(event, letter, index) {
+    onTileTouchStart(event, letter, index) {
+      const touch = event.touches[0];
+      this.isDragging = true;
       this.draggedLetter = letter;
       this.draggedIndex = index;
       this.dragSource = 'rack';
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', JSON.stringify({ letter, index }));
+      this.touchStartX = touch.clientX;
+      this.touchStartY = touch.clientY;
+      this.currentTouchX = touch.clientX;
+      this.currentTouchY = touch.clientY;
+      this.draggedElement = event.target.closest('.tile');
     },
-    onRackDragOver(event, targetIndex) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-    },
-    onRackDrop(event, targetIndex) {
-      event.preventDefault();
+    onTouchMove(event) {
+      if (!this.isDragging) return;
       
-      if (this.dragSource === 'rack' && this.draggedIndex !== null && this.draggedIndex !== targetIndex) {
-        // Reorder tiles in rack
-        const newRack = [...this.rack];
-        const [draggedItem] = newRack.splice(this.draggedIndex, 1);
-        newRack.splice(targetIndex, 0, draggedItem);
-        this.rack = newRack;
-      }
-    },
-    onBoardDragOver(event) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-    },
-    async onBoardDrop(event, cell) {
-      event.preventDefault();
+      const touch = event.touches[0];
+      this.currentTouchX = touch.clientX;
+      this.currentTouchY = touch.clientY;
       
-      if (!this.isCurrentPlayer) {
-        return; // Only allow drops on your turn
+      // Find element under touch point
+      const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+      
+      // Highlight drop target
+      if (this.dropTarget) {
+        this.dropTarget.classList.remove('drop-target-active');
       }
       
-      if (this.dragSource === 'rack' && this.draggedLetter !== null && cell.letter === null && !cell.locked) {
-        // Send the move to the server
-        try {
-          await fetch('/api/place-tile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              playerId: this.playerId,
-              letter: this.draggedLetter,
-              rackIndex: this.draggedIndex,
-              row: cell.actualRow,
-              col: cell.actualCol
-            })
-          });
-          
-          // Remove tile from local rack immediately for better UX
-          const newRack = [...this.rack];
-          newRack.splice(this.draggedIndex, 1);
-          this.rack = newRack;
-          
-          // Then fetch updated data from server
-          await this.fetchRackData();
-        } catch (error) {
-          console.error('Failed to place tile:', error);
-          // Refresh to get correct state
-          await this.fetchRackData();
+      if (elementUnderTouch) {
+        const dropZone = elementUnderTouch.closest('.drop-zone, .tile');
+        if (dropZone && dropZone !== this.draggedElement) {
+          this.dropTarget = dropZone;
+          dropZone.classList.add('drop-target-active');
         }
       }
     },
-    onDragEnd() {
+    async onTouchEnd(event) {
+      if (!this.isDragging) return;
+      
+      const touch = event.changedTouches[0];
+      const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+      
+      // Clean up drop target highlight
+      if (this.dropTarget) {
+        this.dropTarget.classList.remove('drop-target-active');
+      }
+      
+      if (elementUnderTouch) {
+        // Check if dropped on another rack tile (reorder)
+        const rackTile = elementUnderTouch.closest('.tile');
+        if (rackTile && rackTile !== this.draggedElement) {
+          const targetIndex = parseInt(rackTile.dataset.index);
+          if (!isNaN(targetIndex) && this.draggedIndex !== targetIndex) {
+            // Reorder tiles in rack
+            const newRack = [...this.rack];
+            const [draggedItem] = newRack.splice(this.draggedIndex, 1);
+            newRack.splice(targetIndex, 0, draggedItem);
+            this.rack = newRack;
+          }
+        }
+        
+        // Check if dropped on board square
+        const boardSquare = elementUnderTouch.closest('.drop-zone');
+        console.log('[Touch] Element under touch:', elementUnderTouch);
+        console.log('[Touch] Closest board square:', boardSquare);
+        
+        if (boardSquare && this.isCurrentPlayer) {
+          const row = parseInt(boardSquare.dataset.boardRow);
+          const col = parseInt(boardSquare.dataset.boardCol);
+          
+          console.log('[Touch] Board position:', { row, col, isNaN: isNaN(row) || isNaN(col) });
+          
+          if (!isNaN(row) && !isNaN(col)) {
+            // Find the square data
+            const visibleBoard = this.getVisibleBoard();
+            console.log('[Touch] Visible board size:', visibleBoard.length, 'x', visibleBoard[0]?.length);
+            
+            for (const rowArray of visibleBoard) {
+              for (const square of rowArray) {
+                if (square.actualRow === row && square.actualCol === col) {
+                  console.log('[Touch] Found square: actualRow=' + square.actualRow + ', actualCol=' + square.actualCol + ', letter=' + square.letter + ', locked=' + square.locked + ', type=' + square.type);
+                  
+                  const letterIsEmpty = !square.letter || square.letter === null || square.letter === '';
+                  const isNotLocked = !square.locked;
+                  const isNotOutOfBounds = square.type !== 'out-of-bounds';
+                  
+                  console.log('[Touch] Checks: letterIsEmpty=' + letterIsEmpty + ', isNotLocked=' + isNotLocked + ', isNotOutOfBounds=' + isNotOutOfBounds);
+                  
+                  if (letterIsEmpty && isNotLocked && isNotOutOfBounds) {
+                    console.log('[Touch] Placing tile: playerId=' + this.playerId + ', letter=' + this.draggedLetter + ', rackIndex=' + this.draggedIndex + ', row=' + row + ', col=' + col);
+                    
+                    // Place tile on board
+                    try {
+                      const response = await fetch('/api/place-tile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          playerId: this.playerId,
+                          letter: this.draggedLetter,
+                          rackIndex: this.draggedIndex,
+                          row: row,
+                          col: col
+                        })
+                      });
+                      
+                      const result = await response.json();
+                      console.log('[Touch] API result:', result);
+                      
+                      // Remove tile from local rack immediately
+                      const newRack = [...this.rack];
+                      newRack.splice(this.draggedIndex, 1);
+                      this.rack = newRack;
+                      console.log('[Touch] Local rack updated, fetching from server...');
+                      
+                      // Fetch updated state
+                      await this.fetchRackData();
+                    } catch (error) {
+                      console.error('[Touch] Failed to place tile: ' + error.message);
+                      await this.fetchRackData();
+                    }
+                  } else {
+                    console.log('[Touch] Square not available: hasLetter=' + (!!square.letter) + ', locked=' + square.locked + ', outOfBounds=' + (square.type === 'out-of-bounds'));
+                  }
+                  break;
+                }
+              }
+            }
+          } else {
+            console.log('[Touch] Invalid row/col from dataset');
+          }
+        } else if (boardSquare) {
+          console.log('[Touch] Board square found but not current player');
+        } else {
+          console.log('[Touch] No board square found');
+        }
+      }
+      
+      // Reset drag state
+      this.isDragging = false;
       this.draggedLetter = null;
       this.draggedIndex = null;
       this.dragSource = null;
+      this.draggedElement = null;
+      this.dropTarget = null;
     },
     getSquareClass(square) {
       const classes = ['board-square'];
@@ -273,6 +439,108 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Debug Console */
+.debug-console {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  background: rgba(0, 0, 0, 0.95);
+  color: #0f0;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  z-index: 10000;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.debug-header {
+  background: #222;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #444;
+}
+
+.debug-header span {
+  flex: 1;
+  font-weight: bold;
+}
+
+.close-debug, .clear-debug {
+  background: #444;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.close-debug:active, .clear-debug:active {
+  background: #666;
+}
+
+.debug-logs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.debug-log {
+  margin-bottom: 5px;
+  word-wrap: break-word;
+  padding: 5px;
+  border-left: 3px solid #0f0;
+  background: rgba(0, 255, 0, 0.05);
+}
+
+.debug-log.error {
+  color: #f55;
+  border-left-color: #f55;
+  background: rgba(255, 0, 0, 0.1);
+}
+
+.debug-log.warn {
+  color: #ff5;
+  border-left-color: #ff5;
+  background: rgba(255, 255, 0, 0.1);
+}
+
+.log-time {
+  color: #888;
+  margin-right: 8px;
+}
+
+.log-message {
+  color: inherit;
+}
+
+.debug-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  color: #0f0;
+  border: 2px solid #0f0;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 9999;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.debug-toggle:active {
+  transform: scale(0.95);
 }
 
 .rack-container {
@@ -506,5 +774,32 @@ export default {
 
 .connection-status.connected {
   color: #4CAF50;
+}
+
+/* Ghost tile that follows finger */
+.ghost-tile {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #f0e68c, #daa520);
+  border: 2px solid #333;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #333;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 4px 10px rgba(0,0,0,.4);
+}
+
+/* Drop target highlighting */
+.drop-target-active {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(66, 153, 225, 0.8);
+  border: 2px solid #4299e1 !important;
+  transition: all 0.1s ease;
 }
 </style>
