@@ -84,6 +84,31 @@
         <span class="ghost-value">{{ getLetterValue(draggedLetter) }}</span>
       </div>
       
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <button 
+          class="action-btn play-btn" 
+          @click="playWord" 
+          :disabled="!isCurrentPlayer || !hasNewTiles"
+        >
+          ▶️ Play
+        </button>
+        <button 
+          class="action-btn recall-btn" 
+          @click="recallTiles"
+          :disabled="!hasNewTiles"
+        >
+          ↩️ Recall
+        </button>
+        <button 
+          class="action-btn exchange-btn" 
+          @click="exchangeTiles"
+          :disabled="!isCurrentPlayer"
+        >
+          🔄 Exchange
+        </button>
+      </div>
+      
       <div class="refresh-info">
         <p>📱 Page updates automatically</p>
         <p class="connection-status" :class="{ connected: isConnected }">
@@ -143,6 +168,18 @@ export default {
         pointerEvents: 'none',
         zIndex: 9999
       };
+    },
+    hasNewTiles() {
+      // Check if any tiles on the board are marked as new (isNew: true)
+      if (!this.board || this.board.length === 0) return false;
+      for (let row = 0; row < this.board.length; row++) {
+        for (let col = 0; col < this.board[row].length; col++) {
+          if (this.board[row][col].isNew) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
   },
   mounted() {
@@ -211,13 +248,6 @@ export default {
           this.score = data.score;
           this.isCurrentPlayer = data.isCurrentPlayer;
           this.board = data.board || [];
-          
-          // Log a sample square to see its structure
-          if (this.board.length > 7 && this.board[7].length > 7) {
-            const centerSquare = this.board[7][7];
-            console.log('[Fetch] Center square (7,7): letter=' + centerSquare.letter + ', locked=' + centerSquare.locked + ', type=' + centerSquare.type);
-          }
-          
           if (data.viewportCenter) {
             this.viewportCenter = data.viewportCenter;
           }
@@ -242,13 +272,13 @@ export default {
     getVisibleBoard() {
       if (!this.board || this.board.length === 0) return [];
       
-      // Get 5x5 grid centered on viewport
+      // Get 7x7 grid centered on viewport
       const result = [];
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 7; i++) {
         const row = [];
-        for (let j = 0; j < 5; j++) {
-          const boardRow = this.viewportCenter.row - 2 + i;
-          const boardCol = this.viewportCenter.col - 2 + j;
+        for (let j = 0; j < 7; j++) {
+          const boardRow = this.viewportCenter.row - 3 + i;
+          const boardCol = this.viewportCenter.col - 3 + j;
           
           if (boardRow >= 0 && boardRow < 15 && boardCol >= 0 && boardCol < 15) {
             row.push({
@@ -326,37 +356,26 @@ export default {
         
         // Check if dropped on board square
         const boardSquare = elementUnderTouch.closest('.drop-zone');
-        console.log('[Touch] Element under touch:', elementUnderTouch);
-        console.log('[Touch] Closest board square:', boardSquare);
         
         if (boardSquare && this.isCurrentPlayer) {
           const row = parseInt(boardSquare.dataset.boardRow);
           const col = parseInt(boardSquare.dataset.boardCol);
           
-          console.log('[Touch] Board position:', { row, col, isNaN: isNaN(row) || isNaN(col) });
-          
           if (!isNaN(row) && !isNaN(col)) {
             // Find the square data
             const visibleBoard = this.getVisibleBoard();
-            console.log('[Touch] Visible board size:', visibleBoard.length, 'x', visibleBoard[0]?.length);
             
             for (const rowArray of visibleBoard) {
               for (const square of rowArray) {
                 if (square.actualRow === row && square.actualCol === col) {
-                  console.log('[Touch] Found square: actualRow=' + square.actualRow + ', actualCol=' + square.actualCol + ', letter=' + square.letter + ', locked=' + square.locked + ', type=' + square.type);
-                  
                   const letterIsEmpty = !square.letter || square.letter === null || square.letter === '';
                   const isNotLocked = !square.locked;
                   const isNotOutOfBounds = square.type !== 'out-of-bounds';
                   
-                  console.log('[Touch] Checks: letterIsEmpty=' + letterIsEmpty + ', isNotLocked=' + isNotLocked + ', isNotOutOfBounds=' + isNotOutOfBounds);
-                  
                   if (letterIsEmpty && isNotLocked && isNotOutOfBounds) {
-                    console.log('[Touch] Placing tile: playerId=' + this.playerId + ', letter=' + this.draggedLetter + ', rackIndex=' + this.draggedIndex + ', row=' + row + ', col=' + col);
-                    
                     // Place tile on board
                     try {
-                      const response = await fetch('/api/place-tile', {
+                      await fetch('/api/place-tile', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -368,35 +387,23 @@ export default {
                         })
                       });
                       
-                      const result = await response.json();
-                      console.log('[Touch] API result:', result);
-                      
                       // Remove tile from local rack immediately
                       const newRack = [...this.rack];
                       newRack.splice(this.draggedIndex, 1);
                       this.rack = newRack;
-                      console.log('[Touch] Local rack updated, fetching from server...');
                       
                       // Fetch updated state
                       await this.fetchRackData();
                     } catch (error) {
-                      console.error('[Touch] Failed to place tile: ' + error.message);
+                      console.error('Failed to place tile:', error);
                       await this.fetchRackData();
                     }
-                  } else {
-                    console.log('[Touch] Square not available: hasLetter=' + (!!square.letter) + ', locked=' + square.locked + ', outOfBounds=' + (square.type === 'out-of-bounds'));
                   }
                   break;
                 }
               }
             }
-          } else {
-            console.log('[Touch] Invalid row/col from dataset');
           }
-        } else if (boardSquare) {
-          console.log('[Touch] Board square found but not current player');
-        } else {
-          console.log('[Touch] No board square found');
         }
       }
       
@@ -419,6 +426,46 @@ export default {
         classes.push('locked');
       }
       return classes.join(' ');
+    },
+    async playWord() {
+      if (!this.isCurrentPlayer || !this.hasNewTiles) return;
+      
+      try {
+        const response = await fetch('/api/play-word', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: this.playerId })
+        });
+        
+        if (response.ok) {
+          await this.fetchRackData();
+        }
+      } catch (error) {
+        console.error('Failed to play word:', error);
+      }
+    },
+    async recallTiles() {
+      if (!this.hasNewTiles) return;
+      
+      try {
+        const response = await fetch('/api/recall-tiles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: this.playerId })
+        });
+        
+        if (response.ok) {
+          await this.fetchRackData();
+        }
+      } catch (error) {
+        console.error('Failed to recall tiles:', error);
+      }
+    },
+    async exchangeTiles() {
+      if (!this.isCurrentPlayer) return;
+      
+      // For now, just show an alert - exchange UI would need more work
+      alert('Exchange functionality coming soon! For now, use the desktop interface to exchange tiles.');
     }
   }
 };
@@ -751,6 +798,62 @@ export default {
   font-size: .7rem;
   font-weight: bold;
   color: #666;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+  justify-content: space-between;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.play-btn {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+}
+
+.play-btn:active:not(:disabled) {
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+}
+
+.recall-btn {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+}
+
+.recall-btn:active:not(:disabled) {
+  background: linear-gradient(135deg, #f57c00, #e65100);
+}
+
+.exchange-btn {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+  color: white;
+}
+
+.exchange-btn:active:not(:disabled) {
+  background: linear-gradient(135deg, #1976D2, #0D47A1);
 }
 
 .refresh-info {

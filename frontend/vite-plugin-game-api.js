@@ -13,7 +13,8 @@ let gameState = {
     rack: [],
     score: 0,
     isCurrentPlayer: false
-  }
+  },
+  pendingPlayRequest: null // Will be set to playerId when play is requested
 };
 
 export function gameApiPlugin() {
@@ -29,7 +30,8 @@ export function gameApiPlugin() {
             res.end(JSON.stringify({
               ...gameState.player1,
               board: gameState.board,
-              viewportCenter: gameState.viewportCenter
+              viewportCenter: gameState.viewportCenter,
+              pendingPlayRequest: gameState.pendingPlayRequest
             }));
             return;
           } else if (playerId === '2' || playerId === 'player2') {
@@ -37,7 +39,8 @@ export function gameApiPlugin() {
             res.end(JSON.stringify({
               ...gameState.player2,
               board: gameState.board,
-              viewportCenter: gameState.viewportCenter
+              viewportCenter: gameState.viewportCenter,
+              pendingPlayRequest: gameState.pendingPlayRequest
             }));
             return;
           }
@@ -71,34 +74,84 @@ export function gameApiPlugin() {
               const data = JSON.parse(body);
               const { playerId, letter, rackIndex, row, col } = data;
 
-              console.log('[API] Place tile request:', { playerId, letter, rackIndex, row, col });
-              console.log('[API] Current board exists?', !!gameState.board);
-              console.log('[API] Board dimensions:', gameState.board?.length, 'x', gameState.board?.[0]?.length);
-
               // Place tile on board
               if (gameState.board && gameState.board[row] && gameState.board[row][col]) {
-                console.log('[API] Board cell before:', gameState.board[row][col]);
                 gameState.board[row][col].letter = letter;
                 gameState.board[row][col].isNew = true;
-                console.log('[API] Board cell after:', gameState.board[row][col]);
-              } else {
-                console.error('[API] Invalid board position:', row, col);
               }
 
               // Remove tile from player's rack
               const player = playerId === '1' || playerId === 'player1' ? gameState.player1 : gameState.player2;
-              console.log('[API] Player rack before:', player.rack);
               if (player.rack && player.rack.length > rackIndex) {
                 player.rack.splice(rackIndex, 1);
-                console.log('[API] Player rack after:', player.rack);
-              } else {
-                console.error('[API] Invalid rack index:', rackIndex, 'rack length:', player.rack?.length);
               }
 
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ success: true, message: 'Tile placed successfully' }));
             } catch (e) {
-              console.error('[API] Error placing tile:', e);
+              console.error('Error placing tile:', e);
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Invalid JSON' }));
+            }
+          });
+          return;
+        } else if (req.url === '/api/play-word' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              const playerId = data.playerId;
+
+              // Set pending play request flag
+              gameState.pendingPlayRequest = playerId;
+
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, message: 'Play word request sent' }));
+            } catch (e) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Invalid JSON' }));
+            }
+          });
+          return;
+        } else if (req.url === '/api/clear-play-request' && req.method === 'POST') {
+          // Called by desktop after processing the play request
+          gameState.pendingPlayRequest = null;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: true }));
+          return;
+        } else if (req.url === '/api/recall-tiles' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              const playerId = data.playerId;
+
+              // Move all new tiles back to rack
+              const player = playerId === '1' || playerId === 'player1' ? gameState.player1 : gameState.player2;
+
+              for (let row = 0; row < gameState.board.length; row++) {
+                for (let col = 0; col < gameState.board[row].length; col++) {
+                  const square = gameState.board[row][col];
+                  if (square.isNew && square.letter) {
+                    // Add letter back to rack
+                    player.rack.push(square.letter);
+                    // Clear the square
+                    square.letter = '';
+                    square.isNew = false;
+                  }
+                }
+              }
+
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, message: 'Tiles recalled' }));
+            } catch (e) {
+              console.error('Error recalling tiles:', e);
               res.statusCode = 400;
               res.end(JSON.stringify({ error: 'Invalid JSON' }));
             }

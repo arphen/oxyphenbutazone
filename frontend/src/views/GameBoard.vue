@@ -111,6 +111,7 @@ export default {
       showQR: false,
       isMobileView: false,
       viewportCenter: { row: 7, col: 7 }, // Center of 15x15 board
+      pollInterval: null,
     };
   },
   computed: {
@@ -169,6 +170,16 @@ export default {
       
       // Sync game state to localStorage
       this.syncGameState();
+      
+      // Poll for updates from mobile devices every 2 seconds
+      this.pollInterval = setInterval(() => {
+        this.fetchGameStateFromAPI();
+      }, 2000);
+    }
+  },
+  beforeUnmount() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
     }
   },
   methods: {
@@ -553,6 +564,71 @@ export default {
       } catch (error) {
         console.error('Failed to sync game state:', error);
       }
+    },
+    async fetchGameStateFromAPI() {
+      try {
+        // Fetch player 1 data to get the board state and pending requests
+        const response = await fetch('/api/rack/1');
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Check for pending play request from mobile
+          if (data.pendingPlayRequest) {
+            console.log('Processing play request from player:', data.pendingPlayRequest);
+            await this.handleMobilePlayRequest(data.pendingPlayRequest);
+            
+            // Clear the pending request
+            await fetch('/api/clear-play-request', { method: 'POST' });
+          }
+          
+          // Update board if it changed (check if tiles were placed from mobile)
+          if (data.board && data.board.length > 0) {
+            // Only update if there are differences
+            let hasChanges = false;
+            for (let row = 0; row < 15; row++) {
+              for (let col = 0; col < 15; col++) {
+                if (this.board[row][col].letter !== data.board[row][col].letter) {
+                  hasChanges = true;
+                  break;
+                }
+              }
+              if (hasChanges) break;
+            }
+            
+            if (hasChanges) {
+              this.board = data.board;
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - don't spam console
+      }
+    },
+    async handleMobilePlayRequest(playerId) {
+      // Sync board state from API first
+      this.board = (await (await fetch('/api/rack/1')).json()).board;
+      
+      // Find all new tiles on board
+      const newTiles = [];
+      for (let row = 0; row < 15; row++) {
+        for (let col = 0; col < 15; col++) {
+          if (this.board[row][col].isNew) {
+            newTiles.push({ row, col, letter: this.board[row][col].letter });
+          }
+        }
+      }
+      
+      if (newTiles.length === 0) {
+        this.message = 'No tiles placed!';
+        this.messageType = 'error';
+        return;
+      }
+      
+      // Set placedTiles so validation works
+      this.placedTiles = newTiles;
+      
+      // Use the existing playWord method
+      this.playWord();
     },
     toggleQR() {
       this.showQR = !this.showQR;
