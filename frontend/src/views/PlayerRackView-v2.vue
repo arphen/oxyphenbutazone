@@ -86,32 +86,34 @@
           :disabled="!isCurrentPlayer || !hasNewTiles"
         >
           <span class="btn-icon">▶️</span>
-          <span class="btn-label">Play</span>
+          <span class="btn-label">Play Word</span>
         </button>
-        <button 
-          class="action-btn recall-btn" 
-          @click="recallTiles"
-          :disabled="!hasNewTiles"
-        >
-          <span class="btn-icon">↩️</span>
-          <span class="btn-label">Recall</span>
-        </button>
-        <button 
-          class="action-btn pass-btn" 
-          @click="passTurn"
-          :disabled="!isCurrentPlayer || hasNewTiles"
-        >
-          <span class="btn-icon">⏭️</span>
-          <span class="btn-label">Pass</span>
-        </button>
-        <button 
-          class="action-btn exchange-btn" 
-          @click="exchangeTiles"
-          :disabled="!isCurrentPlayer"
-        >
-          <span class="btn-icon">🔄</span>
-          <span class="btn-label">Swap</span>
-        </button>
+        <div class="button-row">
+          <button 
+            class="action-btn recall-btn" 
+            @click="recallTiles"
+            :disabled="!hasNewTiles"
+          >
+            <span class="btn-icon">↩️</span>
+            <span class="btn-label">Recall</span>
+          </button>
+          <button 
+            class="action-btn pass-btn" 
+            @click="passTurn"
+            :disabled="!isCurrentPlayer || hasNewTiles"
+          >
+            <span class="btn-icon">⏭️</span>
+            <span class="btn-label">Pass</span>
+          </button>
+          <button 
+            class="action-btn exchange-btn" 
+            @click="exchangeTiles"
+            :disabled="!isCurrentPlayer"
+          >
+            <span class="btn-icon">🔄</span>
+            <span class="btn-label">Swap</span>
+          </button>
+        </div>
       </div>
       
       <div class="message-box" v-if="gameState?.message" :class="gameState?.messageType">
@@ -713,16 +715,20 @@ export default {
 }
 
 .mobile-rack-view.my-turn {
-  background: linear-gradient(135deg, #1a2e1a 0%, #16213e 50%, #0f4620 100%);
-  animation: subtlePulse 3s ease-in-out infinite;
+  background: linear-gradient(270deg, #0f3460, #105220, #1a2e1a, #206330, #16213e);
+  background-size: 600% 600%;
+  animation: lavaFlow 10s ease infinite;
 }
 
-@keyframes subtlePulse {
-  0%, 100% {
-    background: linear-gradient(135deg, #1a2e1a 0%, #16213e 50%, #0f4620 100%);
+@keyframes lavaFlow {
+  0% {
+    background-position: 0% 50%;
   }
   50% {
-    background: linear-gradient(135deg, #1e331e 0%, #1a2646 50%, #124d24 100%);
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }
 
@@ -1032,7 +1038,7 @@ export default {
 }
 
 .tile .letter {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: #1a1a2e;
 }
@@ -1079,63 +1085,121 @@ export default {
 
 .action-buttons {
   display: flex;
-  gap: 5px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
 }
 
 .action-btn {
   flex: 1;
-  padding: 10px 4px;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 12px 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.25s ease;
+  background: rgba(20, 20, 40, 0.4);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
   color: #e4e4e7;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(50, 50, 70, 0.2);
+  box-shadow: none;
+  transform: none;
+}
+
+.action-btn:not(:disabled):hover {
+  transform: translateY(-3px);
 }
 
 .btn-icon {
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   line-height: 1;
 }
 
 .btn-label {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
-.action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+/* --- Play Button (Green) --- */
+.play-btn {
+  width: 100%;
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #a7f3d0;
 }
-
+.play-btn:not(:disabled):hover {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
 .play-btn:not(:disabled):active {
-  background: rgba(34, 197, 94, 0.15);
-  transform: scale(0.95);
+  transform: scale(0.97);
+  background: rgba(16, 185, 129, 0.4);
 }
 
+/* --- Recall Button (Amber) --- */
+.recall-btn {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fde68a;
+}
+.recall-btn:not(:disabled):hover {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
 .recall-btn:not(:disabled):active {
-  background: rgba(234, 179, 8, 0.15);
-  transform: scale(0.95);
+  transform: scale(0.97);
+  background: rgba(245, 158, 11, 0.4);
 }
 
+/* --- Pass Button (Purple) --- */
+.pass-btn {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #ddd6fe;
+}
+.pass-btn:not(:disabled):hover {
+  background: rgba(139, 92, 246, 0.3);
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
 .pass-btn:not(:disabled):active {
-  background: rgba(168, 85, 247, 0.15);
-  transform: scale(0.95);
+  transform: scale(0.97);
+  background: rgba(139, 92, 246, 0.4);
 }
 
+/* --- Exchange/Swap Button (Blue) --- */
+.exchange-btn {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #bfdbfe;
+}
+.exchange-btn:not(:disabled):hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
 .exchange-btn:not(:disabled):active {
-  background: rgba(59, 130, 246, 0.15);
-  transform: scale(0.95);
+  transform: scale(0.97);
+  background: rgba(59, 130, 246, 0.4);
 }
 
 .message-box {
