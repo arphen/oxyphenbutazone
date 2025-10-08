@@ -582,6 +582,15 @@ export function gameApiPlugin() {
                                     fillRack(gameState.player2);
                                     result = { success: true };
                                     break;
+                                case 'reorder-rack':
+                                    const player = action.playerId === '1' ? gameState.player1 : gameState.player2;
+                                    if (Array.isArray(action.newRack)) {
+                                        player.rack = action.newRack;
+                                        result = { success: true };
+                                    } else {
+                                        result = { success: false, error: 'Invalid rack data' };
+                                    }
+                                    break;
                                 default:
                                     result = { success: false, error: 'Unknown action' };
                             }

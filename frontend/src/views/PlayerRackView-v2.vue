@@ -1,5 +1,8 @@
 <template>
-  <div class="mobile-rack-view">
+  <div class="mobile-rack-view" :class="{ 'my-turn': isCurrentPlayer, 'turn-flash': showTurnFlash }">
+    <!-- Turn Flash Overlay -->
+    <div v-if="showTurnFlash" class="flash-overlay"></div>
+    
     <!-- Debug Console Overlay -->
     <div v-if="showDebugConsole" class="debug-console">
       <div class="debug-header">
@@ -17,26 +20,18 @@
     <button v-else @click="showDebugConsole = true" class="debug-toggle">🐛</button>
     
     <div class="rack-container">
-      <div class="refresh-info">
-        <p>💡 Drag tiles from your rack onto the board</p>
-        <p class="connection-status" :class="{ connected: isConnected }">
-          {{ isConnected ? '🟢 Connected' : '🔴 Connecting...' }}
-        </p>
-      </div>
-      
       <div class="rack-header">
         <div class="player-info">
           <span class="player-name">{{ playerName }}</span>
           <span class="score-value">{{ score }}</span>
         </div>
         <div :class="['turn-status', { active: isCurrentPlayer }]">
-          {{ isCurrentPlayer ? '🟢' : '⏸️' }}
+          {{ isCurrentPlayer ? '▶' : '⏸' }}
         </div>
       </div>
       
       <!-- Mini Board View (7x7) -->
       <div class="mini-board-section">
-        <p class="board-label">📍 Board View</p>
         <div class="mini-board">
           <div v-for="(row, rowIndex) in getVisibleBoard()" :key="rowIndex" class="board-row">
             <div
@@ -187,7 +182,10 @@ export default {
       pendingBlankPosition: null, // { row, col }
       // Debug console
       showDebugConsole: false,
-      debugLogs: []
+      debugLogs: [],
+      // Turn change animation
+      previousTurnPlayer: null,
+      showTurnFlash: false
     };
   },
   computed: {
@@ -299,7 +297,23 @@ export default {
       try {
         const response = await fetch('/api/game-state');
         if (response.ok) {
-          this.gameState = await response.json();
+          const newGameState = await response.json();
+          
+          // Check if turn changed to this player
+          if (this.gameState) {
+            const wasMyTurn = this.playerId === '1' ? this.gameState.player1?.isCurrentPlayer : this.gameState.player2?.isCurrentPlayer;
+            const isNowMyTurn = this.playerId === '1' ? newGameState.player1?.isCurrentPlayer : newGameState.player2?.isCurrentPlayer;
+            
+            if (!wasMyTurn && isNowMyTurn) {
+              // Trigger flash animation
+              this.showTurnFlash = true;
+              setTimeout(() => {
+                this.showTurnFlash = false;
+              }, 1000);
+            }
+          }
+          
+          this.gameState = newGameState;
           this.isConnected = true;
         } else {
           this.isConnected = false;
@@ -452,11 +466,28 @@ export default {
             const [draggedItem] = newRack.splice(this.draggedIndex, 1);
             newRack.splice(targetIndex, 0, draggedItem);
             
-            // Update the rack in the game state
-            const player = this.playerId === '1' ? 'player1' : 'player2';
-            this.gameState[player].rack = newRack;
-            
             console.log(`[Reorder] New rack order:`, newRack);
+            
+            // Persist to server
+            try {
+              const response = await fetch('/api/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'reorder-rack',
+                  playerId: this.playerId,
+                  newRack: newRack
+                })
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                this.gameState = result.gameState;
+                console.log('[Reorder] Rack reordering persisted to server');
+              }
+            } catch (error) {
+              console.error('Failed to reorder rack:', error);
+            }
           }
         }
         
@@ -668,7 +699,7 @@ export default {
   height: 100vh;
   height: -webkit-fill-available;
   width: 100vw;
-  padding: max(15px, env(safe-area-inset-top)) max(15px, env(safe-area-inset-right)) max(15px, env(safe-area-inset-bottom)) max(15px, env(safe-area-inset-left));
+  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -678,6 +709,48 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
+  transition: background 0.6s ease;
+}
+
+.mobile-rack-view.my-turn {
+  background: linear-gradient(135deg, #1a2e1a 0%, #16213e 50%, #0f4620 100%);
+  animation: subtlePulse 3s ease-in-out infinite;
+}
+
+@keyframes subtlePulse {
+  0%, 100% {
+    background: linear-gradient(135deg, #1a2e1a 0%, #16213e 50%, #0f4620 100%);
+  }
+  50% {
+    background: linear-gradient(135deg, #1e331e 0%, #1a2646 50%, #124d24 100%);
+  }
+}
+
+.flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(34, 197, 94, 0.4) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 9999;
+  animation: flashPulse 1s ease-out;
+}
+
+@keyframes flashPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
 }
 
 .debug-console {
@@ -771,47 +844,22 @@ export default {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 12px;
   max-width: 500px;
-  width: calc(100% - 30px);
-  max-height: calc(100vh - 30px);
-  max-height: calc(-webkit-fill-available - 30px);
+  width: calc(100% - 16px);
+  max-height: calc(100vh - 16px);
+  max-height: calc(-webkit-fill-available - 16px);
   overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
-
-.refresh-info {
-  text-align: center;
-  margin-bottom: 15px;
-  font-size: 0.85rem;
-  color: #a1a1aa;
-}
-
-.connection-status {
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 12px;
-  display: inline-block;
-  margin-top: 5px;
-  background: rgba(251, 146, 60, 0.2);
-  color: #fdba74;
-  border: 1px solid rgba(251, 146, 60, 0.3);
-  font-size: 0.75rem;
-}
-
-.connection-status.connected {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-  border-color: rgba(34, 197, 94, 0.3);
 }
 
 .rack-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -822,7 +870,7 @@ export default {
 }
 
 .player-name {
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   color: #a1a1aa;
   font-weight: 600;
   text-transform: uppercase;
@@ -830,7 +878,7 @@ export default {
 }
 
 .score-value {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   color: #60a5fa;
   font-weight: 700;
 }
@@ -839,37 +887,35 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  font-size: 1.2rem;
+  font-size: 1rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
 }
 
 .turn-status.active {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.4);
-  animation: pulse 2s infinite;
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+  animation: turnPulse 2s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+@keyframes turnPulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+  }
+  50% { 
+    transform: scale(1.1);
+    box-shadow: 0 0 25px rgba(34, 197, 94, 0.6);
+  }
 }
 
 .mini-board-section {
-  margin-bottom: 20px;
-}
-
-.board-label {
-  text-align: center;
-  font-weight: 600;
-  color: #a1a1aa;
-  margin-bottom: 10px;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  margin-bottom: 12px;
 }
 
 .mini-board {
@@ -877,7 +923,7 @@ export default {
   flex-direction: column;
   gap: 2px;
   background: rgba(0, 0, 0, 0.4);
-  padding: 5px;
+  padding: 4px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -960,15 +1006,15 @@ export default {
 .tiles {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  margin-bottom: 15px;
+  gap: 5px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
 .tile {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   background: linear-gradient(135deg, rgba(254, 240, 138, 0.9), rgba(252, 211, 77, 0.9));
   border-radius: 6px;
   display: flex;
@@ -1033,13 +1079,13 @@ export default {
 
 .action-buttons {
   display: flex;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 5px;
+  margin-top: 8px;
 }
 
 .action-btn {
   flex: 1;
-  padding: 8px 6px;
+  padding: 10px 4px;
   border: none;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -1057,14 +1103,14 @@ export default {
 }
 
 .btn-icon {
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   line-height: 1;
 }
 
 .btn-label {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .action-btn:disabled {
@@ -1093,12 +1139,12 @@ export default {
 }
 
 .message-box {
-  padding: 12px 15px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-align: center;
-  margin-top: 15px;
+  margin-top: 10px;
   backdrop-filter: blur(10px);
   border: 1px solid;
 }

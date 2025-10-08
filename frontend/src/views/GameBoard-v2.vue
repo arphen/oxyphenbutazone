@@ -61,41 +61,43 @@
           <!-- Game History Table -->
           <div class="history-section">
             <h3>Game History</h3>
-            <table class="history-table">
-              <thead>
-                <tr>
-                  <th>Rnd</th>
-                  <th>Player</th>
-                  <th>Words</th>
-                  <th>Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(entry, index) in combinedHistory" :key="index" :class="entry.result">
-                  <td>{{ entry.round }}</td>
-                  <td>P{{ entry.player }}</td>
-                  <td class="words-cell">
-                    <span v-if="entry.action === 'pass'">
-                      Passed turn
-                    </span>
-                    <span v-else-if="entry.action === 'exchange'">
-                      Exchanged {{ entry.tilesExchanged }}
-                    </span>
-                    <span v-else-if="entry.action === 'invalid'">
-                      ❌ {{ entry.words.map(w => w.word).join(', ') }}
-                    </span>
-                    <span v-else>{{ entry.words.map(w => w.word).join(', ') }}</span>
-                  </td>
-                  <td class="score-cell">
-                    <span v-if="entry.action !== 'exchange' && entry.action !== 'invalid' && entry.action !== 'pass'">+{{ entry.totalScore }}</span>
-                    <span v-else>—</span>
-                  </td>
-                </tr>
-                <tr v-if="combinedHistory.length === 0">
-                  <td colspan="4" class="no-history">No moves yet</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="history-table-wrapper">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>Rnd</th>
+                    <th>Player</th>
+                    <th>Words</th>
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(entry, index) in combinedHistory" :key="index" :class="entry.result">
+                    <td>{{ entry.round }}</td>
+                    <td>P{{ entry.player }}</td>
+                    <td class="words-cell">
+                      <span v-if="entry.action === 'pass'">
+                        Passed turn
+                      </span>
+                      <span v-else-if="entry.action === 'exchange'">
+                        Exchanged {{ entry.tilesExchanged }}
+                      </span>
+                      <span v-else-if="entry.action === 'invalid'">
+                        ❌ {{ entry.words.map(w => w.word).join(', ') }}
+                      </span>
+                      <span v-else>{{ entry.words.map(w => w.word).join(', ') }}</span>
+                    </td>
+                    <td class="score-cell">
+                      <span v-if="entry.action !== 'exchange' && entry.action !== 'invalid' && entry.action !== 'pass'">+{{ entry.totalScore }}</span>
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                  <tr v-if="combinedHistory.length === 0">
+                    <td colspan="4" class="no-history">No moves yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
           
           <!-- Message Box -->
@@ -190,7 +192,8 @@ export default {
         }
       }
       
-      return combined;
+      // Reverse to show most recent moves first
+      return combined.reverse();
     }
   },
   async mounted() {
@@ -299,11 +302,12 @@ export default {
 
 .desktop-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   width: 100vw;
   gap: 0;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 .board-section {
@@ -313,17 +317,20 @@ export default {
   justify-content: center;
   padding: 20px;
   min-width: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
   width: 380px;
+  height: 100vh;
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
 }
 
@@ -419,8 +426,10 @@ export default {
 .history-section {
   flex: 1;
   padding: 20px 15px;
-  overflow-y: auto;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .history-section h3 {
@@ -430,6 +439,13 @@ export default {
   color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.history-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .history-table {
