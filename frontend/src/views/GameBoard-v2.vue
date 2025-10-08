@@ -24,6 +24,9 @@
             <button @click="restartGame" class="icon-button" title="Restart Game">
               🔄
             </button>
+            <button @click="testSound" class="icon-button" title="Test Sound">
+              🔊
+            </button>
           </div>
           
           <!-- QR Section (when visible) -->
@@ -55,6 +58,15 @@
             <div class="player-card" :class="{ active: gameState?.player2.isCurrentPlayer }">
               <div class="player-name">P2</div>
               <div class="player-score">{{ gameState?.player2.score || 0 }}</div>
+            </div>
+          </div>
+          
+          <!-- Tiles Remaining Counter -->
+          <div class="tiles-remaining" :class="getTilesRemainingClass()">
+            <div class="tiles-icon">🎲</div>
+            <div class="tiles-info">
+              <div class="tiles-label">Tiles Left</div>
+              <div class="tiles-count">{{ tilesRemaining }}</div>
             </div>
           </div>
           
@@ -131,6 +143,7 @@ import Board from '../components/Board.vue';
 import QRDisplay from '../components/QRDisplay.vue';
 import MobileRackView from '../components/MobileRackView.vue';
 import GameOverModal from '../components/GameOverModal.vue';
+import { useSoundEffects } from '../composables/useSoundEffects.js';
 
 export default {
   name: 'GameBoard',
@@ -139,6 +152,13 @@ export default {
     QRDisplay,
     MobileRackView,
     GameOverModal,
+  },
+  setup() {
+    const { playClickSound, testSound } = useSoundEffects();
+    return {
+      playClickSound,
+      testSound
+    };
   },
   data() {
     return {
@@ -149,6 +169,27 @@ export default {
     };
   },
   computed: {
+    tilesRemaining() {
+      if (!this.gameState) return 100;
+      
+      // Standard Scrabble has 100 tiles total
+      // Calculate tiles in play: on board + in racks
+      const player1RackSize = this.gameState.player1?.rack?.length || 0;
+      const player2RackSize = this.gameState.player2?.rack?.length || 0;
+      
+      // Count tiles on board
+      let tilesOnBoard = 0;
+      if (this.gameState.board) {
+        for (const row of this.gameState.board) {
+          for (const cell of row) {
+            if (cell.letter) tilesOnBoard++;
+          }
+        }
+      }
+      
+      const tilesInPlay = player1RackSize + player2RackSize + tilesOnBoard;
+      return Math.max(0, 100 - tilesInPlay);
+    },
     combinedHistory() {
       if (!this.gameState) return [];
       
@@ -221,11 +262,44 @@ export default {
       try {
         const response = await fetch('/api/game-state');
         if (response.ok) {
-          this.gameState = await response.json();
+          const newGameState = await response.json();
+          
+          // Check if new tiles were placed (detect isNew tiles)
+          if (this.gameState && newGameState.board) {
+            let hasNewTiles = false;
+            
+            for (let row = 0; row < newGameState.board.length; row++) {
+              for (let col = 0; col < newGameState.board[row].length; col++) {
+                const newCell = newGameState.board[row][col];
+                const oldCell = this.gameState.board?.[row]?.[col];
+                
+                // If there's a letter now that wasn't there before, play sound
+                if (newCell.letter && (!oldCell || !oldCell.letter)) {
+                  hasNewTiles = true;
+                  break;
+                }
+              }
+              if (hasNewTiles) break;
+            }
+            
+            if (hasNewTiles) {
+              console.log('[GameBoard] New tiles detected, playing sound');
+              this.playClickSound();
+            }
+          }
+          
+          this.gameState = newGameState;
         }
       } catch (error) {
         console.error('Failed to fetch game state:', error);
       }
+    },
+    getTilesRemainingClass() {
+      const remaining = this.tilesRemaining;
+      if (remaining > 50) return 'tiles-high';
+      if (remaining > 25) return 'tiles-medium';
+      if (remaining > 10) return 'tiles-low';
+      return 'tiles-critical';
     },
     async handleCellClick({ row, col }) {
       // Update viewport center
@@ -421,6 +495,64 @@ export default {
   font-size: 2.5rem;
   font-weight: 700;
   color: #e4e4e7;
+}
+
+/* Tiles Remaining Counter */
+.tiles-remaining {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.tiles-remaining:hover {
+  opacity: 1;
+}
+
+.tiles-icon {
+  font-size: 1.2rem;
+  opacity: 0.5;
+}
+
+.tiles-info {
+  flex: 1;
+}
+
+.tiles-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.tiles-count {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  transition: color 0.3s ease;
+}
+
+/* Color gradient based on tiles remaining - more subtle */
+.tiles-high .tiles-count {
+  color: #86efac;
+}
+
+.tiles-medium .tiles-count {
+  color: #fde047;
+}
+
+.tiles-low .tiles-count {
+  color: #fdba74;
+}
+
+.tiles-critical .tiles-count {
+  color: #fca5a5;
 }
 
 .history-section {

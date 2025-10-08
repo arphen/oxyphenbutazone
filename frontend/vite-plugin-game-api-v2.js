@@ -433,6 +433,15 @@ function handlePlayWord(playerId) {
         gameState.message = `Invalid word(s): ${invalidWords.map(w => w.word).join(', ')}`;
         gameState.messageType = 'error';
 
+        // Add to history
+        player.history.push({
+            turnNumber: player.history.length + 1,
+            action: 'invalid',
+            words: invalidWords.map(w => ({ word: w.word, score: 0 })),
+            totalScore: 0,
+            timestamp: new Date().toLocaleTimeString()
+        });
+
         // Return tiles to rack
         newTiles.forEach(tile => {
             const square = gameState.board[tile.row][tile.col];
@@ -510,6 +519,65 @@ function handlePlayWord(playerId) {
 
     return { success: true, score: totalScore };
 }
+
+function handleExchangeTiles(playerId, indices) {
+    const player = playerId === '1' ? gameState.player1 : gameState.player2;
+
+    if (!player.isCurrentPlayer) {
+        return { success: false, error: 'Not your turn' };
+    }
+
+    if (indices.length === 0) {
+        return { success: false, error: 'No tiles selected for exchange' };
+    }
+
+    if (gameState.tileBag.length < indices.length) {
+        gameState.message = 'Not enough tiles in the bag to exchange.';
+        gameState.messageType = 'error';
+        return { success: false, error: 'Not enough tiles in bag' };
+    }
+
+    // Sort indices in descending order to avoid issues when removing from rack
+    indices.sort((a, b) => b - a);
+
+    const tilesToReturn = [];
+    for (const index of indices) {
+        if (index >= 0 && index < player.rack.length) {
+            tilesToReturn.push(player.rack.splice(index, 1)[0]);
+        }
+    }
+
+    // Add returned tiles back to the bag and shuffle
+    gameState.tileBag.push(...tilesToReturn);
+    for (let i = gameState.tileBag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [gameState.tileBag[i], gameState.tileBag[j]] = [gameState.tileBag[j], gameState.tileBag[i]];
+    }
+
+    // Refill player's rack
+    fillRack(player);
+
+    // Add to history
+    player.history.push({
+        turnNumber: player.history.length + 1,
+        action: 'exchange',
+        count: tilesToReturn.length,
+        totalScore: 0,
+        timestamp: new Date().toLocaleTimeString()
+    });
+
+    // End turn
+    gameState.player1.isCurrentPlayer = !gameState.player1.isCurrentPlayer;
+    gameState.player2.isCurrentPlayer = !gameState.player2.isCurrentPlayer;
+    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+    gameState.consecutivePasses = 0; // Reset pass counter
+
+    gameState.message = `${player.playerName} exchanged ${indices.length} tiles.`;
+    gameState.messageType = 'info';
+
+    return { success: true };
+}
+
 
 // Load dictionary
 function loadDictionary() {
@@ -590,6 +658,9 @@ export function gameApiPlugin() {
                                     } else {
                                         result = { success: false, error: 'Invalid rack data' };
                                     }
+                                    break;
+                                case 'exchange-tiles':
+                                    result = handleExchangeTiles(action.playerId, action.indices);
                                     break;
                                 default:
                                     result = { success: false, error: 'Unknown action' };

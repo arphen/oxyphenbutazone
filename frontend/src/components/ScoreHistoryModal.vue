@@ -24,16 +24,34 @@
                 <!-- Player 1 -->
                 <td class="player-cell" :class="{ active: activePlayer === 1 }">
                   <div v-if="player1History[turn - 1]">
-                    <div class="words-list">
-                      <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="word-item">
+                    <!-- Word Play -->
+                    <div v-if="player1History[turn - 1].action === 'play' || !player1History[turn - 1].action">
+                      <div class="words-list">
+                        <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="word-item">
+                          {{ word.word }}
+                        </span>
+                      </div>
+                      <div class="word-details">
+                        <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="word-score">
+                          {{ word.word }}:{{ word.score }}
+                        </span>
+                        <span v-if="player1History[turn - 1].bingoBonus" class="bingo-text">+BINGO</span>
+                      </div>
+                    </div>
+                    <!-- Exchange -->
+                    <div v-else-if="player1History[turn - 1].action === 'exchange'" class="action-text">
+                      <span class="action-icon">🔄</span> Exchanged {{ player1History[turn - 1].count }} tiles
+                    </div>
+                    <!-- Pass -->
+                    <div v-else-if="player1History[turn - 1].action === 'pass'" class="action-text">
+                      <span class="action-icon">⏭️</span> Passed turn
+                    </div>
+                    <!-- Invalid Word -->
+                    <div v-else-if="player1History[turn - 1].action === 'invalid'" class="action-text invalid">
+                      <span class="action-icon">❌</span> Invalid word(s):
+                      <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="invalid-word">
                         {{ word.word }}
                       </span>
-                    </div>
-                    <div class="word-details">
-                      <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="word-score">
-                        {{ word.word }}:{{ word.score }}
-                      </span>
-                      <span v-if="player1History[turn - 1].bingoBonus" class="bingo-text">+BINGO</span>
                     </div>
                   </div>
                   <span v-else class="empty-cell">—</span>
@@ -46,16 +64,34 @@
                 <!-- Player 2 -->
                 <td class="player-cell" :class="{ active: activePlayer === 2 }">
                   <div v-if="player2History[turn - 1]">
-                    <div class="words-list">
-                      <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="word-item">
+                    <!-- Word Play -->
+                    <div v-if="player2History[turn - 1].action === 'play' || !player2History[turn - 1].action">
+                      <div class="words-list">
+                        <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="word-item">
+                          {{ word.word }}
+                        </span>
+                      </div>
+                      <div class="word-details">
+                        <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="word-score">
+                          {{ word.word }}:{{ word.score }}
+                        </span>
+                        <span v-if="player2History[turn - 1].bingoBonus" class="bingo-text">+BINGO</span>
+                      </div>
+                    </div>
+                    <!-- Exchange -->
+                    <div v-else-if="player2History[turn - 1].action === 'exchange'" class="action-text">
+                      <span class="action-icon">🔄</span> Exchanged {{ player2History[turn - 1].count }} tiles
+                    </div>
+                    <!-- Pass -->
+                    <div v-else-if="player2History[turn - 1].action === 'pass'" class="action-text">
+                      <span class="action-icon">⏭️</span> Passed turn
+                    </div>
+                    <!-- Invalid Word -->
+                    <div v-else-if="player2History[turn - 1].action === 'invalid'" class="action-text invalid">
+                      <span class="action-icon">❌</span> Invalid word(s):
+                      <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="invalid-word">
                         {{ word.word }}
                       </span>
-                    </div>
-                    <div class="word-details">
-                      <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="word-score">
-                        {{ word.word }}:{{ word.score }}
-                      </span>
-                      <span v-if="player2History[turn - 1].bingoBonus" class="bingo-text">+BINGO</span>
                     </div>
                   </div>
                   <span v-else class="empty-cell">—</span>
@@ -343,6 +379,32 @@ export default {
   border-radius: 3px;
   font-weight: bold;
   font-size: 0.75rem;
+}
+
+.action-text {
+  font-style: italic;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-text.invalid {
+  color: #d32f2f;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.invalid-word {
+  font-family: 'Courier New', monospace;
+  background: #ffebee;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.action-icon {
+  font-size: 1.1rem;
 }
 
 .empty-cell {

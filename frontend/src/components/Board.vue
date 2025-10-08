@@ -3,13 +3,16 @@
     <div v-for="(row, rowIndex) in board" :key="rowIndex" class="board-row">
       <div v-for="(cell, colIndex) in row" :key="colIndex" 
            class="board-cell" 
-           :class="[cell.type, { 'has-tile': cell.letter, 'new-tile': cell.isNew }]" 
+           :class="[cell.type, { 'has-tile': cell.letter || cell.isBlank === true, 'new-tile': cell.isNew, 'blank-tile': cell.isBlank === true }]" 
            @dragover.prevent 
            @drop="onDrop(rowIndex, colIndex)"
            @click="onCellClick(rowIndex, colIndex)"
-           :draggable="cell.letter !== ''"
+           :draggable="!!(cell.letter || cell.isBlank)"
            @dragstart="onDragStart(cell.letter, rowIndex, colIndex)">
-        <span v-if="cell.letter" class="tile-letter">{{ cell.letter }}</span>
+        <span v-if="cell.letter || cell.isBlank === true" class="tile-letter">{{ cell.isBlank === true ? (cell.chosenLetter || '★').toUpperCase() : (cell.letter || '').toUpperCase() }}</span>
+        <span v-if="cell.letter || cell.isBlank === true" class="tile-points">{{ getLetterValue(cell.isBlank === true ? cell.chosenLetter : cell.letter) }}</span>
+        <span v-if="cell.isBlank === true" class="blank-indicator">★</span>
+        <span v-else-if="!cell.letter && cell.isBlank !== true" class="premium-label">{{ getPremiumLabel(cell.type) }}</span>
       </div>
     </div>
   </div>
@@ -35,6 +38,29 @@ export default {
     onCellClick(rowIndex, colIndex) {
       this.$emit('cell-click', { row: rowIndex, col: colIndex });
     },
+    getPremiumLabel(type) {
+      const labels = {
+        dl: 'DL',
+        tl: 'TL',
+        dw: 'DW',
+        tw: 'TW',
+        center: '★'
+      };
+      return labels[type] || '';
+    },
+    getLetterValue(letter) {
+      if (!letter) return 0;
+      const values = {
+        'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
+        'd': 2, 'g': 2,
+        'b': 3, 'c': 3, 'm': 3, 'p': 3,
+        'f': 4, 'h': 4, 'v': 4, 'w': 4, 'y': 4,
+        'k': 5,
+        'j': 8, 'x': 8,
+        'q': 10, 'z': 10
+      };
+      return values[letter.toLowerCase()] || 0;
+    }
   },
 };
 </script>
@@ -73,8 +99,17 @@ export default {
   transition: all 0.2s ease;
 }
 
-.board-cell:hover {
+.board-cell:not(.has-tile):hover {
   background: rgba(40, 40, 60, 0.7);
+}
+
+.premium-label {
+  font-size: clamp(10px, 1.2vw, 16px);
+  text-align: center;
+  line-height: 1;
+  opacity: 0.85;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 /* Colorblind-friendly premium squares */
@@ -82,26 +117,31 @@ export default {
 .dl { 
   background: rgba(125, 211, 252, 0.25);
   box-shadow: inset 0 0 12px rgba(125, 211, 252, 0.3);
+  color: #e0f2fe;
 }
 /* Triple Letter - Dark Blue */
 .tl { 
   background: rgba(37, 99, 235, 0.35);
   box-shadow: inset 0 0 12px rgba(37, 99, 235, 0.4);
+  color: #dbeafe;
 }
 /* Double Word - Light Pink */
 .dw { 
   background: rgba(244, 114, 182, 0.25);
   box-shadow: inset 0 0 12px rgba(244, 114, 182, 0.3);
+  color: #fce7f3;
 }
 /* Triple Word - Dark Pink */
 .tw { 
   background: rgba(219, 39, 119, 0.35);
   box-shadow: inset 0 0 12px rgba(219, 39, 119, 0.4);
+  color: #fbcfe8;
 }
 /* Center - Pink accent */
 .center { 
   background: rgba(236, 72, 153, 0.3);
   box-shadow: inset 0 0 15px rgba(236, 72, 153, 0.4);
+  color: #fce7f3;
 }
 
 .has-tile {
@@ -129,5 +169,29 @@ export default {
   text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
   z-index: 1;
   font-weight: 800;
+}
+
+.blank-tile .tile-letter {
+  color: #fbbf24;
+}
+
+.blank-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: clamp(8px, 1vw, 14px);
+  color: #fbbf24;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  z-index: 3;
+}
+
+.tile-points {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: clamp(8px, 1vw, 12px);
+  font-weight: 600;
+  color: #52525b;
+  z-index: 2;
 }
 </style>

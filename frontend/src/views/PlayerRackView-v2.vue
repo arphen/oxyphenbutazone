@@ -92,7 +92,7 @@
           <button 
             class="action-btn recall-btn" 
             @click="recallTiles"
-            :disabled="!hasNewTiles"
+            :disabled="!isCurrentPlayer || !hasNewTiles"
           >
             <span class="btn-icon">↩️</span>
             <span class="btn-label">Recall</span>
@@ -135,6 +135,14 @@
       @close="() => {}"
     />
     
+    <!-- Swap Tiles Modal -->
+    <SwapTilesModal
+      :isVisible="showSwapModal"
+      :rack="rack"
+      @close="showSwapModal = false"
+      @swap="handleSwapTiles"
+    />
+
     <!-- Blank Letter Picker -->
     <BlankLetterPicker
       v-if="showBlankPicker"
@@ -147,12 +155,22 @@
 <script>
 import GameOverModal from '../components/GameOverModal.vue';
 import BlankLetterPicker from '../components/BlankLetterPicker.vue';
+import SwapTilesModal from '../components/SwapTilesModal.vue';
+import { useSoundEffects } from '../composables/useSoundEffects.js';
 
 export default {
   name: 'PlayerRackView',
   components: {
     GameOverModal,
     BlankLetterPicker,
+    SwapTilesModal,
+  },
+  setup() {
+    const { playClickSound, setVolume } = useSoundEffects();
+    return {
+      playClickSound,
+      setVolume
+    };
   },
   props: {
     playerId: {
@@ -182,6 +200,8 @@ export default {
       // Blank tile handling
       showBlankPicker: false,
       pendingBlankPosition: null, // { row, col }
+      // Swap tiles
+      showSwapModal: false,
       // Debug console
       showDebugConsole: false,
       debugLogs: [],
@@ -209,7 +229,9 @@ export default {
     isCurrentPlayer() {
       if (!this.gameState) return false;
       const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
-      return player?.isCurrentPlayer || false;
+      const result = player?.isCurrentPlayer || false;
+      // console.log('[isCurrentPlayer computed] Player', this.playerId, ':', result);
+      return result;
     },
     board() {
       return this.gameState?.board || [];
@@ -537,6 +559,9 @@ export default {
                           const result = await response.json();
                           this.gameState = result.gameState;
                           console.log('[Place] Tile placed successfully');
+                          // Play sound effect when tile is placed
+                          console.log('[Sound] Attempting to play click sound after tile placement');
+                          this.playClickSound();
                         }
                       } catch (error) {
                         console.error('Failed to place tile:', error);
@@ -574,6 +599,10 @@ export default {
     async playWord() {
       if (!this.isCurrentPlayer || !this.hasNewTiles) return;
       
+      // Play sound effect
+      console.log('[Sound] Attempting to play click sound for Play Word button');
+      this.playClickSound();
+      
       try {
         const response = await fetch('/api/action', {
           method: 'POST',
@@ -593,7 +622,7 @@ export default {
       }
     },
     async recallTiles() {
-      if (!this.hasNewTiles) return;
+      if (!this.isCurrentPlayer || !this.hasNewTiles) return;
       
       try {
         const response = await fetch('/api/action', {
@@ -628,7 +657,18 @@ export default {
         
         if (response.ok) {
           const result = await response.json();
+          console.log('[Pass] Before update - isCurrentPlayer:', this.isCurrentPlayer);
+          console.log('[Pass] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
+          console.log('[Pass] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
+          console.log('[Pass] This player ID:', this.playerId);
+          
+          // Update game state - this should trigger reactivity
           this.gameState = result.gameState;
+          
+          // Force immediate re-render to ensure UI updates
+          this.$nextTick(() => {
+            console.log('[Pass] After nextTick - isCurrentPlayer:', this.isCurrentPlayer);
+          });
         }
       } catch (error) {
         console.error('Failed to pass turn:', error);
@@ -636,7 +676,38 @@ export default {
     },
     async exchangeTiles() {
       if (!this.isCurrentPlayer) return;
-      alert('Exchange functionality coming soon!');
+      this.showSwapModal = true;
+    },
+    async handleSwapTiles(selectedIndices) {
+      if (!this.isCurrentPlayer) return;
+
+      try {
+        const response = await fetch('/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'exchange-tiles',
+            playerId: this.playerId,
+            indices: selectedIndices,
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[Exchange] Before update - isCurrentPlayer:', this.isCurrentPlayer);
+          console.log('[Exchange] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
+          console.log('[Exchange] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
+          
+          this.gameState = result.gameState;
+          
+          // Force immediate re-render
+          this.$nextTick(() => {
+            console.log('[Exchange] After nextTick - isCurrentPlayer:', this.isCurrentPlayer);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to exchange tiles:', error);
+      }
     },
     async handleBlankLetterSelect(chosenLetter) {
       if (!this.pendingBlankPosition) return;
@@ -662,6 +733,9 @@ export default {
         if (response.ok) {
           const result = await response.json();
           this.gameState = result.gameState;
+          // Play sound effect when blank tile is placed
+          console.log('[Sound] Attempting to play click sound after blank tile placement');
+          this.playClickSound();
         }
       } catch (error) {
         console.error('Failed to place blank tile:', error);
@@ -984,7 +1058,7 @@ export default {
 
 .board-letter.blank {
   color: #fbbf24;
-  text-transform: lowercase;
+  text-transform: uppercase;
 }
 
 .blank-indicator {
