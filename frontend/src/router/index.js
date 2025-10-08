@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import GameBoard from '../views/GameBoard.vue';
-import PlayerRackView from '../views/PlayerRackView.vue';
+import GameBoard from '../views/GameBoard-v2.vue';
+import PlayerRackView from '../views/PlayerRackView-v2.vue';
 
 const routes = [
   {

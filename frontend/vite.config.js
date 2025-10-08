@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { gameApiPlugin } from './vite-plugin-game-api.js'
+import { gameApiPlugin } from './vite-plugin-game-api-v2.js'
 
 // https://vite.dev/config/
 export default defineConfig({

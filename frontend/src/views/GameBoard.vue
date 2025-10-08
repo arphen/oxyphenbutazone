@@ -5,57 +5,101 @@
     
     <!-- Main Game View -->
     <template v-else>
-      <div class="game-header">
-        <h1>Scrabble Trainer</h1>
-        <button @click="toggleQR" class="qr-toggle-button">
-          {{ showQR ? '🎮 Hide QR Codes' : '📱 Show QR Codes' }}
-        </button>
-      </div>
-      
-      <div v-if="showQR" class="qr-section">
-        <QRDisplay 
-          :playerId="1" 
-          playerName="Player 1"
-          :rack="player1Rack"
-          :score="player1Score"
-          :isCurrentPlayer="currentPlayer === 1"
-          :gameId="gameId" 
-        />
-        <QRDisplay 
-          :playerId="2" 
-          playerName="Player 2"
-          :rack="player2Rack"
-          :score="player2Score"
-          :isCurrentPlayer="currentPlayer === 2"
-          :gameId="gameId" 
-        />
-      </div>
-      
-      <div class="game-container">
-        <div class="player-section">
-          <h2 :class="{ active: currentPlayer === 1 }">Player 1</h2>
-          <div class="score clickable" @click="showPlayerHistory(1)">
-            Score: {{ player1Score }}
-            <span class="click-hint">📊</span>
-          </div>
-          <Rack :letters="player1Rack" @return-letter="handleReturnLetter" :disabled="currentPlayer !== 1" />
-        </div>
+      <div class="desktop-layout">
+        <!-- Board Section -->
         <div class="board-section">
           <Board :board="board" @place-letter="handlePlaceLetter" @cell-click="handleCellClick" />
-          <Controls 
-            @play-move="handlePlayMove" 
-            @clear-board="handleClearBoard"
-            :message="message"
-            :messageType="messageType"
-            :previewScore="previewScore" />
         </div>
-        <div class="player-section">
-          <h2 :class="{ active: currentPlayer === 2 }">Player 2</h2>
-          <div class="score clickable" @click="showPlayerHistory(2)">
-            Score: {{ player2Score }}
-            <span class="click-hint">📊</span>
+        
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <!-- Header Controls -->
+          <div class="sidebar-header">
+            <button @click="toggleQR" class="icon-button" title="Toggle QR Codes">
+              📱
+            </button>
+            <button @click="restartGame" class="icon-button" title="Restart Game">
+              🔄
+            </button>
           </div>
-          <Rack :letters="player2Rack" @return-letter="handleReturnLetter" :disabled="currentPlayer !== 2" />
+          
+          <!-- QR Section (when visible) -->
+          <div v-if="showQR" class="qr-section">
+            <QRDisplay 
+              :playerId="1" 
+              playerName="P1"
+              :rack="player1Rack"
+              :score="player1Score"
+              :isCurrentPlayer="currentPlayer === 1"
+              :gameId="gameId" 
+            />
+            <QRDisplay 
+              :playerId="2" 
+              playerName="P2"
+              :rack="player2Rack"
+              :score="player2Score"
+              :isCurrentPlayer="currentPlayer === 2"
+              :gameId="gameId" 
+            />
+          </div>
+          
+          <!-- Players Info -->
+          <div class="players-container">
+            <div class="player-card" :class="{ active: currentPlayer === 1 }">
+              <div class="player-name">P1</div>
+              <div class="player-score">{{ player1Score }}</div>
+            </div>
+            <div class="player-card" :class="{ active: currentPlayer === 2 }">
+              <div class="player-name">P2</div>
+              <div class="player-score">{{ player2Score }}</div>
+            </div>
+          </div>
+          
+          <!-- Game History Table -->
+          <div class="history-section">
+            <h3>Game History</h3>
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Rnd</th>
+                  <th>Player</th>
+                  <th>Words</th>
+                  <th>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(entry, index) in combinedHistory" :key="index" :class="entry.result">
+                  <td>{{ entry.round }}</td>
+                  <td>P{{ entry.player }}</td>
+                  <td class="words-cell">
+                    <span v-if="entry.action === 'exchange'">
+                      Exchanged {{ entry.tilesExchanged }}
+                    </span>
+                    <span v-else>{{ entry.words.map(w => w.word).join(', ') }}</span>
+                  </td>
+                  <td class="score-cell">
+                    <span v-if="entry.action !== 'exchange'">+{{ entry.totalScore }}</span>
+                    <span v-else>—</span>
+                  </td>
+                </tr>
+                <tr v-if="combinedHistory.length === 0">
+                  <td colspan="4" class="no-history">No moves yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Controls -->
+          <div class="controls-section">
+            <Controls 
+              @play-move="handlePlayMove" 
+              @clear-board="handleClearBoard"
+              @exchange="handleExchange"
+              :currentRack="currentRack"
+              :message="message"
+              :messageType="messageType"
+              :previewScore="previewScore" />
+          </div>
         </div>
       </div>
     
@@ -74,7 +118,6 @@
 
 <script>
 import Board from '../components/Board.vue';
-import Rack from '../components/Rack.vue';
 import Controls from '../components/Controls.vue';
 import ScoreHistoryModal from '../components/ScoreHistoryModal.vue';
 import QRDisplay from '../components/QRDisplay.vue';
@@ -84,7 +127,6 @@ export default {
   name: 'App',
   components: {
     Board,
-    Rack,
     Controls,
     ScoreHistoryModal,
     QRDisplay,
@@ -117,6 +159,32 @@ export default {
   computed: {
     currentRack() {
       return this.currentPlayer === 1 ? this.player1Rack : this.player2Rack;
+    },
+    combinedHistory() {
+      // Combine both player histories into a single chronological list
+      const combined = [];
+      const maxLength = Math.max(this.player1History.length, this.player2History.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        if (this.player1History[i]) {
+          combined.push({
+            ...this.player1History[i],
+            player: 1,
+            round: i + 1,
+            result: this.player1History[i].action === 'exchange' ? 'exchange-row' : 'valid-row'
+          });
+        }
+        if (this.player2History[i]) {
+          combined.push({
+            ...this.player2History[i],
+            player: 2,
+            round: i + 1,
+            result: this.player2History[i].action === 'exchange' ? 'exchange-row' : 'valid-row'
+          });
+        }
+      }
+      
+      return combined;
     },
     previewScore() {
       if (this.placedTiles.length === 0) {
@@ -425,6 +493,24 @@ export default {
         return;
       }
       
+      // Check if this is the first move (no locked tiles on board)
+      const hasLockedTiles = this.board.some(row => 
+        row.some(cell => cell.letter && !cell.isNew)
+      );
+      
+      if (!hasLockedTiles) {
+        // First move must use center square (7, 7)
+        const usesCenterSquare = this.placedTiles.some(tile => 
+          tile.row === 7 && tile.col === 7
+        );
+        
+        if (!usesCenterSquare) {
+          this.message = 'First word must use the center square (★)!';
+          this.messageType = 'error';
+          return;
+        }
+      }
+      
       const words = this.getWordsFromBoard();
       
       // Filter words that contain at least one newly placed tile
@@ -445,7 +531,22 @@ export default {
         this.message = `Invalid word(s): ${invalidWords.map(w => w.word).join(', ')}`;
         this.messageType = 'error';
         
-        // Return invalid tiles to bag
+        // Save invalid attempt to history
+        const turnData = {
+          turnNumber: (this.currentPlayer === 1 ? this.player1History.length : this.player2History.length) + 1,
+          action: 'invalid',
+          words: invalidWords.map(w => ({ word: w.word, score: 0 })),
+          totalScore: 0,
+          timestamp: new Date().toLocaleTimeString(),
+        };
+        
+        if (this.currentPlayer === 1) {
+          this.player1History.push(turnData);
+        } else {
+          this.player2History.push(turnData);
+        }
+        
+        // Return invalid tiles to player's rack
         const tilesToReturn = [];
         this.placedTiles.forEach(tile => {
           const letter = this.board[tile.row][tile.col].letter;
@@ -453,8 +554,18 @@ export default {
           this.board[tile.row][tile.col].letter = '';
           this.board[tile.row][tile.col].isNew = false;
         });
-        this.returnTilesToBag(tilesToReturn);
+        
+        // Add tiles back to current player's rack
+        if (this.currentPlayer === 1) {
+          this.player1Rack.push(...tilesToReturn);
+        } else {
+          this.player2Rack.push(...tilesToReturn);
+        }
+        
         this.placedTiles = [];
+        
+        // Sync state so mobile sees the updated rack
+        this.syncGameState();
       } else {
         // Calculate total score for all words
         let totalScore = 0;
@@ -500,12 +611,18 @@ export default {
         // Refill current player's rack from bag
         this.fillRack(this.currentPlayer);
         
+        console.log('[Desktop] 🎁 Refilled player', this.currentPlayer, 'rack to', this.currentPlayer === 1 ? this.player1Rack.length : this.player2Rack.length, 'tiles');
+        
         // Switch to other player
         this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+        
+        // Sync state so mobile sees the updated racks, board, and turn
+        // Use force=true to skip API rack check since we just refilled locally
+        this.syncGameState(true);
       }
     },
     handleClearBoard() {
-      // Return all new tiles to bag
+      // Return all new tiles to current player's rack
       const tilesToReturn = [];
       this.placedTiles.forEach(tile => {
         const letter = this.board[tile.row][tile.col].letter;
@@ -513,10 +630,77 @@ export default {
         this.board[tile.row][tile.col].letter = '';
         this.board[tile.row][tile.col].isNew = false;
       });
-      this.returnTilesToBag(tilesToReturn);
+      
+      // Add tiles back to current player's rack
+      if (this.currentPlayer === 1) {
+        this.player1Rack.push(...tilesToReturn);
+      } else {
+        this.player2Rack.push(...tilesToReturn);
+      }
+      
       this.placedTiles = [];
       this.message = '';
       this.messageType = '';
+      
+      // Sync state so mobile sees the updated rack
+      this.syncGameState();
+    },
+    handleExchange(tilesToExchange) {
+      if (this.placedTiles.length > 0) {
+        this.message = 'Cannot exchange tiles with tiles placed on board. Clear the board first.';
+        this.messageType = 'error';
+        return;
+      }
+      
+      if (tilesToExchange.length === 0) {
+        this.message = 'Select tiles to exchange';
+        this.messageType = 'error';
+        return;
+      }
+      
+      if (this.tileBag.length < tilesToExchange.length) {
+        this.message = `Not enough tiles in bag to exchange (${this.tileBag.length} remaining)`;
+        this.messageType = 'error';
+        return;
+      }
+      
+      // Return selected tiles to bag
+      this.returnTilesToBag(tilesToExchange);
+      
+      // Remove exchanged tiles from current player's rack
+      const currentRack = this.currentPlayer === 1 ? this.player1Rack : this.player2Rack;
+      tilesToExchange.forEach(tile => {
+        const index = currentRack.indexOf(tile);
+        if (index !== -1) {
+          currentRack.splice(index, 1);
+        }
+      });
+      
+      // Draw new tiles
+      this.fillRack(this.currentPlayer);
+      
+      // Record exchange in history
+      const turnData = {
+        turnNumber: (this.currentPlayer === 1 ? this.player1History.length : this.player2History.length) + 1,
+        action: 'exchange',
+        tilesExchanged: tilesToExchange.length,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      
+      if (this.currentPlayer === 1) {
+        this.player1History.push(turnData);
+      } else {
+        this.player2History.push(turnData);
+      }
+      
+      this.message = `Exchanged ${tilesToExchange.length} tile(s)`;
+      this.messageType = 'success';
+      
+      // Switch to other player - exchange ends turn
+      this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+      
+      // Sync state
+      this.syncGameState(true);
     },
     showPlayerHistory(player) {
       this.modalPlayer = player;
@@ -530,20 +714,49 @@ export default {
       // Generate a short random game ID
       return Math.random().toString(36).substring(2, 8).toUpperCase();
     },
-    async syncGameState() {
+    async syncGameState(forceLocalRacks = false) {
+      // First, fetch current API state to check for tiles placed from mobile
+      let apiPlayer1Rack = this.player1Rack;
+      let apiPlayer2Rack = this.player2Rack;
+      
+      if (!forceLocalRacks) {
+        try {
+          const response = await fetch('/api/rack/1');
+          if (response.ok) {
+            const data = await response.json();
+            // If API has a different rack length, it means tiles were placed from mobile
+            // Use the API's rack instead of our local one
+            if (data.rack.length !== this.player1Rack.length) {
+              apiPlayer1Rack = data.rack;
+            }
+            
+            // Also check player 2
+            const response2 = await fetch('/api/rack/2');
+            if (response2.ok) {
+              const data2 = await response2.json();
+              if (data2.rack.length !== this.player2Rack.length) {
+                apiPlayer2Rack = data2.rack;
+              }
+            }
+          }
+        } catch (error) {
+          // If fetch fails, use local racks
+        }
+      }
+      
       // Prepare game data
       const gameData = {
         board: this.board,
         viewportCenter: this.viewportCenter,
         player1: {
           playerName: 'Player 1',
-          rack: this.player1Rack,
+          rack: apiPlayer1Rack,
           score: this.player1Score,
           isCurrentPlayer: this.currentPlayer === 1
         },
         player2: {
           playerName: 'Player 2',
-          rack: this.player2Rack,
+          rack: apiPlayer2Rack,
           score: this.player2Score,
           isCurrentPlayer: this.currentPlayer === 2
         }
@@ -574,11 +787,13 @@ export default {
           
           // Check for pending play request from mobile
           if (data.pendingPlayRequest) {
-            console.log('Processing play request from player:', data.pendingPlayRequest);
+            console.log('[Desktop] 🎮 Processing play request from player:', data.pendingPlayRequest);
             await this.handleMobilePlayRequest(data.pendingPlayRequest);
+            console.log('[Desktop] ✅ Play request completed');
             
             // Clear the pending request
             await fetch('/api/clear-play-request', { method: 'POST' });
+            console.log('[Desktop] 🧹 Cleared pending request');
           }
           
           // Update board if it changed (check if tiles were placed from mobile)
@@ -605,8 +820,19 @@ export default {
       }
     },
     async handleMobilePlayRequest(playerId) {
-      // Sync board state from API first
-      this.board = (await (await fetch('/api/rack/1')).json()).board;
+      console.log('[Desktop] 📥 Syncing board and racks from API...');
+      
+      // Sync board state and racks from API first
+      const apiData = await (await fetch('/api/rack/1')).json();
+      this.board = apiData.board;
+      
+      // Also sync the racks from API so we have the current state
+      const apiData2 = await (await fetch('/api/rack/2')).json();
+      this.player1Rack = apiData.rack;
+      this.player2Rack = apiData2.rack;
+      
+      console.log('[Desktop] 📊 Player 1 rack:', this.player1Rack);
+      console.log('[Desktop] 📊 Player 2 rack:', this.player2Rack);
       
       // Find all new tiles on board
       const newTiles = [];
@@ -618,20 +844,81 @@ export default {
         }
       }
       
+      console.log('[Desktop] 🎯 Found', newTiles.length, 'new tiles on board');
+      
       if (newTiles.length === 0) {
         this.message = 'No tiles placed!';
         this.messageType = 'error';
+        console.log('[Desktop] ❌ No tiles to play!');
         return;
       }
       
       // Set placedTiles so validation works
       this.placedTiles = newTiles;
+      console.log('[Desktop] 🔍 Validating word...');
       
-      // Use the existing playWord method
-      this.playWord();
+      // Use the existing handlePlayMove method
+      this.handlePlayMove();
     },
     toggleQR() {
       this.showQR = !this.showQR;
+    },
+    async restartGame() {
+      if (!confirm('Are you sure you want to restart the game? All progress will be lost.')) {
+        return;
+      }
+      
+      // Reset all game state
+      this.board = this.createInitialBoard();
+      this.player1Rack = [];
+      this.player2Rack = [];
+      this.player1Score = 0;
+      this.player2Score = 0;
+      this.player1History = [];
+      this.player2History = [];
+      this.currentPlayer = 1;
+      this.placedTiles = [];
+      this.message = '';
+      this.messageType = '';
+      this.viewportCenter = { row: 7, col: 7 };
+      
+      // Reinitialize tile bag and fill racks
+      this.initializeTileBag();
+      this.fillRack(1);
+      this.fillRack(2);
+      
+      // Force sync to API without checking API state first
+      const gameData = {
+        board: this.board,
+        viewportCenter: this.viewportCenter,
+        player1: {
+          playerName: 'Player 1',
+          rack: this.player1Rack,
+          score: this.player1Score,
+          isCurrentPlayer: this.currentPlayer === 1
+        },
+        player2: {
+          playerName: 'Player 2',
+          rack: this.player2Rack,
+          score: this.player2Score,
+          isCurrentPlayer: this.currentPlayer === 2
+        }
+      };
+      
+      localStorage.setItem(`scrabble_game_${this.gameId}`, JSON.stringify(gameData));
+      
+      try {
+        await fetch('/api/game-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(gameData)
+        });
+      } catch (error) {
+        console.error('Failed to sync restart:', error);
+      }
+      
+      this.message = 'Game restarted!';
+      this.messageType = 'success';
     },
     handleCellClick({ row, col }) {
       // Update viewport center to clicked cell
@@ -669,51 +956,73 @@ export default {
 
 <style>
 #app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  padding: 20px;
-}
-
-.game-header {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.game-header h1 {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  min-height: 100vh;
+  color: #e4e4e7;
+  padding: 0;
   margin: 0;
 }
 
-.qr-toggle-button {
-  padding: 10px 20px;
-  font-size: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+.desktop-layout {
+  display: flex;
+  min-height: 100vh;
+  gap: 0;
 }
 
-.qr-toggle-button:hover {
+.board-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.sidebar {
+  width: 380px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-header {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.icon-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e4e4e7;
+  padding: 10px 15px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
 }
 
 .qr-section {
   display: flex;
-  justify-content: center;
-  gap: 30px;
-  margin-bottom: 30px;
-  padding: 20px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-radius: 15px;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   animation: slideDown 0.3s ease-out;
 }
 
@@ -728,68 +1037,147 @@ export default {
   }
 }
 
-.game-container {
+.players-container {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 30px;
-  max-width: 1400px;
-  margin: 0 auto;
+  gap: 15px;
+  padding: 20px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.player-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.player-section h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: #666;
+.player-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  text-align: center;
   transition: all 0.3s ease;
+  opacity: 0.6;
 }
 
-.player-section h2.active {
-  color: #4CAF50;
-  font-weight: bold;
-  font-size: 1.8rem;
+.player-card.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  opacity: 1;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
 }
 
-.score {
-  font-size: 1.3rem;
-  font-weight: bold;
-  color: #2c3e50;
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  min-width: 150px;
-  position: relative;
-  transition: all 0.3s ease;
+.player-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-.score.clickable {
-  cursor: pointer;
+.player-card.active .player-name {
+  color: #60a5fa;
 }
 
-.score.clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+.player-score {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #e4e4e7;
 }
 
-.click-hint {
-  margin-left: 8px;
-  font-size: 1rem;
-  opacity: 0.8;
+.history-section {
+  flex: 1;
+  padding: 20px 15px;
+  overflow-y: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.board-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
+.history-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.history-table thead {
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.history-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.history-table th:last-child {
+  border-right: none;
+}
+
+.history-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease;
+}
+
+.history-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.history-table tbody tr.valid-row {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.history-table tbody tr.invalid-row {
+  background: rgba(251, 146, 60, 0.05);
+}
+
+.history-table tbody tr.exchange-row {
+  background: rgba(168, 85, 247, 0.05);
+  font-style: italic;
+}
+
+.history-table td {
+  padding: 10px 8px;
+  font-size: 0.9rem;
+  color: #e4e4e7;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.history-table td:last-child {
+  border-right: none;
+}
+
+.words-cell {
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.score-cell {
+  text-align: right;
+  font-weight: 700;
+  color: #60a5fa;
+}
+
+.no-history {
+  text-align: center;
+  color: #71717a;
+  font-style: italic;
+  padding: 30px !important;
+}
+
+.controls-section {
+  padding: 20px 15px;
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>

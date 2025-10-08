@@ -172,14 +172,18 @@ export default {
     hasNewTiles() {
       // Check if any tiles on the board are marked as new (isNew: true)
       if (!this.board || this.board.length === 0) return false;
+      
+      let newTileCount = 0;
       for (let row = 0; row < this.board.length; row++) {
         for (let col = 0; col < this.board[row].length; col++) {
           if (this.board[row][col].isNew) {
-            return true;
+            newTileCount++;
           }
         }
       }
-      return false;
+      
+      console.log('[hasNewTiles] Found', newTileCount, 'new tiles');
+      return newTileCount > 0;
     }
   },
   mounted() {

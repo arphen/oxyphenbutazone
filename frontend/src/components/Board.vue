@@ -43,9 +43,14 @@ export default {
 .board {
   display: flex;
   flex-direction: column;
-  width: 600px;
-  height: 600px;
-  border: 2px solid #333;
+  width: min(calc(100vh - 40px), calc(100vw - 420px));
+  height: min(calc(100vh - 40px), calc(100vw - 420px));
+  max-width: 900px;
+  max-height: 900px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .board-row {
@@ -58,43 +63,71 @@ export default {
   flex: 1;
   align-items: center;
   justify-content: center;
-  border: 1px solid #ccc;
-  font-size: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: clamp(16px, 2vw, 28px);
   font-weight: bold;
   text-transform: uppercase;
   position: relative;
   cursor: pointer;
+  background: rgba(30, 30, 50, 0.6);
+  transition: all 0.2s ease;
 }
 
-.dl { background-color: #a0d8ef; }
-.tl { background-color: #00a8e8; }
-.dw { background-color: #f0a8a8; }
-.tw { background-color: #ff6b6b; }
-.center { background-color: #f0a8a8; }
+.board-cell:hover {
+  background: rgba(40, 40, 60, 0.7);
+}
+
+/* Colorblind-friendly premium squares */
+/* Double Letter - Light Blue */
+.dl { 
+  background: rgba(125, 211, 252, 0.25);
+  box-shadow: inset 0 0 12px rgba(125, 211, 252, 0.3);
+}
+/* Triple Letter - Dark Blue */
+.tl { 
+  background: rgba(37, 99, 235, 0.35);
+  box-shadow: inset 0 0 12px rgba(37, 99, 235, 0.4);
+}
+/* Double Word - Light Pink */
+.dw { 
+  background: rgba(244, 114, 182, 0.25);
+  box-shadow: inset 0 0 12px rgba(244, 114, 182, 0.3);
+}
+/* Triple Word - Dark Pink */
+.tw { 
+  background: rgba(219, 39, 119, 0.35);
+  box-shadow: inset 0 0 12px rgba(219, 39, 119, 0.4);
+}
+/* Center - Pink accent */
+.center { 
+  background: rgba(236, 72, 153, 0.3);
+  box-shadow: inset 0 0 15px rgba(236, 72, 153, 0.4);
+}
 
 .has-tile {
-  background-image: linear-gradient(135deg, rgba(245, 222, 179, 0.85), rgba(222, 184, 135, 0.85));
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(254, 240, 138, 0.9), rgba(252, 211, 77, 0.9));
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 0 15px rgba(255, 255, 255, 0.2);
 }
 
 .new-tile {
-  background-image: linear-gradient(135deg, rgba(255, 235, 205, 0.9), rgba(255, 218, 185, 0.9));
-  box-shadow: inset 0 0 15px rgba(255, 165, 0, 0.3), 0 0 8px rgba(255, 165, 0, 0.4);
-  animation: pulse 1s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(134, 239, 172, 0.9), rgba(74, 222, 128, 0.9));
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.3);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% {
-    box-shadow: inset 0 0 15px rgba(255, 165, 0, 0.3), 0 0 8px rgba(255, 165, 0, 0.4);
+    box-shadow: 0 0 20px rgba(74, 222, 128, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.3);
   }
   50% {
-    box-shadow: inset 0 0 15px rgba(255, 165, 0, 0.5), 0 0 12px rgba(255, 165, 0, 0.6);
+    box-shadow: 0 0 30px rgba(74, 222, 128, 0.8), inset 0 0 25px rgba(255, 255, 255, 0.4);
   }
 }
 
 .tile-letter {
-  color: #2c3e50;
-  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+  color: #1a1a2e;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
   z-index: 1;
+  font-weight: 800;
 }
 </style>
