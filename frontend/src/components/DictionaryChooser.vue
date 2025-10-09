@@ -7,17 +7,17 @@
     <div v-if="showDropdown" class="dropdown-panel">
       <div class="dropdown-header">Dictionary</div>
       <label class="checkbox-item">
-        <input type="checkbox" v-model="sowpodsEnabled" @change="handleChange" />
-        <span>SOWPODS</span>
+        <input type="checkbox" v-model="csw21Enabled" @change="handleChange" />
+        <span>CSW21</span>
       </label>
       <label class="checkbox-item">
-        <input type="checkbox" v-model="twlEnabled" @change="handleChange" />
-        <span>TWL</span>
+        <input type="checkbox" v-model="nwl2023Enabled" @change="handleChange" />
+        <span>NWL2023</span>
       </label>
       <div class="dictionary-info">
-        <span v-if="sowpodsEnabled && twlEnabled">Using union of both</span>
-        <span v-else-if="sowpodsEnabled">Using SOWPODS</span>
-        <span v-else-if="twlEnabled">Using TWL</span>
+        <span v-if="csw21Enabled && nwl2023Enabled">Using union of both</span>
+        <span v-else-if="csw21Enabled">Using CSW21</span>
+        <span v-else-if="nwl2023Enabled">Using NWL2023</span>
         <span v-else class="warning">⚠️ Select at least one</span>
       </div>
     </div>
@@ -30,14 +30,14 @@ export default {
   props: {
     selectedDictionaries: {
       type: Object,
-      default: () => ({ sowpods: true, twl: false })
+      default: () => ({ csw21: true, nwl2023: false })
     }
   },
   data() {
     return {
       showDropdown: false,
-      sowpodsEnabled: this.selectedDictionaries.sowpods,
-      twlEnabled: this.selectedDictionaries.twl
+      csw21Enabled: this.selectedDictionaries.csw21,
+      nwl2023Enabled: this.selectedDictionaries.nwl2023
     };
   },
   methods: {
@@ -46,8 +46,8 @@ export default {
     },
     handleChange() {
       this.$emit('update', {
-        sowpods: this.sowpodsEnabled,
-        twl: this.twlEnabled
+        csw21: this.csw21Enabled,
+        nwl2023: this.nwl2023Enabled
       });
     }
   },

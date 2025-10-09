@@ -110,9 +110,9 @@ export default {
       board: this.createInitialBoard(),
       alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
       dictionary: new Set(),
-      sowpodsDictionary: new Set(),
-      twlDictionary: new Set(),
-      selectedDictionaries: { sowpods: true, twl: false },
+      csw21Dictionary: new Map(),
+      nwl2023Dictionary: new Map(),
+      selectedDictionaries: { csw21: true, nwl2023: false },
       draggedLetter: null,
       dragSource: null, // 'alphabet' or 'board'
       dragSourcePosition: null, // {row, col} if from board
@@ -155,17 +155,46 @@ export default {
     
     async loadDictionary() {
       try {
-        // Load SOWPODS dictionary
-        const sowpodsResponse = await fetch('/sowpods.txt');
-        const sowpodsText = await sowpodsResponse.text();
-        const sowpodsWords = sowpodsText.split('\n').map(word => word.trim().toUpperCase()).filter(word => word.length > 0);
-        this.sowpodsDictionary = new Set(sowpodsWords);
+        // Parse dictionary file with definitions
+        const parseDictionary = (content) => {
+          const dictionary = new Map();
+          const lines = content.split('\n');
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            // Match format: WORD rest of line
+            const match = trimmed.match(/^(\S+)\s+(.+)$/);
+            if (match) {
+              const word = match[1].toUpperCase();
+              const definition = match[2];
+              dictionary.set(word, definition);
+            }
+          }
+          
+          return dictionary;
+        };
         
-        // Load TWL dictionary
-        const twlResponse = await fetch('/twl.txt');
-        const twlText = await twlResponse.text();
-        const twlWords = twlText.split('\n').map(word => word.trim().toUpperCase()).filter(word => word.length > 0);
-        this.twlDictionary = new Set(twlWords);
+        // Load CSW21 dictionary
+        try {
+          const csw21Response = await fetch('/CSW21.txt');
+          const csw21Text = await csw21Response.text();
+          this.csw21Dictionary = parseDictionary(csw21Text);
+          console.log(`CSW21 loaded: ${this.csw21Dictionary.size} words`);
+        } catch (error) {
+          console.warn('CSW21.txt not found:', error);
+        }
+        
+        // Load NWL2023 dictionary
+        try {
+          const nwl2023Response = await fetch('/NWL2023.txt');
+          const nwl2023Text = await nwl2023Response.text();
+          this.nwl2023Dictionary = parseDictionary(nwl2023Text);
+          console.log(`NWL2023 loaded: ${this.nwl2023Dictionary.size} words`);
+        } catch (error) {
+          console.warn('NWL2023.txt not found:', error);
+        }
         
         // Set initial dictionary
         this.updateActiveDictionary();
@@ -175,22 +204,35 @@ export default {
     },
     
     updateActiveDictionary() {
-      const { sowpods, twl } = this.selectedDictionaries;
+      const { csw21, nwl2023 } = this.selectedDictionaries;
       
-      if (sowpods && twl) {
-        this.dictionary = new Set([...this.sowpodsDictionary, ...this.twlDictionary]);
-      } else if (sowpods) {
-        this.dictionary = this.sowpodsDictionary;
-      } else if (twl) {
-        this.dictionary = this.twlDictionary;
-      } else {
-        this.dictionary = this.sowpodsDictionary;
-        this.selectedDictionaries.sowpods = true;
+      this.dictionary = new Set();
+      
+      if (csw21) {
+        for (const word of this.csw21Dictionary.keys()) {
+          this.dictionary.add(word);
+        }
       }
+      
+      if (nwl2023) {
+        for (const word of this.nwl2023Dictionary.keys()) {
+          this.dictionary.add(word);
+        }
+      }
+      
+      // Ensure at least one dictionary is active
+      if (this.dictionary.size === 0 && this.csw21Dictionary.size > 0) {
+        this.selectedDictionaries.csw21 = true;
+        for (const word of this.csw21Dictionary.keys()) {
+          this.dictionary.add(word);
+        }
+      }
+      
+      console.log(`Active dictionary: ${this.dictionary.size} words`);
     },
     
     handleDictionaryUpdate(selection) {
-      if (!selection.sowpods && !selection.twl) {
+      if (!selection.csw21 && !selection.nwl2023) {
         return;
       }
       this.selectedDictionaries = selection;

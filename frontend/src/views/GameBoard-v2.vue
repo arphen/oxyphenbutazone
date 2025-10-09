@@ -102,9 +102,21 @@
                         Exchanged {{ entry.tilesExchanged }}
                       </span>
                       <span v-else-if="entry.action === 'invalid'">
-                        ❌ {{ entry.words.map(w => w.word).join(', ') }}
+                        <span v-for="(wordObj, idx) in entry.words" :key="idx">
+                          <span class="word-with-definition" :title="wordObj.definition">
+                            ❌ {{ wordObj.word }}
+                          </span>
+                          <span v-if="idx < entry.words.length - 1">, </span>
+                        </span>
                       </span>
-                      <span v-else>{{ entry.words.map(w => w.word).join(', ') }}</span>
+                      <span v-else>
+                        <span v-for="(wordObj, idx) in entry.words" :key="idx">
+                          <span class="word-with-definition" :title="wordObj.definition">
+                            {{ wordObj.word }}
+                          </span>
+                          <span v-if="idx < entry.words.length - 1">, </span>
+                        </span>
+                      </span>
                     </td>
                     <td class="score-cell">
                       <span v-if="entry.action !== 'exchange' && entry.action !== 'invalid' && entry.action !== 'pass'">+{{ entry.totalScore }}</span>
@@ -178,7 +190,7 @@ export default {
       showQR: false,
       isMobileView: false,
       pollInterval: null,
-      selectedDictionaries: { sowpods: true, twl: false },
+      selectedDictionaries: { csw21: true, nwl2023: false },
     };
   },
   computed: {
@@ -473,7 +485,7 @@ export default {
     },
     async handleDictionaryUpdate(selection) {
       // Ensure at least one is selected
-      if (!selection.sowpods && !selection.twl) {
+      if (!selection.csw21 && !selection.nwl2023) {
         alert('At least one dictionary must be selected');
         return;
       }
@@ -542,8 +554,11 @@ export default {
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto; /* Changed from hidden to allow scrolling but not clip tooltips */
+  overflow-x: visible;
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 100; /* Ensure sidebar content is above board */
 }
 
 .sidebar-header {
@@ -700,6 +715,9 @@ export default {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: visible; /* Allow tooltips to escape */
+  position: relative;
+  z-index: 1; /* Ensure proper stacking */
 }
 
 .history-section h3 {
@@ -716,6 +734,7 @@ export default {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  overflow-x: visible; /* Allow tooltips to extend outside */
 }
 
 .history-table {
@@ -723,6 +742,11 @@ export default {
   border-collapse: collapse;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.history-table tbody tr {
+  position: relative;
 }
 
 .history-table thead {
@@ -788,6 +812,72 @@ export default {
   font-weight: 500;
   text-transform: uppercase;
   font-size: 0.85rem;
+  position: relative;
+  overflow: visible;
+}
+
+.word-with-definition {
+  cursor: help;
+  position: relative;
+  padding-bottom: 1px;
+  border-bottom: 1px dotted rgba(96, 165, 250, 0.5);
+  transition: all 0.2s ease;
+}
+
+.word-with-definition:hover {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+
+/* Enhanced tooltip styling - using fixed positioning to escape all containers */
+.word-with-definition[title]:hover::after {
+  content: attr(title);
+  position: fixed;
+  right: 30px; /* Fixed distance from right edge of viewport */
+  left: auto;
+  top: 50%; /* Center vertically */
+  transform: translateY(-50%);
+  padding: 12px 16px;
+  background: rgba(20, 20, 35, 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 8px;
+  color: #e4e4e7;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  font-weight: 400;
+  text-transform: none;
+  white-space: normal;
+  max-width: 320px;
+  min-width: 220px;
+  z-index: 99999;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(96, 165, 250, 0.2);
+  animation: tooltipFadeIn 0.2s ease-out;
+  pointer-events: none;
+}
+
+.word-with-definition[title]:hover::before {
+  content: '';
+  position: fixed;
+  right: 40px; /* Arrow positioned with tooltip */
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  border: 7px solid transparent;
+  border-top-color: rgba(96, 165, 250, 0.4);
+  z-index: 99998;
+  pointer-events: none;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .score-cell {

@@ -174,6 +174,49 @@
               This is the starting position of the game before any moves were made.
             </div>
             
+            <!-- Move Analysis Section -->
+            <div v-if="currentMove && currentMove.action === 'play-word'" class="move-analysis-section">
+              <div class="analysis-note">
+                <strong>Note:</strong> Move analysis is currently in development. 
+                Full analysis requires backend support to validate moves and compute scores.
+              </div>
+              
+              <button 
+                @click="analyzeCurrentMove" 
+                class="analyze-button"
+                :disabled="moveAnalysis?.analyzing.value"
+              >
+                <span v-if="moveAnalysis?.analyzing.value">Analyzing...</span>
+                <span v-else>🔍 Analyze Move (Beta)</span>
+              </button>
+              
+              <div v-if="currentMoveAnalysis" class="analysis-results">
+                <h4>Move Analysis</h4>
+                <div class="analysis-rating" :class="currentMoveAnalysis.rating.toLowerCase()">
+                  Rating: {{ currentMoveAnalysis.rating }}
+                </div>
+                <div class="analysis-detail">
+                  <span class="label">Your Score:</span>
+                  <span class="value">{{ currentMoveAnalysis.playedScore }}</span>
+                </div>
+                <div class="analysis-detail" v-if="currentMoveAnalysis.bestScore">
+                  <span class="label">Best Possible:</span>
+                  <span class="value">{{ currentMoveAnalysis.bestScore }}</span>
+                </div>
+                <div class="analysis-detail" v-if="currentMoveAnalysis.scoreDiff > 0">
+                  <span class="label">Could Gain:</span>
+                  <span class="value improvement">+{{ currentMoveAnalysis.scoreDiff }}</span>
+                </div>
+                <div class="analysis-message">
+                  {{ currentMoveAnalysis.message }}
+                </div>
+                <div v-if="currentMoveAnalysis.bestMove && currentMoveAnalysis.bestMove.found" class="best-move-details">
+                  <h5>Best Move:</h5>
+                  <div>{{ currentMoveAnalysis.bestMove.word }} at ({{ currentMoveAnalysis.bestMove.row }}, {{ currentMoveAnalysis.bestMove.col }})</div>
+                </div>
+              </div>
+            </div>
+            
             <!-- Debug Info -->
             <div v-if="currentMove" class="debug-info" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); font-size: 0.75rem;">
               <details>
@@ -223,6 +266,7 @@
 <script>
 import Board from '../components/Board.vue';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
+import { useMoveAnalysis } from '../composables/useMoveAnalysis.js';
 
 export default {
   name: 'GameReplay',
@@ -233,8 +277,11 @@ export default {
     return {
       game: null,
       gamePersistence: null,
+      moveAnalysis: null,
       currentMoveIndex: 0,
-      showRacks: false
+      showRacks: false,
+      showAnalysis: false,
+      moveAnalysisResults: {} // Cache analysis results by move index
     };
   },
   computed: {
@@ -284,6 +331,9 @@ export default {
     currentMove() {
       if (this.currentMoveIndex === 0) return null;
       return this.game.moves[this.currentMoveIndex - 1];
+    },
+    currentMoveAnalysis() {
+      return this.moveAnalysisResults[this.currentMoveIndex] || null;
     }
   },
   watch: {
@@ -295,9 +345,57 @@ export default {
   },
   mounted() {
     this.gamePersistence = useGamePersistence();
+    this.moveAnalysis = useMoveAnalysis();
     this.loadGame();
   },
   methods: {
+    async analyzeCurrentMove() {
+      if (!this.currentMove || this.currentMoveIndex === 0) {
+        alert('No move to analyze. Select a move from the history.');
+        return;
+      }
+
+      // Get the board state BEFORE this move
+      const previousState = this.currentMoveIndex > 1 
+        ? this.game.moves[this.currentMoveIndex - 2]?.gameStateSnapshot 
+        : this.game.initialState;
+
+      if (!previousState) {
+        alert('Cannot analyze: missing board state before move');
+        return;
+      }
+
+      const playerId = this.currentMove.playerId;
+      const player = playerId === '1' ? previousState.player1 : previousState.player2;
+      const rack = this.currentMove.rackBefore || player?.rack || [];
+
+      if (rack.length === 0) {
+        alert('Cannot analyze: rack data not available');
+        return;
+      }
+
+      console.log('[GameReplay] Analyzing move:', {
+        moveIndex: this.currentMoveIndex,
+        playerId,
+        rack,
+        boardState: previousState.board
+      });
+
+      const result = await this.moveAnalysis.analyzeMoveQuality(
+        {
+          score: this.currentMove.scoreDelta,
+          tilesPlaced: this.currentMove.tilesPlaced,
+          wordsFormed: this.currentMove.wordsFormed
+        },
+        rack,
+        previousState.board,
+        previousState
+      );
+
+      // Cache the result
+      this.moveAnalysisResults[this.currentMoveIndex] = result;
+      this.showAnalysis = true;
+    },
     reconstructStateFromMove(move) {
       // For invalid moves, show the board with the attempted tiles (boardStateBefore)
       // For valid moves, show the board after the move (boardState)
@@ -765,6 +863,148 @@ export default {
   color: #a1a1aa;
   font-style: italic;
   text-align: center;
+}
+
+.move-analysis-section {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.analysis-note {
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #93c5fd;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.analysis-note strong {
+  color: #bfdbfe;
+}
+
+.analyze-button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.analyze-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.analyze-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.analysis-results {
+  margin-top: 15px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.analysis-results h4 {
+  margin-bottom: 10px;
+  color: #e4e4e7;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.analysis-rating {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.analysis-rating.excellent {
+  background: rgba(134, 239, 172, 0.2);
+  color: #86efac;
+  border: 1px solid rgba(134, 239, 172, 0.3);
+}
+
+.analysis-rating.good {
+  background: rgba(147, 197, 253, 0.2);
+  color: #93c5fd;
+  border: 1px solid rgba(147, 197, 253, 0.3);
+}
+
+.analysis-rating.okay {
+  background: rgba(253, 224, 71, 0.2);
+  color: #fde047;
+  border: 1px solid rgba(253, 224, 71, 0.3);
+}
+
+.analysis-rating.weak {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.analysis-detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 0.9rem;
+}
+
+.analysis-detail .label {
+  color: #a1a1aa;
+}
+
+.analysis-detail .value {
+  color: #e4e4e7;
+  font-weight: 600;
+}
+
+.analysis-detail .value.improvement {
+  color: #86efac;
+}
+
+.analysis-message {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #d4d4d8;
+  font-style: italic;
+}
+
+.best-move-details {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+}
+
+.best-move-details h5 {
+  margin-bottom: 5px;
+  color: #93c5fd;
+  font-size: 0.85rem;
+}
+
+.best-move-details div {
+  color: #e4e4e7;
+  font-size: 0.9rem;
 }
 
 .move-history {

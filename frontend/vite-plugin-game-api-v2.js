@@ -4,8 +4,10 @@ import path from 'path';
 // Single source of truth - all game state lives here
 let gameState = null;
 
-// Dictionary loaded once at startup
-let dictionary = new Set();
+// Dictionaries loaded once at startup
+let csw21Dictionary = new Map(); // word -> definition
+let nwl2023Dictionary = new Map(); // word -> definition
+let activeDictionary = new Set(); // combined active words
 
 // Initialize game state
 function createInitialGameState() {
@@ -427,7 +429,7 @@ function handlePlayWord(playerId) {
     }
 
     // Check dictionary
-    const invalidWords = newWords.filter(wordObj => !dictionary.has(wordObj.word.toLowerCase()));
+    const invalidWords = newWords.filter(wordObj => !activeDictionary.has(wordObj.word.toLowerCase()));
 
     if (invalidWords.length > 0) {
         gameState.message = `Invalid word(s): ${invalidWords.map(w => w.word).join(', ')}`;
@@ -437,7 +439,11 @@ function handlePlayWord(playerId) {
         player.history.push({
             turnNumber: player.history.length + 1,
             action: 'invalid',
-            words: invalidWords.map(w => ({ word: w.word, score: 0 })),
+            words: invalidWords.map(w => ({
+                word: w.word,
+                score: 0,
+                definition: 'Not in dictionary'
+            })),
             totalScore: 0,
             timestamp: new Date().toLocaleTimeString()
         });
@@ -470,7 +476,12 @@ function handlePlayWord(playerId) {
     const wordScores = newWords.map(wordObj => {
         const score = calculateWordScore(wordObj);
         totalScore += score;
-        return { word: wordObj.word, score };
+        const definition = getDefinition(wordObj.word);
+        return {
+            word: wordObj.word,
+            score,
+            definition: definition || 'Definition not available'
+        };
     });
 
     // Bingo bonus
@@ -579,25 +590,101 @@ function handleExchangeTiles(playerId, indices) {
 }
 
 
-// Load dictionary
-function loadDictionary() {
-    try {
-        const dictPath = path.join(process.cwd(), 'public', 'sowpods.txt');
-        const content = fs.readFileSync(dictPath, 'utf-8');
-        const words = content.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
-        dictionary = new Set(words);
-        console.log(`[Game API] Dictionary loaded: ${dictionary.size} words`);
-    } catch (error) {
-        console.error('[Game API] Failed to load dictionary:', error);
+// Parse dictionary file with definitions
+// Format: WORD definition [metadata]
+function parseDictionaryFile(content) {
+    const dictionary = new Map();
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Match format: WORD rest of line
+        const match = trimmed.match(/^(\S+)\s+(.+)$/);
+        if (match) {
+            const word = match[1].toLowerCase();
+            const definition = match[2];
+            dictionary.set(word, definition);
+        }
     }
+
+    return dictionary;
+}
+
+// Load dictionaries
+function loadDictionaries() {
+    try {
+        // Load CSW21
+        const csw21Path = path.join(process.cwd(), 'public', 'CSW21.txt');
+        if (fs.existsSync(csw21Path)) {
+            const content = fs.readFileSync(csw21Path, 'utf-8');
+            csw21Dictionary = parseDictionaryFile(content);
+            console.log(`[Game API] CSW21 Dictionary loaded: ${csw21Dictionary.size} words`);
+        } else {
+            console.warn('[Game API] CSW21.txt not found');
+        }
+
+        // Load NWL2023
+        const nwl2023Path = path.join(process.cwd(), 'public', 'NWL2023.txt');
+        if (fs.existsSync(nwl2023Path)) {
+            const content = fs.readFileSync(nwl2023Path, 'utf-8');
+            nwl2023Dictionary = parseDictionaryFile(content);
+            console.log(`[Game API] NWL2023 Dictionary loaded: ${nwl2023Dictionary.size} words`);
+        } else {
+            console.warn('[Game API] NWL2023.txt not found');
+        }
+
+        // Initialize active dictionary with CSW21 by default
+        updateActiveDictionary({ csw21: true, nwl2023: false });
+
+    } catch (error) {
+        console.error('[Game API] Failed to load dictionaries:', error);
+    }
+}
+
+// Update which dictionaries are active
+function updateActiveDictionary(selection) {
+    activeDictionary = new Set();
+
+    if (selection.csw21) {
+        for (const word of csw21Dictionary.keys()) {
+            activeDictionary.add(word);
+        }
+    }
+
+    if (selection.nwl2023) {
+        for (const word of nwl2023Dictionary.keys()) {
+            activeDictionary.add(word);
+        }
+    }
+
+    console.log(`[Game API] Active dictionary updated: ${activeDictionary.size} words (CSW21: ${selection.csw21}, NWL2023: ${selection.nwl2023})`);
+}
+
+// Get definition for a word from active dictionaries
+function getDefinition(word) {
+    const lowerWord = word.toLowerCase();
+
+    // Try CSW21 first
+    if (csw21Dictionary.has(lowerWord)) {
+        return csw21Dictionary.get(lowerWord);
+    }
+
+    // Then try NWL2023
+    if (nwl2023Dictionary.has(lowerWord)) {
+        return nwl2023Dictionary.get(lowerWord);
+    }
+
+    return null;
 }
 
 export function gameApiPlugin() {
     return {
         name: 'game-api-v2',
         configureServer(server) {
-            // Load dictionary on startup
-            loadDictionary();
+            // Load dictionaries on startup
+            loadDictionaries();
 
             // Initialize game
             gameState = createInitialGameState();
@@ -661,6 +748,10 @@ export function gameApiPlugin() {
                                     break;
                                 case 'exchange-tiles':
                                     result = handleExchangeTiles(action.playerId, action.indices);
+                                    break;
+                                case 'update-dictionary':
+                                    updateActiveDictionary(action.dictionaries);
+                                    result = { success: true };
                                     break;
                                 default:
                                     result = { success: false, error: 'Unknown action' };
