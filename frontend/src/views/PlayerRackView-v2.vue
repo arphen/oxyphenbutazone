@@ -132,7 +132,7 @@
       :remaining1="gameState?.finalScores?.player1Remaining || 0"
       :remaining2="gameState?.finalScores?.player2Remaining || 0"
       @new-game="restartGame"
-      @close="() => {}"
+      @close="handleGameOverClose"
     />
     
     <!-- Swap Tiles Modal -->
@@ -157,6 +157,7 @@ import GameOverModal from '../components/GameOverModal.vue';
 import BlankLetterPicker from '../components/BlankLetterPicker.vue';
 import SwapTilesModal from '../components/SwapTilesModal.vue';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
+import { useGamePersistence } from '../composables/useGamePersistence.js';
 
 export default {
   name: 'PlayerRackView',
@@ -167,9 +168,11 @@ export default {
   },
   setup() {
     const { playClickSound, setVolume } = useSoundEffects();
+    const gamePersistence = useGamePersistence();
     return {
       playClickSound,
-      setVolume
+      setVolume,
+      gamePersistence
     };
   },
   props: {
@@ -322,6 +325,25 @@ export default {
         const response = await fetch('/api/game-state');
         if (response.ok) {
           const newGameState = await response.json();
+          
+          // Initialize game persistence if this is the first state and no current game exists
+          const isFirstFetch = !this.gameState;
+          if (isFirstFetch && !this.gamePersistence.currentGameId.value) {
+            // Check if this is a fresh game (no moves yet) OR if we need to recover mid-game
+            const hasNoMoves = (!newGameState.player1?.history || newGameState.player1.history.length === 0) &&
+                              (!newGameState.player2?.history || newGameState.player2.history.length === 0);
+            
+            if (hasNoMoves && !newGameState.gameOver) {
+              // Fresh game, initialize it
+              this.gamePersistence.startNewGame(newGameState);
+              console.log('[GamePersistence] Initialized new game:', this.gamePersistence.currentGameId.value);
+            } else if (!hasNoMoves || newGameState.gameOver) {
+              // Game in progress or completed but we don't have it tracked
+              // This can happen if page was refreshed mid-game
+              console.warn('[GamePersistence] Game in progress detected but not tracked. Starting tracking now.');
+              this.gamePersistence.startNewGame(newGameState);
+            }
+          }
           
           // Check if turn changed to this player
           if (this.gameState) {
@@ -603,6 +625,33 @@ export default {
       console.log('[Sound] Attempting to play click sound for Play Word button');
       this.playClickSound();
       
+      // Capture state before move
+      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const stateBefore = {
+        rackBefore: [...(player?.rack || [])],
+        scoreBefore: player?.score || 0,
+        boardStateBefore: this.captureBoard(this.gameState.board)
+      };
+      
+      // Capture tiles that are currently placed (marked as isNew)
+      const tilesPlaced = [];
+      if (this.gameState?.board) {
+        for (let row = 0; row < this.gameState.board.length; row++) {
+          for (let col = 0; col < this.gameState.board[row].length; col++) {
+            const cell = this.gameState.board[row][col];
+            if (cell.isNew && cell.letter) {
+              tilesPlaced.push({
+                row,
+                col,
+                letter: cell.letter,
+                isBlank: cell.isBlank,
+                chosenLetter: cell.chosenLetter
+              });
+            }
+          }
+        }
+      }
+      
       try {
         const response = await fetch('/api/action', {
           method: 'POST',
@@ -615,7 +664,39 @@ export default {
         
         if (response.ok) {
           const result = await response.json();
-          this.gameState = result.gameState;
+          const newGameState = result.gameState;
+          
+          // Extract words formed from player history
+          const playerHistory = this.playerId === '1' ? 
+            newGameState.player1?.history : 
+            newGameState.player2?.history;
+          const lastMove = playerHistory?.[playerHistory.length - 1];
+          
+          // Log the state before saving
+          console.log('[PlayerRackView] About to save move with newGameState:', {
+            hasBoardData: !!newGameState.board && newGameState.board.length > 0,
+            boardLength: newGameState.board?.length,
+            player1Rack: newGameState.player1?.rack,
+            player2Rack: newGameState.player2?.rack,
+            tilesPlaced,
+            wordsFormed: lastMove?.words
+          });
+          
+          // Save move to persistence
+          this.gamePersistence.saveMove(newGameState, 'play-word', {
+            playerId: this.playerId,
+            ...stateBefore,
+            tilesPlaced,
+            wordsFormed: lastMove?.words || [],
+            valid: lastMove?.action !== 'invalid'
+          });
+          
+          this.gameState = newGameState;
+          
+          // Check if game is over and save it
+          if (newGameState.gameOver) {
+            this.gamePersistence.completeGame(newGameState);
+          }
         }
       } catch (error) {
         console.error('Failed to play word:', error);
@@ -645,6 +726,13 @@ export default {
     async passTurn() {
       if (!this.isCurrentPlayer || this.hasNewTiles) return;
       
+      // Capture state before pass
+      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const stateBefore = {
+        rackBefore: [...(player?.rack || [])],
+        scoreBefore: player?.score || 0
+      };
+      
       try {
         const response = await fetch('/api/action', {
           method: 'POST',
@@ -661,6 +749,12 @@ export default {
           console.log('[Pass] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
           console.log('[Pass] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
           console.log('[Pass] This player ID:', this.playerId);
+          
+          // Save pass action
+          this.gamePersistence.saveMove(result.gameState, 'pass', {
+            playerId: this.playerId,
+            ...stateBefore
+          });
           
           // Update game state - this should trigger reactivity
           this.gameState = result.gameState;
@@ -681,6 +775,13 @@ export default {
     async handleSwapTiles(selectedIndices) {
       if (!this.isCurrentPlayer) return;
 
+      // Capture state before exchange
+      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const stateBefore = {
+        rackBefore: [...(player?.rack || [])],
+        scoreBefore: player?.score || 0
+      };
+
       try {
         const response = await fetch('/api/action', {
           method: 'POST',
@@ -697,6 +798,13 @@ export default {
           console.log('[Exchange] Before update - isCurrentPlayer:', this.isCurrentPlayer);
           console.log('[Exchange] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
           console.log('[Exchange] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
+          
+          // Save exchange action
+          this.gamePersistence.saveMove(result.gameState, 'exchange', {
+            playerId: this.playerId,
+            ...stateBefore,
+            tilesExchanged: selectedIndices.length
+          });
           
           this.gameState = result.gameState;
           
@@ -752,9 +860,37 @@ export default {
           body: JSON.stringify({ type: 'restart' })
         });
         await this.fetchGameState();
+        
+        // Initialize new game in persistence
+        if (this.gameState) {
+          this.gamePersistence.startNewGame(this.gameState);
+        }
       } catch (error) {
         console.error('Failed to restart game:', error);
       }
+    },
+    handleGameOverClose() {
+      // When the game over modal is closed, complete the game if not already done
+      if (this.gameState?.gameOver && this.gamePersistence.currentGameId.value) {
+        console.log('[GameOver] Completing game on modal close');
+        this.gamePersistence.completeGame(this.gameState);
+      }
+      // Navigate to game history to see the completed game
+      this.$router.push('/history');
+    },
+    captureBoard(board) {
+      if (!board) return [];
+      
+      return board.map(row => 
+        row.map(cell => ({
+          letter: cell.letter || null,
+          isBlank: cell.isBlank || false,
+          chosenLetter: cell.chosenLetter || null,
+          locked: cell.locked || false,
+          isNew: cell.isNew || false,
+          type: cell.type || 'normal'
+        }))
+      );
     }
   }
 };

@@ -194,13 +194,13 @@ export default {
 .mobile-rack {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
 }
 
 .rack-tile {
-  width: 70px;
-  height: 70px;
+  width: 90px;
+  height: 90px;
   background: linear-gradient(135deg, #f0e68c 0%, #daa520 100%);
   border: 2px solid #333;
   border-radius: 8px;
@@ -213,7 +213,7 @@ export default {
 }
 
 .letter {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: bold;
   text-transform: uppercase;
   color: #333;
@@ -221,9 +221,9 @@ export default {
 
 .points {
   position: absolute;
-  bottom: 4px;
-  right: 6px;
-  font-size: 0.8rem;
+  bottom: 5px;
+  right: 8px;
+  font-size: 1rem;
   font-weight: bold;
   color: #666;
 }

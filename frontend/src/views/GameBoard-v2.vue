@@ -18,9 +18,16 @@
         <div class="sidebar">
           <!-- Header Controls -->
           <div class="sidebar-header">
+            <button @click="goHome" class="icon-button" title="Back to Menu">
+              🏠
+            </button>
             <button @click="toggleQR" class="icon-button" title="Toggle QR Codes">
               📱
             </button>
+            <DictionaryChooser 
+              :selectedDictionaries="selectedDictionaries"
+              @update="handleDictionaryUpdate"
+            />
             <button @click="restartGame" class="icon-button" title="Restart Game">
               🔄
             </button>
@@ -133,7 +140,7 @@
       :remaining1="gameState?.finalScores?.player1Remaining || 0"
       :remaining2="gameState?.finalScores?.player2Remaining || 0"
       @new-game="restartGame"
-      @close="() => {}"
+      @close="handleGameOverClose"
     />
   </div>
 </template>
@@ -143,7 +150,9 @@ import Board from '../components/Board.vue';
 import QRDisplay from '../components/QRDisplay.vue';
 import MobileRackView from '../components/MobileRackView.vue';
 import GameOverModal from '../components/GameOverModal.vue';
+import DictionaryChooser from '../components/DictionaryChooser.vue';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
+import { useGamePersistence } from '../composables/useGamePersistence.js';
 
 export default {
   name: 'GameBoard',
@@ -152,12 +161,15 @@ export default {
     QRDisplay,
     MobileRackView,
     GameOverModal,
+    DictionaryChooser,
   },
   setup() {
     const { playClickSound, testSound } = useSoundEffects();
+    const gamePersistence = useGamePersistence();
     return {
       playClickSound,
-      testSound
+      testSound,
+      gamePersistence
     };
   },
   data() {
@@ -166,6 +178,7 @@ export default {
       showQR: false,
       isMobileView: false,
       pollInterval: null,
+      selectedDictionaries: { sowpods: true, twl: false },
     };
   },
   computed: {
@@ -258,11 +271,55 @@ export default {
     }
   },
   methods: {
+    goHome() {
+      this.$router.push('/');
+    },
     async fetchGameState() {
       try {
         const response = await fetch('/api/game-state');
         if (response.ok) {
           const newGameState = await response.json();
+          
+          // Initialize game persistence if this is the first state and no current game exists
+          const isFirstFetch = !this.gameState;
+          if (isFirstFetch && !this.gamePersistence.currentGameId.value) {
+            // Check if this is a fresh game (no moves yet) OR if we need to recover mid-game
+            const hasNoMoves = (!newGameState.player1?.history || newGameState.player1.history.length === 0) &&
+                              (!newGameState.player2?.history || newGameState.player2.history.length === 0);
+            
+            if (hasNoMoves && !newGameState.gameOver) {
+              // Fresh game, initialize it
+              this.gamePersistence.startNewGame(newGameState);
+              console.log('[GamePersistence] Initialized new game:', this.gamePersistence.currentGameId.value);
+            } else if (!hasNoMoves || newGameState.gameOver) {
+              // Game in progress or completed but we don't have it tracked
+              // This can happen if page was refreshed mid-game
+              console.warn('[GamePersistence] Game in progress detected but not tracked. Starting tracking now.');
+              this.gamePersistence.startNewGame(newGameState);
+            }
+          }
+          
+          // Detect new moves by comparing history lengths
+          if (this.gameState && this.gamePersistence.currentGameId.value) {
+            const oldP1Moves = this.gameState.player1?.history?.length || 0;
+            const oldP2Moves = this.gameState.player2?.history?.length || 0;
+            const newP1Moves = newGameState.player1?.history?.length || 0;
+            const newP2Moves = newGameState.player2?.history?.length || 0;
+            
+            // Check if player 1 made a new move
+            if (newP1Moves > oldP1Moves) {
+              const lastMove = newGameState.player1.history[newP1Moves - 1];
+              console.log('[GameBoard] Player 1 made a move, recording it');
+              this.recordMoveFromHistory(newGameState, '1', lastMove);
+            }
+            
+            // Check if player 2 made a new move
+            if (newP2Moves > oldP2Moves) {
+              const lastMove = newGameState.player2.history[newP2Moves - 1];
+              console.log('[GameBoard] Player 2 made a move, recording it');
+              this.recordMoveFromHistory(newGameState, '2', lastMove);
+            }
+          }
           
           // Check if new tiles were placed (detect isNew tiles)
           if (this.gameState && newGameState.board) {
@@ -289,6 +346,15 @@ export default {
           }
           
           this.gameState = newGameState;
+          
+          // Check if game just ended
+          if (newGameState.gameOver && this.gamePersistence.currentGameId.value) {
+            const currentGame = this.gamePersistence.getCurrentGame();
+            if (currentGame && currentGame.status !== 'completed') {
+              console.log('[GameBoard] Game ended, completing it');
+              this.gamePersistence.completeGame(newGameState);
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to fetch game state:', error);
@@ -352,8 +418,80 @@ export default {
           body: JSON.stringify({ type: 'restart' })
         });
         await this.fetchGameState();
+        
+        // Initialize new game in persistence
+        if (this.gameState) {
+          this.gamePersistence.startNewGame(this.gameState);
+        }
       } catch (error) {
         console.error('Failed to restart game:', error);
+      }
+    },
+    recordMoveFromHistory(gameState, playerNum, historyEntry) {
+      // Extract move details from the backend history entry
+      // Map backend action to our action types
+      const action = historyEntry.action === 'play' ? 'play-word' : 
+                     historyEntry.action === 'pass' ? 'pass' :
+                     historyEntry.action === 'exchange' ? 'exchange' : 'play-word';
+      
+      const metadata = {
+        playerId: playerNum,
+        tilesPlaced: historyEntry.tiles || [],
+        wordsFormed: historyEntry.words || [],
+        scoreBefore: gameState[`player${playerNum}`]?.score - (historyEntry.points || 0) || 0,
+        rackBefore: [], // We don't have rack before from history
+        valid: true
+      };
+      
+      // Add move-specific data based on action type
+      if (historyEntry.action === 'exchange') {
+        metadata.tilesExchanged = historyEntry.tiles?.length || 0;
+      }
+      
+      console.log('[GameBoard] Recording move from history:', {
+        action,
+        playerNum,
+        historyEntry,
+        metadata,
+        gameState: {
+          hasBoard: !!gameState.board,
+          boardLength: gameState.board?.length
+        }
+      });
+      
+      this.gamePersistence.saveMove(gameState, action, metadata);
+    },
+    
+    handleGameOverClose() {
+      // When the game over modal is closed, complete the game if not already done
+      if (this.gameState?.gameOver && this.gamePersistence.currentGameId.value) {
+        console.log('[GameBoard] Completing game on modal close');
+        this.gamePersistence.completeGame(this.gameState);
+      }
+      // Navigate to game history to see the completed game
+      this.$router.push('/history');
+    },
+    async handleDictionaryUpdate(selection) {
+      // Ensure at least one is selected
+      if (!selection.sowpods && !selection.twl) {
+        alert('At least one dictionary must be selected');
+        return;
+      }
+      
+      this.selectedDictionaries = selection;
+      
+      try {
+        await fetch('/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'update-dictionary',
+            dictionaries: selection
+          })
+        });
+        await this.fetchGameState();
+      } catch (error) {
+        console.error('Failed to update dictionary:', error);
       }
     },
   },
