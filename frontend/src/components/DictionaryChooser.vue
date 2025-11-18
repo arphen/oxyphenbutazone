@@ -8,17 +8,27 @@
       <div class="dropdown-header">Dictionary</div>
       <label class="checkbox-item">
         <input type="checkbox" v-model="csw21Enabled" @change="handleChange" />
-        <span>CSW21</span>
+        <span>CSW21 🇬🇧</span>
       </label>
       <label class="checkbox-item">
         <input type="checkbox" v-model="nwl2023Enabled" @change="handleChange" />
-        <span>NWL2023</span>
+        <span>NWL2023 🇺🇸</span>
+      </label>
+      <label class="checkbox-item">
+        <input type="checkbox" v-model="slovenianEnabled" @change="handleChange" />
+        <span>Slovenian 🇸🇮</span>
       </label>
       <div class="dictionary-info">
-        <span v-if="csw21Enabled && nwl2023Enabled">Using union of both</span>
+        <span v-if="activeDictionaryCount > 1">Using union of {{ activeDictionaryCount }} dictionaries</span>
         <span v-else-if="csw21Enabled">Using CSW21</span>
         <span v-else-if="nwl2023Enabled">Using NWL2023</span>
+        <span v-else-if="slovenianEnabled">Using Slovenian (254k words)</span>
         <span v-else class="warning">⚠️ Select at least one</span>
+      </div>
+      <div class="tile-info">
+        <span class="tile-label">Tiles:</span>
+        <span v-if="slovenianEnabled && !csw21Enabled && !nwl2023Enabled" class="tile-language">🇸🇮 Slovenian alphabet</span>
+        <span v-else class="tile-language">🇬🇧 English alphabet</span>
       </div>
     </div>
   </div>
@@ -30,15 +40,25 @@ export default {
   props: {
     selectedDictionaries: {
       type: Object,
-      default: () => ({ csw21: true, nwl2023: false })
+      default: () => ({ csw21: true, nwl2023: false, slovenian: false })
     }
   },
   data() {
     return {
       showDropdown: false,
       csw21Enabled: this.selectedDictionaries.csw21,
-      nwl2023Enabled: this.selectedDictionaries.nwl2023
+      nwl2023Enabled: this.selectedDictionaries.nwl2023,
+      slovenianEnabled: this.selectedDictionaries.slovenian
     };
+  },
+  computed: {
+    activeDictionaryCount() {
+      let count = 0;
+      if (this.csw21Enabled) count++;
+      if (this.nwl2023Enabled) count++;
+      if (this.slovenianEnabled) count++;
+      return count;
+    }
   },
   methods: {
     toggleDropdown() {
@@ -47,7 +67,8 @@ export default {
     handleChange() {
       this.$emit('update', {
         csw21: this.csw21Enabled,
-        nwl2023: this.nwl2023Enabled
+        nwl2023: this.nwl2023Enabled,
+        slovenian: this.slovenianEnabled
       });
     }
   },
@@ -153,5 +174,28 @@ export default {
 
 .dictionary-info .warning {
   color: #fbbf24;
+}
+
+.tile-info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tile-label {
+  color: #71717a;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.75rem;
+}
+
+.tile-language {
+  color: #60a5fa;
+  font-weight: 500;
 }
 </style>

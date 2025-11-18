@@ -3,12 +3,22 @@
     <div v-for="(row, rowIndex) in board" :key="rowIndex" class="board-row">
       <div v-for="(cell, colIndex) in row" :key="colIndex" 
            class="board-cell" 
-           :class="[cell.type, { 'has-tile': cell.letter || cell.isBlank === true, 'new-tile': cell.isNew, 'blank-tile': cell.isBlank === true }]" 
-           @dragover.prevent 
-           @drop="onDrop(rowIndex, colIndex)"
+           :class="[
+             cell.type, 
+             { 
+               'has-tile': cell.letter || cell.isBlank === true, 
+               'new-tile': cell.isNew, 
+               'blank-tile': cell.isBlank === true,
+               'drag-over': dragOverCell && dragOverCell.row === rowIndex && dragOverCell.col === colIndex
+             }
+           ]" 
+           @dragover.prevent="onDragOver($event, rowIndex, colIndex)" 
+           @dragenter.prevent="onDragEnter($event, rowIndex, colIndex)"
+           @dragleave.prevent="onDragLeave($event)"
+           @drop.prevent.stop="onDrop($event, rowIndex, colIndex)"
            @click="onCellClick(rowIndex, colIndex)"
            :draggable="!!(cell.letter || cell.isBlank)"
-           @dragstart="onDragStart(cell.letter, rowIndex, colIndex)">
+           @dragstart="onDragStart($event, cell.letter, rowIndex, colIndex)">
         <span v-if="cell.letter || cell.isBlank === true" class="tile-letter">{{ cell.isBlank === true ? (cell.chosenLetter || '★').toUpperCase() : (cell.letter || '').toUpperCase() }}</span>
         <span v-if="cell.letter || cell.isBlank === true" class="tile-points">{{ getLetterValue(cell.isBlank === true ? cell.chosenLetter : cell.letter) }}</span>
         <span v-if="cell.isBlank === true" class="blank-indicator">★</span>
@@ -27,13 +37,54 @@ export default {
       required: true,
     },
   },
+  data() {
+    return {
+      dragOverCell: null,
+    };
+  },
   methods: {
-    onDrop(rowIndex, colIndex) {
-      const data = JSON.parse(event.dataTransfer.getData('text/plain'));
-      this.$emit('place-letter', { ...data, toRowIndex: rowIndex, toColIndex: colIndex });
+    onDragOver(event, rowIndex, colIndex) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
     },
-    onDragStart(letter, rowIndex, colIndex) {
-      event.dataTransfer.setData('text/plain', JSON.stringify({ letter, from: 'board', fromRowIndex: rowIndex, fromColIndex: colIndex }));
+    onDragEnter(event, rowIndex, colIndex) {
+      event.preventDefault();
+      // Only highlight empty cells
+      const cell = this.board[rowIndex][colIndex];
+      if (!cell.letter && cell.isBlank !== true) {
+        this.dragOverCell = { row: rowIndex, col: colIndex };
+      }
+    },
+    onDragLeave(event) {
+      event.preventDefault();
+      // Clear highlight when leaving
+      this.dragOverCell = null;
+    },
+    onDrop(event, rowIndex, colIndex) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.dragOverCell = null;
+      
+      try {
+        const dataStr = event.dataTransfer.getData('text/plain');
+        if (!dataStr) {
+          console.warn('No drag data found');
+          return;
+        }
+        const data = JSON.parse(dataStr);
+        this.$emit('place-letter', { ...data, toRowIndex: rowIndex, toColIndex: colIndex });
+      } catch (error) {
+        console.error('Error handling drop:', error);
+      }
+    },
+    onDragStart(event, letter, rowIndex, colIndex) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', JSON.stringify({ 
+        letter, 
+        from: 'board', 
+        fromRowIndex: rowIndex, 
+        fromColIndex: colIndex 
+      }));
     },
     onCellClick(rowIndex, colIndex) {
       this.$emit('cell-click', { row: rowIndex, col: colIndex });
@@ -101,6 +152,13 @@ export default {
 
 .board-cell:not(.has-tile):hover {
   background: rgba(40, 40, 60, 0.7);
+}
+
+.board-cell.drag-over {
+  background: rgba(134, 239, 172, 0.4) !important;
+  box-shadow: inset 0 0 20px rgba(74, 222, 128, 0.6);
+  transform: scale(1.05);
+  z-index: 10;
 }
 
 .premium-label {

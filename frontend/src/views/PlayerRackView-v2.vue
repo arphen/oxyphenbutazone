@@ -216,22 +216,22 @@ export default {
   computed: {
     playerName() {
       if (!this.gameState) return '';
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       return player?.playerName || '';
     },
     rack() {
       if (!this.gameState) return [];
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       return player?.rack || [];
     },
     score() {
       if (!this.gameState) return 0;
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       return player?.score || 0;
     },
     isCurrentPlayer() {
       if (!this.gameState) return false;
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       const result = player?.isCurrentPlayer || false;
       // console.log('[isCurrentPlayer computed] Player', this.playerId, ':', result);
       return result;
@@ -347,8 +347,8 @@ export default {
           
           // Check if turn changed to this player
           if (this.gameState) {
-            const wasMyTurn = this.playerId === '1' ? this.gameState.player1?.isCurrentPlayer : this.gameState.player2?.isCurrentPlayer;
-            const isNowMyTurn = this.playerId === '1' ? newGameState.player1?.isCurrentPlayer : newGameState.player2?.isCurrentPlayer;
+            const wasMyTurn = this.gameState[`player${this.playerId}`]?.isCurrentPlayer;
+            const isNowMyTurn = newGameState[`player${this.playerId}`]?.isCurrentPlayer;
             
             if (!wasMyTurn && isNowMyTurn) {
               // Trigger flash animation
@@ -626,7 +626,7 @@ export default {
       this.playClickSound();
       
       // Capture state before move
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       const stateBefore = {
         rackBefore: [...(player?.rack || [])],
         scoreBefore: player?.score || 0,
@@ -667,9 +667,7 @@ export default {
           const newGameState = result.gameState;
           
           // Extract words formed from player history
-          const playerHistory = this.playerId === '1' ? 
-            newGameState.player1?.history : 
-            newGameState.player2?.history;
+          const playerHistory = newGameState[`player${this.playerId}`]?.history;
           const lastMove = playerHistory?.[playerHistory.length - 1];
           
           // Log the state before saving
@@ -727,7 +725,7 @@ export default {
       if (!this.isCurrentPlayer || this.hasNewTiles) return;
       
       // Capture state before pass
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       const stateBefore = {
         rackBefore: [...(player?.rack || [])],
         scoreBefore: player?.score || 0
@@ -1173,8 +1171,11 @@ export default {
 .board-square.locked { background: rgba(40, 40, 60, 0.6); }
 
 .board-square.drop-target-active {
-  box-shadow: 0 0 0 2px #86efac;
-  background: rgba(34, 197, 94, 0.3);
+  box-shadow: 0 0 0 3px #86efac, inset 0 0 20px rgba(134, 239, 172, 0.6);
+  background: rgba(34, 197, 94, 0.5) !important;
+  transform: scale(1.08);
+  transition: all 0.15s ease;
+  z-index: 10;
 }
 
 .tile.reorder-target {
@@ -1283,6 +1284,7 @@ export default {
   color: #2c3e50;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
   opacity: 0.9;
+  pointer-events: none; /* Allow touch events to pass through to elements below */
 }
 
 .ghost-value {

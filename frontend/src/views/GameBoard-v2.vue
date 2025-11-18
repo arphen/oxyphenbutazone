@@ -36,35 +36,24 @@
             </button>
           </div>
           
-          <!-- QR Section (when visible) -->
-          <div v-if="showQR" class="qr-section">
-            <QRDisplay 
-              :playerId="1" 
-              playerName="P1"
-              :rack="gameState?.player1.rack || []"
-              :score="gameState?.player1.score || 0"
-              :isCurrentPlayer="gameState?.player1.isCurrentPlayer || false"
-              :gameId="gameState?.gameId || ''" 
-            />
-            <QRDisplay 
-              :playerId="2" 
-              playerName="P2"
-              :rack="gameState?.player2.rack || []"
-              :score="gameState?.player2.score || 0"
-              :isCurrentPlayer="gameState?.player2.isCurrentPlayer || false"
-              :gameId="gameState?.gameId || ''" 
-            />
-          </div>
-          
           <!-- Players Info -->
           <div class="players-container">
-            <div class="player-card" :class="{ active: gameState?.player1.isCurrentPlayer }">
-              <div class="player-name">P1</div>
-              <div class="player-score">{{ gameState?.player1.score || 0 }}</div>
-            </div>
-            <div class="player-card" :class="{ active: gameState?.player2.isCurrentPlayer }">
-              <div class="player-name">P2</div>
-              <div class="player-score">{{ gameState?.player2.score || 0 }}</div>
+            <div 
+              v-for="playerNum in playerCount" 
+              :key="playerNum"
+              class="player-card" 
+              :class="{ 
+                active: gameState?.[`player${playerNum}`]?.isCurrentPlayer,
+                [`player-${playerNum}`]: true
+              }"
+            >
+              <div class="player-badge">
+                <span class="player-icon">👤</span>
+              </div>
+              <div class="player-info">
+                <div class="player-name">P{{ playerNum }}</div>
+                <div class="player-score">{{ gameState?.[`player${playerNum}`]?.score || 0 }}</div>
+              </div>
             </div>
           </div>
           
@@ -154,12 +143,20 @@
       @new-game="restartGame"
       @close="handleGameOverClose"
     />
+    
+    <!-- QR Modal -->
+    <QRModal
+      :show="showQR"
+      :players="qrPlayers"
+      :playerCount="playerCount"
+      @close="toggleQR"
+    />
   </div>
 </template>
 
 <script>
 import Board from '../components/Board.vue';
-import QRDisplay from '../components/QRDisplay.vue';
+import QRModal from '../components/QRModal.vue';
 import MobileRackView from '../components/MobileRackView.vue';
 import GameOverModal from '../components/GameOverModal.vue';
 import DictionaryChooser from '../components/DictionaryChooser.vue';
@@ -170,7 +167,7 @@ export default {
   name: 'GameBoard',
   components: {
     Board,
-    QRDisplay,
+    QRModal,
     MobileRackView,
     GameOverModal,
     DictionaryChooser,
@@ -190,17 +187,33 @@ export default {
       showQR: false,
       isMobileView: false,
       pollInterval: null,
-      selectedDictionaries: { csw21: true, nwl2023: false },
+      selectedDictionaries: { csw21: true, nwl2023: false, slovenian: false },
+      playerCount: 4, // Default to 4 players, can be changed from route params
     };
   },
   computed: {
+    qrPlayers() {
+      if (!this.gameState) return [];
+      return Array.from({ length: this.playerCount }, (_, i) => {
+        const playerNum = i + 1;
+        const player = this.gameState[`player${playerNum}`];
+        return {
+          name: `Player ${playerNum}`,
+          score: player?.score || 0,
+          isCurrentPlayer: player?.isCurrentPlayer || false,
+          rack: player?.rack || [],
+        };
+      });
+    },
     tilesRemaining() {
       if (!this.gameState) return 100;
       
       // Standard Scrabble has 100 tiles total
       // Calculate tiles in play: on board + in racks
-      const player1RackSize = this.gameState.player1?.rack?.length || 0;
-      const player2RackSize = this.gameState.player2?.rack?.length || 0;
+      let totalRackSize = 0;
+      for (let i = 1; i <= this.playerCount; i++) {
+        totalRackSize += this.gameState[`player${i}`]?.rack?.length || 0;
+      }
       
       // Count tiles on board
       let tilesOnBoard = 0;
@@ -212,49 +225,43 @@ export default {
         }
       }
       
-      const tilesInPlay = player1RackSize + player2RackSize + tilesOnBoard;
+      const tilesInPlay = totalRackSize + tilesOnBoard;
       return Math.max(0, 100 - tilesInPlay);
     },
     combinedHistory() {
       if (!this.gameState) return [];
       
-      const player1History = this.gameState.player1?.history || [];
-      const player2History = this.gameState.player2?.history || [];
-      const combined = [];
-      const maxLength = Math.max(player1History.length, player2History.length);
+      // Collect histories from all players
+      const playerHistories = [];
+      let maxLength = 0;
       
-      for (let i = 0; i < maxLength; i++) {
-        if (player1History[i]) {
-          let resultClass = 'valid-row';
-          if (player1History[i].action === 'pass') {
-            resultClass = 'pass-row';
-          } else if (player1History[i].action === 'exchange') {
-            resultClass = 'exchange-row';
-          } else if (player1History[i].action === 'invalid') {
-            resultClass = 'invalid-row';
+      for (let i = 1; i <= this.playerCount; i++) {
+        const history = this.gameState[`player${i}`]?.history || [];
+        playerHistories.push(history);
+        maxLength = Math.max(maxLength, history.length);
+      }
+      
+      const combined = [];
+      
+      for (let round = 0; round < maxLength; round++) {
+        for (let playerNum = 1; playerNum <= this.playerCount; playerNum++) {
+          const history = playerHistories[playerNum - 1];
+          if (history[round]) {
+            let resultClass = 'valid-row';
+            if (history[round].action === 'pass') {
+              resultClass = 'pass-row';
+            } else if (history[round].action === 'exchange') {
+              resultClass = 'exchange-row';
+            } else if (history[round].action === 'invalid') {
+              resultClass = 'invalid-row';
+            }
+            combined.push({
+              ...history[round],
+              player: playerNum,
+              round: round + 1,
+              result: resultClass
+            });
           }
-          combined.push({
-            ...player1History[i],
-            player: 1,
-            round: i + 1,
-            result: resultClass
-          });
-        }
-        if (player2History[i]) {
-          let resultClass = 'valid-row';
-          if (player2History[i].action === 'pass') {
-            resultClass = 'pass-row';
-          } else if (player2History[i].action === 'exchange') {
-            resultClass = 'exchange-row';
-          } else if (player2History[i].action === 'invalid') {
-            resultClass = 'invalid-row';
-          }
-          combined.push({
-            ...player2History[i],
-            player: 2,
-            round: i + 1,
-            result: resultClass
-          });
         }
       }
       
@@ -267,7 +274,24 @@ export default {
     const urlParams = new URLSearchParams(window.location.search);
     this.isMobileView = urlParams.get('view') === 'mobile';
     
+    // Get player count from route params or query
+    const routePlayerCount = this.$route.params.playerCount || this.$route.query.players;
+    if (routePlayerCount) {
+      this.playerCount = Math.min(4, Math.max(2, parseInt(routePlayerCount)));
+    }
+    
     if (!this.isMobileView) {
+      // Initialize game with correct player count first
+      console.log('[GameBoard] Initializing game with', this.playerCount, 'players');
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          type: 'restart',
+          playerCount: this.playerCount 
+        })
+      });
+      
       // Fetch initial game state
       await this.fetchGameState();
       
@@ -427,7 +451,10 @@ export default {
         await fetch('/api/action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'restart' })
+          body: JSON.stringify({ 
+            type: 'restart',
+            playerCount: this.playerCount 
+          })
         });
         await this.fetchGameState();
         
@@ -485,7 +512,7 @@ export default {
     },
     async handleDictionaryUpdate(selection) {
       // Ensure at least one is selected
-      if (!selection.csw21 && !selection.nwl2023) {
+      if (!selection.csw21 && !selection.nwl2023 && !selection.slovenian) {
         alert('At least one dictionary must be selected');
         return;
       }
@@ -607,47 +634,168 @@ export default {
 }
 
 .players-container {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 15px;
   padding: 20px 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .player-card {
-  flex: 1;
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  text-align: center;
-  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   opacity: 0.6;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.player-card:hover::before {
+  transform: translateX(100%);
+}
+
+.player-card.player-1 {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.player-card.player-2 {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.player-card.player-3 {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.player-card.player-4 {
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.player-badge {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  transition: all 0.3s ease;
+}
+
+.player-card.player-1 .player-badge {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.player-card.player-2 .player-badge {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.player-card.player-3 .player-badge {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.player-card.player-4 .player-badge {
+  background: rgba(168, 85, 247, 0.2);
+}
+
+.player-info {
+  flex: 1;
+  text-align: left;
+}
+
+.player-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }
 
 .player-card.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.5);
   opacity: 1;
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  transform: scale(1.02);
+}
+
+.player-card.player-1.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 
+    0 0 30px rgba(59, 130, 246, 0.4),
+    0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.player-card.player-2.active {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 
+    0 0 30px rgba(34, 197, 94, 0.4),
+    0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.player-card.player-3.active {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 
+    0 0 30px rgba(245, 158, 11, 0.4),
+    0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.player-card.player-4.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 
+    0 0 30px rgba(168, 85, 247, 0.4),
+    0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.player-card.active .player-badge {
+  animation: rotateBadge 3s linear infinite;
+}
+
+@keyframes rotateBadge {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .player-name {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: #a1a1aa;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 
 .player-card.active .player-name {
-  color: #60a5fa;
+  color: #e4e4e7;
 }
 
 .player-score {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #e4e4e7;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 /* Tiles Remaining Counter */

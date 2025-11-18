@@ -44,56 +44,73 @@ export default {
       }
     },
     onDragOver(event, index) {
-      if (!this.disabled && this.draggedIndex !== null) {
+      if (!this.disabled) {
         event.preventDefault();
+        event.stopPropagation(); // Only stop within rack
         this.dragOverIndex = index;
       }
     },
-    onDragLeave() {
-      this.dragOverIndex = null;
+    onDragLeave(event) {
+      // Don't clear if we're still within the rack
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        this.dragOverIndex = null;
+      }
     },
     onLetterDrop(event, targetIndex) {
       event.preventDefault();
       event.stopPropagation();
       
       if (!this.disabled) {
-        const data = JSON.parse(event.dataTransfer.getData('text/plain'));
-        
-        // If dragging from rack to rack (reorder)
-        if (data.from === 'rack' && targetIndex !== data.index) {
-          this.$emit('reorder-letters', { fromIndex: data.index, toIndex: targetIndex });
+        try {
+          const dataStr = event.dataTransfer.getData('text/plain');
+          if (!dataStr) return;
+          
+          const data = JSON.parse(dataStr);
+          
+          // If dragging from rack to rack (reorder)
+          if (data.from === 'rack' && targetIndex !== data.index) {
+            this.$emit('reorder-letters', { fromIndex: data.index, toIndex: targetIndex });
+          }
+        } catch (error) {
+          console.error('Error handling rack letter drop:', error);
         }
         
-        this.dragOverIndex = null;
-        this.draggedIndex = null;
-        
-        // Remove dragging class
-        const draggingElement = this.$el.querySelector('.dragging');
-        if (draggingElement) {
-          draggingElement.classList.remove('dragging');
-        }
+        this.cleanupDrag();
       }
     },
     onRackDrop(event) {
-      event.preventDefault();
-      event.stopPropagation();
+      // Only handle if drop is on the rack container itself, not a letter
+      if (event.target.classList.contains('rack')) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        if (!this.disabled) {
+          try {
+            const dataStr = event.dataTransfer.getData('text/plain');
+            if (!dataStr) return;
+            
+            const data = JSON.parse(dataStr);
+            
+            // If returning from board
+            if (data.from === 'board') {
+              this.$emit('return-letter', data);
+            }
+          } catch (error) {
+            console.error('Error handling rack drop:', error);
+          }
+          
+          this.cleanupDrag();
+        }
+      }
+    },
+    cleanupDrag() {
+      this.dragOverIndex = null;
+      this.draggedIndex = null;
       
-      if (!this.disabled) {
-        const data = JSON.parse(event.dataTransfer.getData('text/plain'));
-        
-        // If returning from board
-        if (data.from === 'board') {
-          this.$emit('return-letter', data);
-        }
-        
-        this.dragOverIndex = null;
-        this.draggedIndex = null;
-        
-        // Remove dragging class
-        const draggingElement = this.$el.querySelector('.dragging');
-        if (draggingElement) {
-          draggingElement.classList.remove('dragging');
-        }
+      // Remove dragging class
+      const draggingElement = this.$el.querySelector('.dragging');
+      if (draggingElement) {
+        draggingElement.classList.remove('dragging');
       }
     },
   },

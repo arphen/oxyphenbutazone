@@ -7,29 +7,21 @@ let gameState = null;
 // Dictionaries loaded once at startup
 let csw21Dictionary = new Map(); // word -> definition
 let nwl2023Dictionary = new Map(); // word -> definition
+let slovenianDictionary = new Map(); // word -> definition
 let activeDictionary = new Set(); // combined active words
 
 // Initialize game state
-function createInitialGameState() {
-    return {
+function createInitialGameState(playerCount = 4, language = 'english') {
+    // Update current language
+    currentLanguage = language;
+
+    const state = {
         board: createInitialBoard(),
-        tileBag: initializeTileBag(),
+        tileBag: initializeTileBag(language),
         viewportCenter: { row: 7, col: 7 },
-        player1: {
-            playerName: 'Player 1',
-            rack: [],
-            score: 0,
-            history: [],
-            isCurrentPlayer: true
-        },
-        player2: {
-            playerName: 'Player 2',
-            rack: [],
-            score: 0,
-            history: [],
-            isCurrentPlayer: false
-        },
         currentPlayer: 1,
+        playerCount: playerCount,
+        language: language,
         consecutivePasses: 0,
         gameOver: false,
         winner: null,
@@ -38,6 +30,19 @@ function createInitialGameState() {
         messageType: '',
         gameId: generateGameId()
     };
+
+    // Create players dynamically based on playerCount
+    for (let i = 1; i <= playerCount; i++) {
+        state[`player${i}`] = {
+            playerName: `Player ${i}`,
+            rack: [],
+            score: 0,
+            history: [],
+            isCurrentPlayer: i === 1
+        };
+    }
+
+    return state;
 }
 
 function generateGameId() {
@@ -73,18 +78,53 @@ function createInitialBoard() {
     return board;
 }
 
-function initializeTileBag() {
-    const letterDistribution = [
-        { letter: 'e', count: 12 }, { letter: 'a', count: 9 }, { letter: 'i', count: 9 },
-        { letter: 'o', count: 8 }, { letter: 'n', count: 6 }, { letter: 'r', count: 6 },
-        { letter: 't', count: 6 }, { letter: 'l', count: 4 }, { letter: 's', count: 4 },
-        { letter: 'u', count: 4 }, { letter: 'd', count: 4 }, { letter: 'g', count: 3 },
-        { letter: 'b', count: 2 }, { letter: 'c', count: 2 }, { letter: 'm', count: 2 },
-        { letter: 'p', count: 2 }, { letter: 'f', count: 2 }, { letter: 'h', count: 2 },
-        { letter: 'v', count: 2 }, { letter: 'w', count: 2 }, { letter: 'y', count: 2 },
-        { letter: 'k', count: 1 }, { letter: 'j', count: 1 }, { letter: 'x', count: 1 },
-        { letter: 'q', count: 1 }, { letter: 'z', count: 1 }, { letter: '', count: 2 } // blanks
-    ];
+// Tile distributions for different languages
+const TILE_DISTRIBUTIONS = {
+    english: {
+        tiles: [
+            { letter: 'e', count: 12 }, { letter: 'a', count: 9 }, { letter: 'i', count: 9 },
+            { letter: 'o', count: 8 }, { letter: 'n', count: 6 }, { letter: 'r', count: 6 },
+            { letter: 't', count: 6 }, { letter: 'l', count: 4 }, { letter: 's', count: 4 },
+            { letter: 'u', count: 4 }, { letter: 'd', count: 4 }, { letter: 'g', count: 3 },
+            { letter: 'b', count: 2 }, { letter: 'c', count: 2 }, { letter: 'm', count: 2 },
+            { letter: 'p', count: 2 }, { letter: 'f', count: 2 }, { letter: 'h', count: 2 },
+            { letter: 'v', count: 2 }, { letter: 'w', count: 2 }, { letter: 'y', count: 2 },
+            { letter: 'k', count: 1 }, { letter: 'j', count: 1 }, { letter: 'x', count: 1 },
+            { letter: 'q', count: 1 }, { letter: 'z', count: 1 }, { letter: '', count: 2 }
+        ],
+        values: {
+            'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
+            'd': 2, 'g': 2, 'b': 3, 'c': 3, 'm': 3, 'p': 3,
+            'f': 4, 'h': 4, 'v': 4, 'w': 4, 'y': 4, 'k': 5,
+            'j': 8, 'x': 8, 'q': 10, 'z': 10, '': 0
+        }
+    },
+    slovenian: {
+        tiles: [
+            { letter: 'e', count: 11 }, { letter: 'a', count: 10 }, { letter: 'i', count: 9 },
+            { letter: 'o', count: 8 }, { letter: 'n', count: 7 }, { letter: 'r', count: 6 },
+            { letter: 's', count: 6 }, { letter: 'j', count: 4 }, { letter: 'l', count: 4 },
+            { letter: 't', count: 4 }, { letter: 'd', count: 4 }, { letter: 'v', count: 4 },
+            { letter: 'k', count: 3 }, { letter: 'm', count: 2 }, { letter: 'p', count: 2 },
+            { letter: 'u', count: 2 }, { letter: 'b', count: 2 }, { letter: 'g', count: 2 },
+            { letter: 'z', count: 2 }, { letter: 'č', count: 1 }, { letter: 'h', count: 1 },
+            { letter: 'š', count: 1 }, { letter: 'c', count: 1 }, { letter: 'f', count: 1 },
+            { letter: 'ž', count: 1 }, { letter: '', count: 2 }
+        ],
+        values: {
+            'e': 1, 'a': 1, 'i': 1, 'o': 1, 'n': 1, 'r': 1, 's': 1, 'j': 1, 'l': 1, 't': 1,
+            'd': 2, 'v': 2, 'k': 3, 'm': 3, 'p': 3, 'u': 3,
+            'b': 4, 'g': 4, 'z': 4, 'č': 5, 'h': 5, 'š': 6, 'c': 8, 'f': 10, 'ž': 10, '': 0
+        }
+    }
+};
+
+// Current language for tile distribution
+let currentLanguage = 'english';
+
+function initializeTileBag(language = currentLanguage) {
+    const distribution = TILE_DISTRIBUTIONS[language] || TILE_DISTRIBUTIONS.english;
+    const letterDistribution = distribution.tiles;
 
     const bag = [];
     letterDistribution.forEach(({ letter, count }) => {
@@ -109,13 +149,8 @@ function fillRack(player) {
 }
 
 function getLetterValue(letter) {
-    const values = {
-        'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
-        'd': 2, 'g': 2, 'b': 3, 'c': 3, 'm': 3, 'p': 3,
-        'f': 4, 'h': 4, 'v': 4, 'w': 4, 'y': 4, 'k': 5,
-        'j': 8, 'x': 8, 'q': 10, 'z': 10, '': 0
-    };
-    return values[letter?.toLowerCase()] || 0;
+    const distribution = TILE_DISTRIBUTIONS[currentLanguage] || TILE_DISTRIBUTIONS.english;
+    return distribution.values[letter?.toLowerCase()] || 0;
 }
 
 function getWordsFromBoard() {
@@ -208,7 +243,13 @@ function calculateWordScore(wordObj) {
 }
 
 function handlePlaceTile(playerId, letter, rackIndex, row, col, chosenLetter = null) {
-    const player = playerId === '1' ? gameState.player1 : gameState.player2;
+    const player = gameState[`player${playerId}`];
+
+    // Validate player exists
+    if (!player) {
+        console.error(`Player ${playerId} not found. Available players:`, Object.keys(gameState).filter(k => k.startsWith('player')));
+        return { success: false, error: `Player ${playerId} not found` };
+    }
 
     // Validate
     if (!player.isCurrentPlayer) {
@@ -243,7 +284,12 @@ function handlePlaceTile(playerId, letter, rackIndex, row, col, chosenLetter = n
 }
 
 function handleRecallTiles(playerId) {
-    const player = playerId === '1' ? gameState.player1 : gameState.player2;
+    const player = gameState[`player${playerId}`];
+
+    if (!player) {
+        console.error(`Player ${playerId} not found in handleRecallTiles`);
+        return { success: false, error: `Player ${playerId} not found` };
+    }
 
     // Find all new tiles and return to rack
     for (let row = 0; row < 15; row++) {
@@ -290,7 +336,12 @@ function handleSetBlankLetter(row, col, chosenLetter) {
 }
 
 function handlePass(playerId) {
-    const player = playerId === '1' ? gameState.player1 : gameState.player2;
+    const player = gameState[`player${playerId}`];
+
+    if (!player) {
+        console.error(`Player ${playerId} not found in handlePass`);
+        return { success: false, error: `Player ${playerId} not found` };
+    }
 
     if (!player.isCurrentPlayer) {
         return { success: false, error: 'Not your turn' };
@@ -307,6 +358,8 @@ function handlePass(playerId) {
     // Increment consecutive passes
     gameState.consecutivePasses++;
 
+    console.log(`[Pass] Player ${playerId} passed. Consecutive passes: ${gameState.consecutivePasses}/${gameState.playerCount}`);
+
     // Add pass to history
     player.history.push({
         turnNumber: player.history.length + 1,
@@ -317,40 +370,82 @@ function handlePass(playerId) {
     gameState.message = `${player.playerName} passed their turn`;
     gameState.messageType = 'info';
 
-    // Check if game should end (2 consecutive passes)
-    if (gameState.consecutivePasses >= 2) {
+    // Check if game should end (all players passed consecutively)
+    if (gameState.consecutivePasses >= gameState.playerCount) {
+        console.log(`[Pass] Game ending - all ${gameState.playerCount} players passed consecutively`);
         endGame();
         return { success: true, gameOver: true };
     }
 
-    // Switch player
-    gameState.player1.isCurrentPlayer = !gameState.player1.isCurrentPlayer;
-    gameState.player2.isCurrentPlayer = !gameState.player2.isCurrentPlayer;
-    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+    // Switch to next player
+    switchToNextPlayer();
 
     return { success: true };
 }
 
-function calculateFinalScores() {
-    const player1RemainingValue = gameState.player1.rack.reduce((sum, letter) => sum + getLetterValue(letter), 0);
-    const player2RemainingValue = gameState.player2.rack.reduce((sum, letter) => sum + getLetterValue(letter), 0);
+function switchToNextPlayer() {
+    const previousPlayer = gameState.currentPlayer;
 
-    let finalScore1 = gameState.player1.score - player1RemainingValue;
-    let finalScore2 = gameState.player2.score - player2RemainingValue;
+    console.log(`[Turn Switch DEBUG] Before: currentPlayer=${gameState.currentPlayer}, playerCount=${gameState.playerCount}, type=${typeof gameState.playerCount}`);
 
-    // If one player used all tiles, they get opponent's remaining tile values
-    if (gameState.player1.rack.length === 0) {
-        finalScore1 += player2RemainingValue;
-    } else if (gameState.player2.rack.length === 0) {
-        finalScore2 += player1RemainingValue;
+    // Set all players to not current
+    for (let i = 1; i <= gameState.playerCount; i++) {
+        gameState[`player${i}`].isCurrentPlayer = false;
     }
 
-    return {
-        player1: finalScore1,
-        player2: finalScore2,
-        player1Remaining: player1RemainingValue,
-        player2Remaining: player2RemainingValue
-    };
+    // Move to next player (circular rotation)
+    // If current is 3 and count is 3: (3 % 3) = 0, wrap to 1
+    // If current is 1 and count is 3: (1 % 3) = 1, next is 2
+    // If current is 2 and count is 3: (2 % 3) = 2, next is 3
+    let nextPlayer = (gameState.currentPlayer % gameState.playerCount) + 1;
+
+    console.log(`[Turn Switch DEBUG] Calculation: (${previousPlayer} % ${gameState.playerCount}) + 1 = ${nextPlayer}`);
+
+    // Double-check the player exists, otherwise fall back to player 1
+    if (!gameState[`player${nextPlayer}`]) {
+        console.error(`[Turn Switch ERROR] Player ${nextPlayer} does not exist! Falling back to Player 1. Available:`, Object.keys(gameState).filter(k => k.startsWith('player')));
+        nextPlayer = 1;
+    }
+
+    gameState.currentPlayer = nextPlayer;
+    gameState[`player${gameState.currentPlayer}`].isCurrentPlayer = true;
+
+    console.log(`[Turn Switch] Player ${previousPlayer} → Player ${gameState.currentPlayer} (${gameState.playerCount} players total)`);
+}
+
+function calculateFinalScores() {
+    const finalScores = {};
+    const remainingValues = {};
+    let playerWithEmptyRack = null;
+    let totalRemaining = 0;
+
+    // Calculate remaining tile values for each player
+    for (let i = 1; i <= gameState.playerCount; i++) {
+        const player = gameState[`player${i}`];
+        const remaining = player.rack.reduce((sum, letter) => sum + getLetterValue(letter), 0);
+        remainingValues[`player${i}`] = remaining;
+        remainingValues[`player${i}Remaining`] = remaining;
+
+        if (player.rack.length === 0 && !playerWithEmptyRack) {
+            playerWithEmptyRack = i;
+        }
+        totalRemaining += remaining;
+    }
+
+    // Calculate final scores
+    for (let i = 1; i <= gameState.playerCount; i++) {
+        const player = gameState[`player${i}`];
+        let finalScore = player.score - remainingValues[`player${i}`];
+
+        // If this player used all tiles, they get all opponents' remaining values
+        if (playerWithEmptyRack === i) {
+            finalScore += totalRemaining;
+        }
+
+        finalScores[`player${i}`] = finalScore;
+    }
+
+    return { ...finalScores, ...remainingValues };
 }
 
 function endGame() {
@@ -358,21 +453,42 @@ function endGame() {
     const finalScores = calculateFinalScores();
     gameState.finalScores = finalScores;
 
-    if (finalScores.player1 > finalScores.player2) {
-        gameState.winner = 1;
-        gameState.message = `Game Over! ${gameState.player1.playerName} wins ${finalScores.player1} - ${finalScores.player2}!`;
-    } else if (finalScores.player2 > finalScores.player1) {
-        gameState.winner = 2;
-        gameState.message = `Game Over! ${gameState.player2.playerName} wins ${finalScores.player2} - ${finalScores.player1}!`;
+    // Find the winner(s)
+    let highestScore = -Infinity;
+    let winners = [];
+
+    for (let i = 1; i <= gameState.playerCount; i++) {
+        const score = finalScores[`player${i}`];
+        if (score > highestScore) {
+            highestScore = score;
+            winners = [i];
+        } else if (score === highestScore) {
+            winners.push(i);
+        }
+    }
+
+    if (winners.length === 1) {
+        gameState.winner = winners[0];
+        const winnerName = gameState[`player${winners[0]}`].playerName;
+        const scoresText = Array.from({ length: gameState.playerCount }, (_, i) =>
+            finalScores[`player${i + 1}`]
+        ).join(' - ');
+        gameState.message = `Game Over! ${winnerName} wins with ${highestScore} points! (${scoresText})`;
     } else {
         gameState.winner = 0; // Tie
-        gameState.message = `Game Over! It's a tie at ${finalScores.player1} - ${finalScores.player2}!`;
+        const winnerNames = winners.map(w => gameState[`player${w}`].playerName).join(' and ');
+        gameState.message = `Game Over! It's a tie between ${winnerNames} at ${highestScore} points!`;
     }
     gameState.messageType = 'success';
 }
 
 function handlePlayWord(playerId) {
-    const player = playerId === '1' ? gameState.player1 : gameState.player2;
+    const player = gameState[`player${playerId}`];
+
+    if (!player) {
+        console.error(`Player ${playerId} not found in handlePlayWord`);
+        return { success: false, error: `Player ${playerId} not found` };
+    }
 
     if (!player.isCurrentPlayer) {
         return { success: false, error: 'Not your turn' };
@@ -464,9 +580,7 @@ function handlePlayWord(playerId) {
         });
 
         // Switch player (end turn)
-        gameState.player1.isCurrentPlayer = !gameState.player1.isCurrentPlayer;
-        gameState.player2.isCurrentPlayer = !gameState.player2.isCurrentPlayer;
-        gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+        switchToNextPlayer();
 
         return { success: false, error: 'Invalid words' };
     }
@@ -506,6 +620,7 @@ function handlePlayWord(playerId) {
     });
 
     // Reset consecutive passes on successful play
+    console.log(`[Play Word] Player ${playerId} played a word. Resetting consecutive passes from ${gameState.consecutivePasses} to 0`);
     gameState.consecutivePasses = 0;
 
     // Refill rack
@@ -518,9 +633,7 @@ function handlePlayWord(playerId) {
     }
 
     // Switch player
-    gameState.player1.isCurrentPlayer = !gameState.player1.isCurrentPlayer;
-    gameState.player2.isCurrentPlayer = !gameState.player2.isCurrentPlayer;
-    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+    switchToNextPlayer();
 
     // Message
     const wordDetails = wordScores.map(ws => `${ws.word} (${ws.score})`).join(', ');
@@ -532,7 +645,12 @@ function handlePlayWord(playerId) {
 }
 
 function handleExchangeTiles(playerId, indices) {
-    const player = playerId === '1' ? gameState.player1 : gameState.player2;
+    const player = gameState[`player${playerId}`];
+
+    if (!player) {
+        console.error(`Player ${playerId} not found in handleExchangeTiles`);
+        return { success: false, error: `Player ${playerId} not found` };
+    }
 
     if (!player.isCurrentPlayer) {
         return { success: false, error: 'Not your turn' };
@@ -578,9 +696,7 @@ function handleExchangeTiles(playerId, indices) {
     });
 
     // End turn
-    gameState.player1.isCurrentPlayer = !gameState.player1.isCurrentPlayer;
-    gameState.player2.isCurrentPlayer = !gameState.player2.isCurrentPlayer;
-    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+    switchToNextPlayer();
     gameState.consecutivePasses = 0; // Reset pass counter
 
     gameState.message = `${player.playerName} exchanged ${indices.length} tiles.`;
@@ -600,12 +716,16 @@ function parseDictionaryFile(content) {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        // Match format: WORD rest of line
+        // Match format: WORD rest of line (with definition)
         const match = trimmed.match(/^(\S+)\s+(.+)$/);
         if (match) {
             const word = match[1].toLowerCase();
             const definition = match[2];
             dictionary.set(word, definition);
+        } else {
+            // Format: just WORD (no definition)
+            const word = trimmed.toLowerCase();
+            dictionary.set(word, null);
         }
     }
 
@@ -635,8 +755,18 @@ function loadDictionaries() {
             console.warn('[Game API] NWL2023.txt not found');
         }
 
+        // Load Slovenian dictionary
+        const slovenianPath = path.join(process.cwd(), 'public', 'SLOVENIAN.txt');
+        if (fs.existsSync(slovenianPath)) {
+            const content = fs.readFileSync(slovenianPath, 'utf-8');
+            slovenianDictionary = parseDictionaryFile(content);
+            console.log(`[Game API] Slovenian Dictionary loaded: ${slovenianDictionary.size} words 🇸🇮`);
+        } else {
+            console.warn('[Game API] SLOVENIAN.txt not found');
+        }
+
         // Initialize active dictionary with CSW21 by default
-        updateActiveDictionary({ csw21: true, nwl2023: false });
+        updateActiveDictionary({ csw21: true, nwl2023: false, slovenian: false });
 
     } catch (error) {
         console.error('[Game API] Failed to load dictionaries:', error);
@@ -659,7 +789,32 @@ function updateActiveDictionary(selection) {
         }
     }
 
-    console.log(`[Game API] Active dictionary updated: ${activeDictionary.size} words (CSW21: ${selection.csw21}, NWL2023: ${selection.nwl2023})`);
+    if (selection.slovenian) {
+        for (const word of slovenianDictionary.keys()) {
+            activeDictionary.add(word);
+        }
+    }
+
+    const activeNames = [];
+    if (selection.csw21) activeNames.push('CSW21');
+    if (selection.nwl2023) activeNames.push('NWL2023');
+    if (selection.slovenian) activeNames.push('Slovenian 🇸🇮');
+
+    // Determine language based on dictionary selection
+    // If only Slovenian is selected, use Slovenian tiles
+    // If mixed or only English dictionaries, use English tiles
+    const newLanguage = (selection.slovenian && !selection.csw21 && !selection.nwl2023) ? 'slovenian' : 'english';
+
+    // If language changed and game is in progress, warn that tiles won't change mid-game
+    if (newLanguage !== currentLanguage && gameState) {
+        console.log(`[Game API] Language changed from ${currentLanguage} to ${newLanguage}. Tile distribution will apply to next game.`);
+        currentLanguage = newLanguage;
+        if (gameState) {
+            gameState.language = newLanguage;
+        }
+    }
+
+    console.log(`[Game API] Active dictionary updated: ${activeDictionary.size} words (${activeNames.join(' + ')}), Language: ${currentLanguage}`);
 }
 
 // Get definition for a word from active dictionaries
@@ -676,6 +831,11 @@ function getDefinition(word) {
         return nwl2023Dictionary.get(lowerWord);
     }
 
+    // Then try Slovenian
+    if (slovenianDictionary.has(lowerWord)) {
+        return slovenianDictionary.get(lowerWord);
+    }
+
     return null;
 }
 
@@ -686,11 +846,12 @@ export function gameApiPlugin() {
             // Load dictionaries on startup
             loadDictionaries();
 
-            // Initialize game
-            gameState = createInitialGameState();
-            fillRack(gameState.player1);
-            fillRack(gameState.player2);
-            console.log('[Game API] Game initialized');
+            // Initialize game with 4 players by default, English language
+            gameState = createInitialGameState(4, 'english');
+            for (let i = 1; i <= gameState.playerCount; i++) {
+                fillRack(gameState[`player${i}`]);
+            }
+            console.log('[Game API] Game initialized with', gameState.playerCount, 'players, language:', gameState.language);
 
             server.middlewares.use((req, res, next) => {
                 // GET /api/game-state - Returns complete game state
@@ -732,18 +893,23 @@ export function gameApiPlugin() {
                                     result = { success: true };
                                     break;
                                 case 'restart':
-                                    gameState = createInitialGameState();
-                                    fillRack(gameState.player1);
-                                    fillRack(gameState.player2);
+                                    const playerCount = action.playerCount || gameState.playerCount || 4;
+                                    const language = action.language || currentLanguage || 'english';
+                                    console.log(`[Restart] Creating new game with ${playerCount} players, language: ${language}`);
+                                    gameState = createInitialGameState(playerCount, language);
+                                    for (let i = 1; i <= gameState.playerCount; i++) {
+                                        fillRack(gameState[`player${i}`]);
+                                    }
+                                    console.log(`[Restart] Game created. Current player: ${gameState.currentPlayer}, Language: ${gameState.language}, Available players:`, Object.keys(gameState).filter(k => k.startsWith('player')));
                                     result = { success: true };
                                     break;
                                 case 'reorder-rack':
-                                    const player = action.playerId === '1' ? gameState.player1 : gameState.player2;
-                                    if (Array.isArray(action.newRack)) {
+                                    const player = gameState[`player${action.playerId}`];
+                                    if (player && Array.isArray(action.newRack)) {
                                         player.rack = action.newRack;
                                         result = { success: true };
                                     } else {
-                                        result = { success: false, error: 'Invalid rack data' };
+                                        result = { success: false, error: 'Invalid rack data or player' };
                                     }
                                     break;
                                 case 'exchange-tiles':
@@ -752,6 +918,20 @@ export function gameApiPlugin() {
                                 case 'update-dictionary':
                                     updateActiveDictionary(action.dictionaries);
                                     result = { success: true };
+                                    break;
+                                case 'validate-word':
+                                    const wordToValidate = action.word?.toLowerCase();
+                                    if (!wordToValidate) {
+                                        result = { success: false, valid: false, error: 'No word provided' };
+                                    } else {
+                                        const isValid = activeDictionary.has(wordToValidate);
+                                        console.log(`[Validate] Word: "${wordToValidate}", Valid: ${isValid}, Active Dict Size: ${activeDictionary.size}`);
+                                        result = {
+                                            success: true,
+                                            valid: isValid,
+                                            word: wordToValidate.toUpperCase()
+                                        };
+                                    }
                                     break;
                                 default:
                                     result = { success: false, error: 'Unknown action' };
@@ -765,6 +945,76 @@ export function gameApiPlugin() {
                             res.end(JSON.stringify({ success: false, error: e.message }));
                         }
                     });
+                    return;
+                }
+
+                // GET /api/words?dictionary=csw21 - Returns all words from specified dictionary
+                if (req.url?.startsWith('/api/words') && req.method === 'GET') {
+                    const url = new URL(req.url, `http://${req.headers.host}`);
+                    const dictionary = url.searchParams.get('dictionary');
+                    const length = url.searchParams.get('length');
+                    const contains = url.searchParams.get('contains');
+                    const containsAny = url.searchParams.get('containsAny');
+                    const startsWith = url.searchParams.get('startsWith');
+                    const endsWith = url.searchParams.get('endsWith');
+                    const excludes = url.searchParams.get('excludes');
+
+                    let words = [];
+                    if (dictionary === 'csw21') {
+                        words = Array.from(csw21Dictionary.keys());
+                    } else if (dictionary === 'nwl2023') {
+                        words = Array.from(nwl2023Dictionary.keys());
+                    } else if (dictionary === 'slovenian') {
+                        words = Array.from(slovenianDictionary.keys());
+                    } else {
+                        // Return all active dictionary words
+                        words = Array.from(activeDictionary);
+                    }
+
+                    // Apply filters
+                    if (length) {
+                        const targetLength = parseInt(length);
+                        words = words.filter(w => w.length === targetLength);
+                    }
+
+                    if (contains) {
+                        // Word must contain ALL specified letters
+                        const containsLetters = contains.toUpperCase().split(',');
+                        words = words.filter(w => {
+                            const upper = w.toUpperCase();
+                            return containsLetters.every(letter => upper.includes(letter.trim()));
+                        });
+                    }
+
+                    if (containsAny) {
+                        // Word must contain AT LEAST ONE of the specified letters
+                        const containsLetters = containsAny.toUpperCase().split(',');
+                        words = words.filter(w => {
+                            const upper = w.toUpperCase();
+                            return containsLetters.some(letter => upper.includes(letter.trim()));
+                        });
+                    }
+
+                    if (startsWith) {
+                        const prefix = startsWith.toUpperCase();
+                        words = words.filter(w => w.toUpperCase().startsWith(prefix));
+                    }
+
+                    if (endsWith) {
+                        const suffix = endsWith.toUpperCase();
+                        words = words.filter(w => w.toUpperCase().endsWith(suffix));
+                    }
+
+                    if (excludes) {
+                        const excludeLetters = excludes.toUpperCase().split(',');
+                        words = words.filter(w => {
+                            const upper = w.toUpperCase();
+                            return !excludeLetters.some(letter => upper.includes(letter.trim()));
+                        });
+                    }
+
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ words, count: words.length }));
                     return;
                 }
 
