@@ -5,6 +5,8 @@
  * Categories help players practice specific skills like unusual letters, short words, etc.
  */
 
+import { generatedScenarios } from './generatedScenarios';
+
 export const practiceCategories = {
     'v-words': {
         name: '3-Letter V Words',
@@ -40,6 +42,11 @@ export const practiceCategories = {
         name: 'High-Value Letters',
         description: 'Maximize points with J, X, and Z',
         icon: '💎'
+    },
+    'extensions': {
+        name: '3-Letter Extensions',
+        description: 'Extend 2-letter words into 3-letter words',
+        icon: '🌱'
     }
 };
 
@@ -542,6 +549,9 @@ export const practiceScenarios = [
         ]
     }
 ];
+
+// Add generated scenarios
+practiceScenarios.push(...generatedScenarios);
 
 /**
  * Get scenarios by category

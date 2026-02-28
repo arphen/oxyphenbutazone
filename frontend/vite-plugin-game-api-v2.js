@@ -3,6 +3,7 @@ import path from 'path';
 
 // Single source of truth - all game state lives here
 let gameState = null;
+let oddOneOutSessions = new Map(); // sessionId -> sessionState
 
 // Dictionaries loaded once at startup
 let csw21Dictionary = new Map(); // word -> definition
@@ -416,6 +417,7 @@ function switchToNextPlayer() {
 function calculateFinalScores() {
     const finalScores = {};
     const remainingValues = {};
+    const exportRemaining = {};
     let playerWithEmptyRack = null;
     let totalRemaining = 0;
 
@@ -424,7 +426,7 @@ function calculateFinalScores() {
         const player = gameState[`player${i}`];
         const remaining = player.rack.reduce((sum, letter) => sum + getLetterValue(letter), 0);
         remainingValues[`player${i}`] = remaining;
-        remainingValues[`player${i}Remaining`] = remaining;
+        exportRemaining[`player${i}Remaining`] = remaining;
 
         if (player.rack.length === 0 && !playerWithEmptyRack) {
             playerWithEmptyRack = i;
@@ -445,7 +447,7 @@ function calculateFinalScores() {
         finalScores[`player${i}`] = finalScore;
     }
 
-    return { ...finalScores, ...remainingValues };
+    return { ...finalScores, ...exportRemaining };
 }
 
 function endGame() {
@@ -1015,6 +1017,106 @@ export function gameApiPlugin() {
 
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ words, count: words.length }));
+                    return;
+                }
+
+                // ODD ONE OUT MULTIPLAYER API
+
+                // POST /api/odd-one-out/create
+                if (req.url === '/api/odd-one-out/create' && req.method === 'POST') {
+                    let body = '';
+                    req.on('data', chunk => body += chunk);
+                    req.on('end', () => {
+                        const { roundDuration } = JSON.parse(body || '{}');
+                        const sessionId = Math.random().toString(36).substring(2, 8).toUpperCase();
+                        oddOneOutSessions.set(sessionId, {
+                            id: sessionId,
+                            players: {}, // { 1: { connected: false, answer: null }, 2: ... }
+                            status: 'waiting', // waiting, playing, review
+                            puzzle: null,
+                            startTime: null,
+                            roundDuration: roundDuration || 5
+                        });
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify({ sessionId }));
+                    });
+                    return;
+                }
+
+                // POST /api/odd-one-out/join
+                if (req.url === '/api/odd-one-out/join' && req.method === 'POST') {
+                    let body = '';
+                    req.on('data', chunk => body += chunk);
+                    req.on('end', () => {
+                        const { sessionId, playerId } = JSON.parse(body);
+                        const session = oddOneOutSessions.get(sessionId);
+                        if (session) {
+                            session.players[playerId] = { connected: true, answer: null };
+                            res.end(JSON.stringify({ success: true }));
+                        } else {
+                            res.statusCode = 404;
+                            res.end(JSON.stringify({ error: 'Session not found' }));
+                        }
+                    });
+                    return;
+                }
+
+                // GET /api/odd-one-out/state
+                if (req.url?.startsWith('/api/odd-one-out/state') && req.method === 'GET') {
+                    const url = new URL(req.url, `http://${req.headers.host}`);
+                    const sessionId = url.searchParams.get('sessionId');
+                    const session = oddOneOutSessions.get(sessionId);
+                    if (session) {
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify(session));
+                    } else {
+                        res.statusCode = 404;
+                        res.end(JSON.stringify({ error: 'Session not found' }));
+                    }
+                    return;
+                }
+
+                // POST /api/odd-one-out/update (Host updates state)
+                if (req.url === '/api/odd-one-out/update' && req.method === 'POST') {
+                    let body = '';
+                    req.on('data', chunk => body += chunk);
+                    req.on('end', () => {
+                        const { sessionId, status, puzzle } = JSON.parse(body);
+                        const session = oddOneOutSessions.get(sessionId);
+                        if (session) {
+                            if (status) session.status = status;
+                            if (puzzle) session.puzzle = puzzle;
+
+                            if (status === 'playing') {
+                                // Reset answers and start timer
+                                Object.values(session.players).forEach(p => p.answer = null);
+                                session.startTime = Date.now();
+                            }
+
+                            res.end(JSON.stringify({ success: true }));
+                        } else {
+                            res.statusCode = 404;
+                            res.end(JSON.stringify({ error: 'Session not found' }));
+                        }
+                    });
+                    return;
+                }
+
+                // POST /api/odd-one-out/submit (Player submits answer)
+                if (req.url === '/api/odd-one-out/submit' && req.method === 'POST') {
+                    let body = '';
+                    req.on('data', chunk => body += chunk);
+                    req.on('end', () => {
+                        const { sessionId, playerId, answerIndex } = JSON.parse(body);
+                        const session = oddOneOutSessions.get(sessionId);
+                        if (session && session.players[playerId]) {
+                            session.players[playerId].answer = answerIndex;
+                            res.end(JSON.stringify({ success: true }));
+                        } else {
+                            res.statusCode = 404;
+                            res.end(JSON.stringify({ error: 'Session or player not found' }));
+                        }
+                    });
                     return;
                 }
 

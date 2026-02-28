@@ -1,6 +1,6 @@
 <template>
   <div class="qr-display">
-    <div class="qr-header">
+    <div class="qr-header" v-if="!customUrl">
       <h3>{{ playerName }}</h3>
       <p class="qr-instruction">Scan with phone camera to view your letters</p>
       <p class="qr-note">Updates automatically in real-time ✨</p>
@@ -50,15 +50,19 @@ export default {
     },
     playerName: {
       type: String,
-      required: true,
+      default: '',
     },
     rack: {
       type: Array,
-      required: true,
+      default: () => [],
     },
     score: {
       type: Number,
-      required: true,
+      default: 0,
+    },
+    customUrl: {
+      type: String,
+      default: null,
     },
     isCurrentPlayer: {
       type: Boolean,
@@ -71,6 +75,7 @@ export default {
   },
   computed: {
     qrDataUrl() {
+      if (this.customUrl) return this.customUrl;
       // Generate a URL that can be scanned and opened on a phone
       const url = `${window.location.protocol}//${window.location.host}/rack/${this.playerId}`;
       console.log(`QR URL for ${this.playerName}:`, url);

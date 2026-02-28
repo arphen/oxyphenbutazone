@@ -90,6 +90,9 @@ The game will be available at:
 
 ```
 oxyphenbutazone/
+├── docs/                           # Documentation and guides
+├── scripts/                        # Utility scripts and tests
+├── legacy/                         # Legacy code
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -107,7 +110,7 @@ oxyphenbutazone/
 │   │   └── main.js                 # App entry point
 │   ├── public/
 │   │   └── sowpods.txt            # Scrabble dictionary
-│   ├── vite-plugin-game-api.js    # Custom API middleware
+│   ├── vite-plugin-game-api-v2.js # Custom API middleware
 │   └── vite.config.js             # Vite configuration
 └── backend/                        # Django (not currently used)
 ```

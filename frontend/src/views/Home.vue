@@ -45,7 +45,21 @@
           <p>Learn words with flashcards and practice scenarios</p>
           <button class="mode-button">Practice Words</button>
         </div>
+
+        <div class="mode-card" @click="goToPractice">
+          <div class="mode-icon">🧩</div>
+          <h2>Scenarios</h2>
+          <p>Solve specific board puzzles and find the best moves</p>
+          <button class="mode-button">Solve Puzzles</button>
+        </div>
         
+        <div class="mode-card" @click="goToOddOneOut">
+          <div class="mode-icon">🕵️</div>
+          <h2>Odd One Out</h2>
+          <p>Find the invalid word among valid ones</p>
+          <button class="mode-button">Play Now</button>
+        </div>
+
         <div class="mode-card" @click="goToHistory">
           <div class="mode-icon">�</div>
           <h2>Game History</h2>
@@ -69,7 +83,10 @@ export default {
     goToGame() {
       this.$router.push({
         path: '/game',
-        query: { players: this.selectedPlayerCount }
+        query: { 
+          players: this.selectedPlayerCount,
+          newGame: 'true'
+        }
       });
     },
     goToFreePlay() {
@@ -77,6 +94,12 @@ export default {
     },
     goToFlashcards() {
       this.$router.push('/flashcards');
+    },
+    goToPractice() {
+      this.$router.push('/practice');
+    },
+    goToOddOneOut() {
+      this.$router.push('/odd-one-out');
     },
     goToHistory() {
       this.$router.push('/history');

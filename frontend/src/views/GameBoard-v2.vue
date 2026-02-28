@@ -134,6 +134,7 @@
     <GameOverModal
       :show="gameState?.gameOver || false"
       :winner="gameState?.winner"
+      :gameState="gameState"
       :finalScore1="gameState?.finalScores?.player1 || 0"
       :finalScore2="gameState?.finalScores?.player2 || 0"
       :gameScore1="gameState?.player1.score || 0"
@@ -220,7 +221,7 @@ export default {
       if (this.gameState.board) {
         for (const row of this.gameState.board) {
           for (const cell of row) {
-            if (cell.letter) tilesOnBoard++;
+            if (cell.letter || cell.isBlank) tilesOnBoard++;
           }
         }
       }
@@ -281,16 +282,28 @@ export default {
     }
     
     if (!this.isMobileView) {
-      // Initialize game with correct player count first
-      console.log('[GameBoard] Initializing game with', this.playerCount, 'players');
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          type: 'restart',
-          playerCount: this.playerCount 
-        })
-      });
+      // Check if we should start a new game
+      const shouldRestart = this.$route.query.newGame === 'true';
+      
+      if (shouldRestart) {
+        // Initialize game with correct player count first
+        console.log('[GameBoard] Initializing new game with', this.playerCount, 'players');
+        await fetch('/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            type: 'restart',
+            playerCount: this.playerCount 
+          })
+        });
+        
+        // Remove the newGame query param so a refresh doesn't restart again
+        const query = { ...this.$route.query };
+        delete query.newGame;
+        this.$router.replace({ query });
+      } else {
+        console.log('[GameBoard] Joining existing game');
+      }
       
       // Fetch initial game state
       await this.fetchGameState();
@@ -381,6 +394,11 @@ export default {
             }
           }
           
+          // Update player count from game state to ensure consistency
+          if (newGameState.playerCount) {
+            this.playerCount = newGameState.playerCount;
+          }
+
           this.gameState = newGameState;
           
           // Check if game just ended

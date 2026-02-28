@@ -70,6 +70,9 @@ export default {
   padding: 24px;
   max-width: 400px;
   width: 90%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
   animation: slideUp 0.3s ease-out;
 }
@@ -122,8 +125,10 @@ export default {
 
 .letter-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
+  overflow-y: auto;
+  padding: 4px;
 }
 
 .letter-btn {
@@ -152,15 +157,17 @@ export default {
 
 @media (max-width: 480px) {
   .blank-picker {
-    padding: 20px;
+    padding: 16px;
+    width: 95%;
   }
   
   .letter-grid {
-    gap: 6px;
+    gap: 8px;
+    grid-template-columns: repeat(5, 1fr);
   }
   
   .letter-btn {
-    font-size: 1rem;
+    font-size: 1.2rem;
   }
 }
 </style>

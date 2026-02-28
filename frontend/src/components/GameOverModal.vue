@@ -226,7 +226,7 @@ export default {
   animation: modalSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   text-align: center;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 @keyframes modalSlideIn {

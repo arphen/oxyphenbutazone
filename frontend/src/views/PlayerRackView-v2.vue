@@ -98,6 +98,13 @@
             <span class="btn-label">Recall</span>
           </button>
           <button 
+            class="action-btn shuffle-btn" 
+            @click="shuffleRack"
+          >
+            <span class="btn-icon">🔀</span>
+            <span class="btn-label">Shuffle</span>
+          </button>
+          <button 
             class="action-btn pass-btn" 
             @click="passTurn"
             :disabled="!isCurrentPlayer || hasNewTiles"
@@ -125,6 +132,7 @@
     <GameOverModal
       :show="gameState?.gameOver || false"
       :winner="gameState?.winner"
+      :gameState="gameState"
       :finalScore1="gameState?.finalScores?.player1 || 0"
       :finalScore2="gameState?.finalScores?.player2 || 0"
       :gameScore1="gameState?.player1?.score || 0"
@@ -319,6 +327,37 @@ export default {
         '': 0
       };
       return values[letter?.toLowerCase()] || 0;
+    },
+    async shuffleRack() {
+      if (!this.rack || this.rack.length < 2) return;
+      
+      // Create a copy and shuffle
+      const newRack = [...this.rack];
+      for (let i = newRack.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newRack[i], newRack[j]] = [newRack[j], newRack[i]];
+      }
+      
+      try {
+        await fetch('/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'reorder-rack',
+            playerId: this.playerId,
+            newRack: newRack
+          })
+        });
+        
+        // Optimistically update local state to avoid flicker
+        if (this.gameState && this.gameState[`player${this.playerId}`]) {
+           this.gameState[`player${this.playerId}`].rack = newRack;
+        }
+        
+        this.playClickSound();
+      } catch (error) {
+        console.error('Failed to shuffle rack:', error);
+      }
     },
     async fetchGameState() {
       try {
@@ -1380,6 +1419,22 @@ export default {
 .recall-btn:not(:disabled):active {
   transform: scale(0.97);
   background: rgba(245, 158, 11, 0.4);
+}
+
+/* --- Shuffle Button (Pink) --- */
+.shuffle-btn {
+  background: rgba(236, 72, 153, 0.2);
+  border-color: rgba(236, 72, 153, 0.4);
+  color: #fbcfe8;
+}
+.shuffle-btn:not(:disabled):hover {
+  background: rgba(236, 72, 153, 0.3);
+  border-color: rgba(236, 72, 153, 0.6);
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
+.shuffle-btn:not(:disabled):active {
+  transform: scale(0.97);
+  background: rgba(236, 72, 153, 0.4);
 }
 
 /* --- Pass Button (Purple) --- */
