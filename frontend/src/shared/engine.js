@@ -159,6 +159,32 @@ export function createEngine(dict, { random = Math.random } = {}) {
         return { success: true };
     }
 
+    /** Take back ONE tile placed this turn (the player on turn only); a blank becomes a plain blank again. */
+    function handleRecallTile(playerId, row, col) {
+        const player = gameState[`player${playerId}`];
+
+        if (!player) {
+            return { success: false, error: `Player ${playerId} not found` };
+        }
+
+        if (!player.isCurrentPlayer) {
+            return { success: false, error: 'Not your turn' };
+        }
+
+        const square = gameState.board[row][col];
+        if (!square.isNew) {
+            return { success: false, error: 'No tile placed this turn on that square' };
+        }
+
+        player.rack.push(square.isBlank ? '' : square.letter);
+        square.letter = '';
+        square.isBlank = false;
+        square.chosenLetter = '';
+        square.isNew = false;
+
+        return { success: true };
+    }
+
     function handleSetBlankLetter(row, col, chosenLetter) {
         const square = gameState.board[row][col];
 
@@ -565,7 +591,7 @@ export function createEngine(dict, { random = Math.random } = {}) {
             return { success: false, error: 'That is not your seat', gameState };
         }
 
-        const MOVES = ['place-tile', 'set-blank-letter', 'recall', 'play-word', 'pass', 'exchange-tiles'];
+        const MOVES = ['place-tile', 'set-blank-letter', 'recall', 'recall-tile', 'play-word', 'pass', 'exchange-tiles'];
         if (gameState.gameOver && MOVES.includes(action.type)) {
             return { success: false, error: 'The game is over', gameState };
         }
@@ -583,6 +609,9 @@ export function createEngine(dict, { random = Math.random } = {}) {
                 break;
             case 'recall':
                 result = handleRecallTiles(action.playerId);
+                break;
+            case 'recall-tile':
+                result = handleRecallTile(action.playerId, action.row, action.col);
                 break;
             case 'play-word':
                 result = handlePlayWord(action.playerId);
