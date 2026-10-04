@@ -17,6 +17,7 @@ export const ACTION_TYPES = [
   'place-tile',
   'set-blank-letter',
   'recall',
+  'recall-tile',
   'play-word',
   'pass',
   'exchange-tiles',
@@ -127,6 +128,16 @@ export function sanitizeAction(raw) {
             row: cellCoord(raw.row, 'row'),
             col: cellCoord(raw.col, 'col'),
             chosenLetter: tileLetter(raw.chosenLetter, 'chosenLetter', { allowBlank: false }),
+          },
+        };
+      case 'recall-tile':
+        return {
+          ok: true,
+          action: {
+            type,
+            playerId: playerIdOf(raw.playerId),
+            row: cellCoord(raw.row, 'row'),
+            col: cellCoord(raw.col, 'col'),
           },
         };
       case 'recall':

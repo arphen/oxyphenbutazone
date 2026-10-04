@@ -39,9 +39,10 @@ const realState = (playerCount = 4) => {
 };
 
 describe('constants', () => {
-  it('exposes 11 action types and the player cap', () => {
-    expect(ACTION_TYPES).toHaveLength(11);
-    expect(new Set(ACTION_TYPES).size).toBe(11);
+  it('exposes 12 action types and the player cap', () => {
+    expect(ACTION_TYPES).toHaveLength(12);
+    expect(new Set(ACTION_TYPES).size).toBe(12);
+    expect(ACTION_TYPES).toContain('recall-tile');
     expect(MAX_PLAYERS).toBe(4);
     expect(MAX_ACTION_BYTES).toBe(4096);
     expect(MAX_STATE_BYTES).toBe(1024 * 1024);
@@ -258,6 +259,45 @@ describe('sanitizeAction: set-blank-letter', () => {
     ['string row', { row: '3', col: 4, chosenLetter: 'e' }],
   ])('rejects %s', (_label, fields) => {
     expect(sanitizeAction({ type: 'set-blank-letter', ...fields }).ok).toBe(false);
+  });
+});
+
+describe('sanitizeAction: recall-tile', () => {
+  const valid = { type: 'recall-tile', playerId: 2, row: 7, col: 8 };
+
+  it('rebuilds a valid action exactly and drops extras', () => {
+    expect(sanitizeAction({ ...valid, letter: 'a', rackIndex: 0, evil: { x: 1 } })).toEqual({
+      ok: true,
+      action: { type: 'recall-tile', playerId: 2, row: 7, col: 8 },
+    });
+  });
+
+  it('accepts boundary values', () => {
+    expect(sanitizeAction({ type: 'recall-tile', playerId: 1, row: 0, col: 0 })).toEqual({
+      ok: true,
+      action: { type: 'recall-tile', playerId: 1, row: 0, col: 0 },
+    });
+    expect(sanitizeAction({ type: 'recall-tile', playerId: 4, row: 14, col: 14 })).toEqual({
+      ok: true,
+      action: { type: 'recall-tile', playerId: 4, row: 14, col: 14 },
+    });
+  });
+
+  it.each([
+    ['missing playerId', { row: 7, col: 7 }, 'playerId must be an integer from 1 to 4'],
+    ['missing row', { playerId: 1, col: 7 }, 'row must be an integer from 0 to 14'],
+    ['missing col', { playerId: 1, row: 7 }, 'col must be an integer from 0 to 14'],
+    ['row 15', { playerId: 1, row: 15, col: 7 }, 'row must be an integer from 0 to 14'],
+    ['row -1', { playerId: 1, row: -1, col: 7 }, 'row must be an integer from 0 to 14'],
+    ['col 15', { playerId: 1, row: 7, col: 15 }, 'col must be an integer from 0 to 14'],
+    ['float col', { playerId: 1, row: 7, col: 7.5 }, 'col must be an integer from 0 to 14'],
+    ['string row', { playerId: 1, row: '7', col: 7 }, 'row must be an integer from 0 to 14'],
+    ['string playerId', { playerId: '1', row: 7, col: 7 }, 'playerId must be an integer from 1 to 4'],
+    ['playerId 0', { playerId: 0, row: 7, col: 7 }, 'playerId must be an integer from 1 to 4'],
+    ['playerId 5', { playerId: 5, row: 7, col: 7 }, 'playerId must be an integer from 1 to 4'],
+    ['NaN row', { playerId: 1, row: NaN, col: 7 }, 'row must be an integer from 0 to 14'],
+  ])('rejects %s', (_label, fields, error) => {
+    expect(sanitizeAction({ type: 'recall-tile', ...fields })).toEqual({ ok: false, error });
   });
 });
 

@@ -1169,11 +1169,112 @@ describe('reorder-rack', () => {
   });
 });
 
+describe('recall-tile', () => {
+  const recallTile = (engine, playerId, row, col) => engine.dispatch({ type: 'recall-tile', playerId, row, col });
+
+  it('returns that one tile to the end of the rack and leaves the other placed tiles alone', () => {
+    const engine = newGame(2);
+    engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
+    place(engine, 1, 'c', 7, 6);
+    place(engine, 1, 'a', 7, 7);
+    expect(engine.getState().player1.rack).toEqual(['t', 'x', 'y', 'z', 'q']);
+    const result = recallTile(engine, 1, 7, 6);
+    expect(result.success).toBe(true);
+    const s = engine.getState();
+    expect(s.player1.rack).toEqual(['t', 'x', 'y', 'z', 'q', 'c']);
+    expect(s.board[7][6]).toMatchObject({ letter: '', isNew: false, locked: false, isBlank: false, chosenLetter: '' });
+    expect(s.board[7][7]).toMatchObject({ letter: 'a', isNew: true });
+    expect(newTileCells(engine)).toEqual([[7, 7]]);
+    expect(s.currentPlayer).toBe(1);
+  });
+
+  it('a recalled blank goes back as a blank and forgets its chosen letter', () => {
+    const engine = newGame(2);
+    engine.debugSetRack(1, ['', 'a', 'q', 'q', 'q', 'q', 'q']);
+    place(engine, 1, '', 7, 7, 'e');
+    expect(engine.getState().board[7][7]).toMatchObject({ isBlank: true, chosenLetter: 'e' });
+    expect(recallTile(engine, 1, 7, 7).success).toBe(true);
+    const s = engine.getState();
+    expect(s.player1.rack).toEqual(['a', 'q', 'q', 'q', 'q', 'q', '']);
+    expect(s.board[7][7]).toMatchObject({ letter: '', isBlank: false, chosenLetter: '', isNew: false });
+    // placed again without a letter it is an unassigned blank, not an E
+    place(engine, 1, '', 7, 7);
+    expect(engine.getState().board[7][7]).toMatchObject({ isBlank: true, chosenLetter: '' });
+  });
+
+  it('the remaining tiles still play normally: place CATX, take back X, CAT = (3+1+1)*2 = 10', () => {
+    const engine = newGame(2);
+    engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
+    placeWord(engine, 1, 'catx', 7, 6);
+    expect(recallTile(engine, 1, 7, 9).success).toBe(true);
+    expect(engine.getState().player1.rack).toEqual(['y', 'z', 'q', 'x']);
+    expect(play(engine, 1)).toMatchObject({ success: true, score: 10 });
+    expect(engine.getState().player1.score).toBe(10);
+    expect(engine.getState().board[7][9].letter).toBe('');
+  });
+
+  it('refuses an empty square and changes nothing', () => {
+    const engine = newGame(2);
+    engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
+    place(engine, 1, 'c', 7, 7);
+    const before = JSON.stringify(engine.getState());
+    expect(recallTile(engine, 1, 0, 0)).toMatchObject({ success: false, error: 'No tile placed this turn on that square' });
+    expect(JSON.stringify(engine.getState())).toBe(before);
+  });
+
+  it('refuses a locked tile from an earlier turn', () => {
+    const engine = newGame(2);
+    engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
+    placeWord(engine, 1, 'cat', 7, 6);
+    expect(play(engine, 1).success).toBe(true);
+    const result = recallTile(engine, 2, 7, 6);
+    expect(result).toMatchObject({ success: false, error: 'No tile placed this turn on that square' });
+    expect(engine.getState().board[7][6]).toMatchObject({ letter: 'c', locked: true });
+    expect(engine.getState().player2.rack).toHaveLength(7);
+    expect(lockedCount(engine)).toBe(3);
+  });
+
+  it('a player who is not on turn cannot take back the current player\'s tile', () => {
+    const engine = newGame(2);
+    engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
+    place(engine, 1, 'c', 7, 7);
+    expect(recallTile(engine, 2, 7, 7)).toMatchObject({ success: false, error: 'Not your turn' });
+    expect(engine.getState().board[7][7]).toMatchObject({ letter: 'c', isNew: true });
+    expect(engine.getState().player1.rack).toHaveLength(6);
+    expect(engine.getState().player2.rack).toHaveLength(7);
+  });
+
+  it('refuses an unknown seat', () => {
+    const engine = newGame(2);
+    expect(recallTile(engine, 3, 7, 7)).toMatchObject({ success: false, error: 'Player 3 not found' });
+  });
+
+  it('refuses once the game is over', () => {
+    const engine = newGame(2);
+    pass(engine, 1);
+    pass(engine, 2);
+    expect(engine.getState().gameOver).toBe(true);
+    Object.assign(engine.getState().board[7][7], { letter: 'c', isNew: true });
+    const rack = [...engine.getState().player2.rack];
+    expect(recallTile(engine, 2, 7, 7)).toMatchObject({ success: false, error: 'The game is over' });
+    expect(engine.getState().board[7][7].letter).toBe('c');
+    expect(engine.getState().player2.rack).toEqual(rack);
+  });
+
+  it('malformed coordinates are refused by validation', () => {
+    const engine = newGame(2);
+    const result = engine.dispatch({ type: 'recall-tile', playerId: 1, row: 15, col: 7 });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('row must be an integer from 0 to 14');
+  });
+});
+
 describe('dispatch with ctx.playerId (seat pinning)', () => {
   it.each([
     ['pass', { type: 'pass', playerId: 1 }],
     ['play-word', { type: 'play-word', playerId: 1 }],
     ['recall', { type: 'recall', playerId: 1 }],
+    ['recall-tile', { type: 'recall-tile', playerId: 1, row: 7, col: 7 }],
     ['place-tile', { type: 'place-tile', playerId: 1, rackIndex: 0, row: 7, col: 7 }],
     ['exchange-tiles', { type: 'exchange-tiles', playerId: 1, indices: [0] }],
     ['reorder-rack', { type: 'reorder-rack', playerId: 1, newRack: [] }],
@@ -1501,6 +1602,8 @@ describe('invalid actions never throw', () => {
     { type: 'pass', playerId: -0.5 },
     { type: 'place-tile', playerId: 1, rackIndex: 0, row: 1e9, col: -1e9 },
     { type: 'place-tile', playerId: 1, rackIndex: Number.MAX_SAFE_INTEGER, row: 7, col: 7 },
+    { type: 'recall-tile', playerId: 1, row: -1, col: 7 },
+    { type: 'recall-tile', playerId: 1, row: 7 },
     { type: 'exchange-tiles', playerId: 1, indices: '0123' },
     { type: 'exchange-tiles', playerId: 1, indices: new Array(1e6) },
     { type: 'reorder-rack', playerId: 1, newRack: [['a']] },
@@ -1561,6 +1664,8 @@ describe('invalid actions never throw', () => {
       { type: 'place-tile', playerId: 4, rackIndex: 0, row: 0, col: 0 },
       { type: 'set-blank-letter', row: 0, col: 0, chosenLetter: 'a' },
       { type: 'recall', playerId: 3 },
+      { type: 'recall-tile', playerId: 3, row: 7, col: 7 },
+      { type: 'recall-tile', playerId: 1, row: 7, col: 7 },
       { type: 'play-word', playerId: 4 },
       { type: 'pass', playerId: 3 },
       { type: 'exchange-tiles', playerId: 4, indices: [0] },

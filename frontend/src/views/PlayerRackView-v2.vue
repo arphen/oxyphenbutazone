@@ -20,49 +20,45 @@
     <button v-else-if="debugEnabled" @click="showDebugConsole = true" class="debug-toggle">🐛</button>
     
     <div class="rack-container">
-      <div class="rack-header">
+      <header class="rack-header">
         <div class="player-info">
           <span class="player-name">{{ playerName }}</span>
           <span class="score-value">{{ score }}</span>
         </div>
-        <div :class="['turn-status', { active: isCurrentPlayer }]">
-          {{ isCurrentPlayer ? '▶' : '⏸' }}
+        <div :class="['turn-status', { active: isCurrentPlayer }]" data-testid="turn-status">
+          {{ isCurrentPlayer ? 'Your turn' : `${currentPlayerName}'s turn` }}
         </div>
-      </div>
-      
-      <!-- Mini Board View (7x7) -->
-      <div class="mini-board-section">
-        <div class="mini-board">
-          <div v-for="(row, rowIndex) in getVisibleBoard()" :key="rowIndex" class="board-row">
-            <div
-              v-for="(square, colIndex) in row"
-              :key="colIndex"
-              :class="getSquareClass(square)"
-              :data-board-row="square.actualRow"
-              :data-board-col="square.actualCol"
-              class="board-square drop-zone"
-            >
-              <span v-if="square.letter || square.isBlank" class="board-letter" :class="{ locked: square.locked, blank: square.isBlank }">
-                {{ square.isBlank ? (square.chosenLetter || '★').toUpperCase() : square.letter.toUpperCase() }}
-                <span class="letter-points">{{ getLetterValue(square.isBlank ? square.chosenLetter : square.letter) }}</span>
-                <span v-if="square.isBlank" class="blank-indicator">★</span>
-              </span>
-              <span v-else-if="square.type !== 'out-of-bounds'" class="square-label">
-                {{ square.type === 'tw' ? 'TW' : square.type === 'dw' ? 'DW' : square.type === 'tl' ? 'TL' : square.type === 'dl' ? 'DL' : square.type === 'center' ? '★' : '' }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="tiles">
-        <div 
-          v-for="(letter, index) in rack" 
-          :key="index" 
+      </header>
+
+      <PhoneBoard
+        ref="phoneBoard"
+        :board="board"
+        :language="gameState?.language || 'english'"
+        :center-row="viewportCenter.row"
+        :center-col="viewportCenter.col"
+        :placing="isCurrentPlayer && selectedIndex !== null"
+        @cell-tap="onCellTap"
+      >
+        <template #hint>
+          <span class="hint" data-testid="hint">{{ hintText }}</span>
+        </template>
+      </PhoneBoard>
+
+      <div class="tiles" data-testid="rack">
+        <div
+          v-for="(letter, index) in rack"
+          :key="index"
           class="tile"
-          :class="{ dragging: draggedIndex === index && isDragging, 'blank-tile': letter === '' }"
+          :class="{
+            dragging: draggedIndex === index && isDragging && dragIntent,
+            selected: selectedIndex === index,
+            'blank-tile': letter === ''
+          }"
+          role="button"
+          :aria-pressed="selectedIndex === index"
           :data-index="index"
           :data-letter="letter"
+          @click="onRackTileClick(index)"
           @touchstart="onTileTouchStart($event, letter, index)"
           @touchmove.prevent="onTouchMove"
           @touchend="onTouchEnd"
@@ -71,63 +67,65 @@
           <span class="value">{{ getLetterValue(letter) }}</span>
         </div>
       </div>
-      
+
       <!-- Ghost tile that follows finger during drag -->
-      <div v-if="isDragging" class="ghost-tile" :style="ghostTileStyle">
+      <div v-if="isDragging && dragIntent" class="ghost-tile" :style="ghostTileStyle">
         {{ (draggedLetter || '★').toUpperCase() }}
         <span class="ghost-value">{{ getLetterValue(draggedLetter) }}</span>
       </div>
-      
-      <!-- Action Buttons -->
-      <div class="action-buttons">
-        <button 
-          class="action-btn play-btn" 
-          @click="playWord" 
-          :disabled="!isCurrentPlayer || !hasNewTiles"
-        >
-          <span class="btn-icon">▶️</span>
-          <span class="btn-label">Play Word</span>
-        </button>
-        <div class="button-row">
-          <button 
-            class="action-btn recall-btn" 
-            @click="recallTiles"
-            :disabled="!isCurrentPlayer || !hasNewTiles"
-          >
-            <span class="btn-icon">↩️</span>
-            <span class="btn-label">Recall</span>
-          </button>
-          <button 
-            class="action-btn shuffle-btn" 
-            @click="shuffleRack"
-          >
-            <span class="btn-icon">🔀</span>
-            <span class="btn-label">Shuffle</span>
-          </button>
-          <button 
-            class="action-btn pass-btn" 
-            @click="passTurn"
-            :disabled="!isCurrentPlayer || hasNewTiles"
-          >
-            <span class="btn-icon">⏭️</span>
-            <span class="btn-label">Pass</span>
-          </button>
-          <button 
-            class="action-btn exchange-btn" 
-            @click="exchangeTiles"
-            :disabled="!isCurrentPlayer"
-          >
-            <span class="btn-icon">🔄</span>
-            <span class="btn-label">Swap</span>
-          </button>
-        </div>
-      </div>
-      
-      <div class="message-box" v-if="gameState?.message" :class="gameState?.messageType">
+
+      <div v-if="notice" class="message-box error" data-testid="notice">{{ notice }}</div>
+      <div v-if="gameState?.message" class="message-box" :class="gameState?.messageType" data-testid="message">
         {{ gameState.message }}
       </div>
     </div>
-    
+
+    <!-- Action bar, pinned above the home indicator -->
+    <nav class="action-bar" aria-label="Game actions">
+      <div class="action-bar-inner">
+        <button
+          class="action-btn play-btn"
+          data-testid="play-btn"
+          :disabled="!isCurrentPlayer || !hasNewTiles || busy"
+          @click="playWord"
+        >
+          <span class="btn-icon">▶️</span>
+          <span class="btn-label">Play</span>
+        </button>
+        <button
+          class="action-btn recall-btn"
+          data-testid="recall-btn"
+          :disabled="!isCurrentPlayer || !hasNewTiles || busy"
+          @click="recallTiles"
+        >
+          <span class="btn-icon">↩️</span>
+          <span class="btn-label">Recall</span>
+        </button>
+        <button class="action-btn shuffle-btn" data-testid="shuffle-btn" :disabled="rack.length < 2" @click="shuffleRack">
+          <span class="btn-icon">🔀</span>
+          <span class="btn-label">Shuffle</span>
+        </button>
+        <button
+          class="action-btn exchange-btn"
+          data-testid="swap-btn"
+          :disabled="!isCurrentPlayer || hasNewTiles"
+          @click="exchangeTiles"
+        >
+          <span class="btn-icon">🔄</span>
+          <span class="btn-label">Swap</span>
+        </button>
+        <button
+          class="action-btn pass-btn"
+          data-testid="pass-btn"
+          :disabled="!isCurrentPlayer || hasNewTiles"
+          @click="passTurn"
+        >
+          <span class="btn-icon">⏭️</span>
+          <span class="btn-label">Pass</span>
+        </button>
+      </div>
+    </nav>
+
     <!-- Game Over Modal -->
     <GameOverModal
       :show="gameState?.gameOver || false"
@@ -166,6 +164,7 @@
 import GameOverModal from '../components/GameOverModal.vue';
 import BlankLetterPicker from '../components/BlankLetterPicker.vue';
 import SwapTilesModal from '../components/SwapTilesModal.vue';
+import PhoneBoard from '../components/PhoneBoard.vue';
 import { letterValue, getAlphabet } from '../shared/rules';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
@@ -177,6 +176,7 @@ export default {
     GameOverModal,
     BlankLetterPicker,
     SwapTilesModal,
+    PhoneBoard,
   },
   setup() {
     const { playClickSound, setVolume } = useSoundEffects();
@@ -212,6 +212,13 @@ export default {
       // Drag intent detection
       dragIntent: null, // 'reorder', 'place', or null
       dragThreshold: 15, // pixels to move before determining intent
+      // Tap-to-place: the rack tile picked up by a tap (index + letter, so a changed rack drops the selection)
+      selectedIndex: null,
+      selectedLetter: null,
+      busy: false, // a tap action is in flight; further board taps are ignored until it lands
+      suppressClick: false, // the click that follows a finished drag must not also select the tile
+      notice: '',
+      noticeTimer: null,
       // Blank tile handling
       showBlankPicker: false,
       pendingBlankPosition: null, // { row, col }
@@ -233,6 +240,25 @@ export default {
   computed: {
     alphabet() {
       return getAlphabet(this.gameState?.language);
+    },
+    /** The seat as the integer the protocol requires (the route param is a string). */
+    seat() {
+      return Number(this.playerId);
+    },
+    currentPlayerName() {
+      const current = this.gameState?.currentPlayer;
+      return this.gameState?.[`player${current}`]?.playerName || `Player ${current ?? ''}`;
+    },
+    hintText() {
+      if (!this.gameState) return 'Connecting…';
+      if (this.gameState.gameOver) return 'Game over';
+      if (!this.isCurrentPlayer) return `Waiting for ${this.currentPlayerName}. Pinch or double-tap the board to zoom.`;
+      if (this.selectedIndex !== null) {
+        const letter = this.selectedLetter === '' ? 'the blank' : (this.selectedLetter || '').toUpperCase();
+        return `Tap an empty square to place ${letter}`;
+      }
+      if (this.hasNewTiles) return 'Tap a placed tile to take it back, or Play';
+      return 'Tap a tile, then tap a square';
     },
     playerName() {
       if (!this.gameState) return '';
@@ -287,6 +313,12 @@ export default {
       return false;
     }
   },
+  watch: {
+    rack(newRack) {
+      // Drop a selection that no longer points at the same tile (shuffled, placed, swapped, new game...)
+      if (this.selectedIndex !== null && newRack[this.selectedIndex] !== this.selectedLetter) this.clearSelection();
+    },
+  },
   mounted() {
     // Override console for debug logs only when debug mode is enabled
     if (this.debugEnabled) {
@@ -326,6 +358,7 @@ export default {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
     }
+    clearTimeout(this.noticeTimer);
   },
   methods: {
     addDebugLog(type, message) {
@@ -338,6 +371,104 @@ export default {
     },
     getLetterValue(letter) {
       return letterValue(this.gameState?.language, letter);
+    },
+    showNotice(text) {
+      this.notice = text;
+      clearTimeout(this.noticeTimer);
+      this.noticeTimer = setTimeout(() => {
+        this.notice = '';
+      }, 2500);
+    },
+    clearSelection() {
+      this.selectedIndex = null;
+      this.selectedLetter = null;
+    },
+    onRackTileClick(index) {
+      if (this.suppressClick) {
+        this.suppressClick = false;
+        return;
+      }
+      if (this.selectedIndex === index) {
+        this.clearSelection();
+        return;
+      }
+      this.selectedIndex = index;
+      this.selectedLetter = this.rack[index];
+    },
+    /** POST one action; adopts the returned state. Returns the result, or null when the request failed. */
+    async sendAction(action) {
+      const response = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action)
+      });
+      if (!response.ok) return null;
+      const result = await response.json();
+      if (result.gameState) this.gameState = result.gameState;
+      return result;
+    },
+    async placeTile(rackIndex, row, col, chosenLetter) {
+      const action = {
+        type: 'place-tile',
+        playerId: this.seat,
+        letter: this.rack[rackIndex],
+        rackIndex,
+        row,
+        col
+      };
+      if (chosenLetter) action.chosenLetter = chosenLetter;
+      this.busy = true;
+      try {
+        const result = await this.sendAction(action);
+        if (result?.success) {
+          debug(`[Place] Tile placed at (${row}, ${col})`);
+          this.playClickSound();
+        } else if (result) {
+          this.showNotice(result.error || 'Could not place that tile');
+        }
+      } catch (error) {
+        logError('Failed to place tile:', error);
+      } finally {
+        this.busy = false;
+      }
+    },
+    async recallTile(row, col) {
+      this.busy = true;
+      try {
+        const result = await this.sendAction({ type: 'recall-tile', playerId: this.seat, row, col });
+        if (result && !result.success) this.showNotice(result.error || 'Could not take that tile back');
+      } catch (error) {
+        logError('Failed to recall tile:', error);
+      } finally {
+        this.busy = false;
+      }
+    },
+    /** A tap on a board square (from PhoneBoard). consume() tells the board the tap did something. */
+    onCellTap({ row, col, consume }) {
+      const cell = this.board[row]?.[col];
+      if (!cell) return;
+      if (this.busy) {
+        consume();
+        return;
+      }
+      if (cell.letter || cell.isBlank) {
+        if (cell.isNew && this.isCurrentPlayer) {
+          consume();
+          this.recallTile(row, col);
+        }
+        return;
+      }
+      if (this.selectedIndex === null || !this.isCurrentPlayer || cell.locked) return;
+      consume();
+      const rackIndex = this.selectedIndex;
+      const letter = this.rack[rackIndex];
+      this.clearSelection();
+      if (letter === '') {
+        this.pendingBlankPosition = { row, col, rackIndex };
+        this.showBlankPicker = true;
+      } else {
+        this.placeTile(rackIndex, row, col);
+      }
     },
     async shuffleRack() {
       if (!this.rack || this.rack.length < 2) return;
@@ -355,7 +486,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'reorder-rack',
-            playerId: this.playerId,
+            playerId: this.seat,
             newRack: newRack
           })
         });
@@ -418,30 +549,6 @@ export default {
         logError('Error fetching game state:', error);
         this.isConnected = false;
       }
-    },
-    getVisibleBoard() {
-      if (!this.board || this.board.length === 0) return [];
-      
-      const result = [];
-      for (let i = 0; i < 7; i++) {
-        const row = [];
-        for (let j = 0; j < 7; j++) {
-          const boardRow = this.viewportCenter.row - 3 + i;
-          const boardCol = this.viewportCenter.col - 3 + j;
-          
-          if (boardRow >= 0 && boardRow < 15 && boardCol >= 0 && boardCol < 15) {
-            row.push({
-              ...this.board[boardRow][boardCol],
-              actualRow: boardRow,
-              actualCol: boardCol
-            });
-          } else {
-            row.push({ type: 'out-of-bounds', letter: null, locked: true });
-          }
-        }
-        result.push(row);
-      }
-      return result;
     },
     onTileTouchStart(event, letter, index) {
       const touch = event.touches[0];
@@ -571,7 +678,7 @@ export default {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   type: 'reorder-rack',
-                  playerId: this.playerId,
+                  playerId: this.seat,
                   newRack: newRack
                 })
               });
@@ -592,62 +699,28 @@ export default {
         if (boardSquare && this.isCurrentPlayer && (this.dragIntent === 'place' || !this.dragIntent)) {
           const row = parseInt(boardSquare.dataset.boardRow);
           const col = parseInt(boardSquare.dataset.boardCol);
-          
-          if (!isNaN(row) && !isNaN(col)) {
-            const visibleBoard = this.getVisibleBoard();
-            
-            for (const rowArray of visibleBoard) {
-              for (const square of rowArray) {
-                if (square.actualRow === row && square.actualCol === col) {
-                  const isEmpty = !square.letter || square.letter === '';
-                  const isNotLocked = !square.locked;
-                  const isNotOutOfBounds = square.type !== 'out-of-bounds';
-                  
-                  if (isEmpty && isNotLocked && isNotOutOfBounds) {
-                    debug(`[Place] Placing tile at (${row}, ${col})`);
-                    
-                    // Check if it's a blank tile
-                    if (this.draggedLetter === '') {
-                      // Show blank picker and store position
-                      this.pendingBlankPosition = { row, col, rackIndex: this.draggedIndex };
-                      this.showBlankPicker = true;
-                    } else {
-                      // Place regular tile
-                      try {
-                        const response = await fetch('/api/action', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            type: 'place-tile',
-                            playerId: this.playerId,
-                            letter: this.draggedLetter,
-                            rackIndex: this.draggedIndex,
-                            row: row,
-                            col: col
-                          })
-                        });
-                        
-                        if (response.ok) {
-                          const result = await response.json();
-                          this.gameState = result.gameState;
-                          debug('[Place] Tile placed successfully');
-                          // Play sound effect when tile is placed
-                          debug('[Sound] Attempting to play click sound after tile placement');
-                          this.playClickSound();
-                        }
-                      } catch (error) {
-                        logError('Failed to place tile:', error);
-                      }
-                    }
-                  }
-                  break;
-                }
-              }
+          const square = this.board[row]?.[col];
+          if (square && !square.letter && !square.isBlank && !square.locked) {
+            debug(`[Place] Dropping tile at (${row}, ${col})`);
+            this.clearSelection();
+            if (this.draggedLetter === '') {
+              this.pendingBlankPosition = { row, col, rackIndex: this.draggedIndex };
+              this.showBlankPicker = true;
+            } else {
+              await this.placeTile(this.draggedIndex, row, col);
             }
           }
         }
       }
-      
+
+      // A real drag is followed by a click on the tile; it must not toggle the selection
+      if (this.dragIntent) {
+        this.suppressClick = true;
+        setTimeout(() => {
+          this.suppressClick = false;
+        }, 400);
+      }
+
       // Reset drag state
       this.isDragging = false;
       this.draggedLetter = null;
@@ -655,18 +728,6 @@ export default {
       this.draggedElement = null;
       this.dropTarget = null;
       this.dragIntent = null;
-    },
-    getSquareClass(square) {
-      const classes = ['board-square'];
-      if (square.type === 'out-of-bounds') {
-        classes.push('out-of-bounds');
-      } else if (square.type) {
-        classes.push(square.type);
-      }
-      if (square.locked) {
-        classes.push('locked');
-      }
-      return classes.join(' ');
     },
     async playWord() {
       if (!this.isCurrentPlayer || !this.hasNewTiles) return;
@@ -708,7 +769,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'play-word',
-            playerId: this.playerId
+            playerId: this.seat
           })
         });
         
@@ -759,7 +820,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'recall',
-            playerId: this.playerId
+            playerId: this.seat
           })
         });
         
@@ -787,7 +848,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'pass',
-            playerId: this.playerId
+            playerId: this.seat
           })
         });
         
@@ -824,7 +885,7 @@ export default {
       if (!this.isCurrentPlayer) return;
 
       // Capture state before exchange
-      const player = this.playerId === '1' ? this.gameState.player1 : this.gameState.player2;
+      const player = this.gameState[`player${this.playerId}`];
       const stateBefore = {
         rackBefore: [...(player?.rack || [])],
         scoreBefore: player?.score || 0
@@ -836,7 +897,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'exchange-tiles',
-            playerId: this.playerId,
+            playerId: this.seat,
             indices: selectedIndices,
           }),
         });
@@ -877,7 +938,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'place-tile',
-            playerId: this.playerId,
+            playerId: this.seat,
             letter: '',
             rackIndex: rackIndex,
             row: row,
@@ -954,22 +1015,17 @@ export default {
 .mobile-rack-view {
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  /* A normal, scrollable page: only the board itself captures touch gestures */
   min-height: 100vh;
-  min-height: -webkit-fill-available;
-  height: 100vh;
-  height: -webkit-fill-available;
-  width: 100vw;
-  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  min-height: 100dvh;
+  width: 100%;
+  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+    calc(var(--action-bar-height) + 12px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   transition: background 0.6s ease;
+  --action-bar-height: 64px;
 }
 
 .mobile-rack-view.my-turn {
@@ -1088,49 +1144,43 @@ export default {
 
 .debug-toggle {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
+  bottom: calc(var(--action-bar-height) + 20px + env(safe-area-inset-bottom));
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #e4e4e7;
-  font-size: 24px;
+  font-size: 22px;
   cursor: pointer;
-  z-index: 9000;
+  z-index: 900;
   box-shadow: 0 4px 16px rgba(0,0,0,0.5);
 }
 
 .rack-container {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 12px;
-  max-width: 500px;
-  width: calc(100% - 16px);
-  max-height: calc(100vh - 16px);
-  max-height: calc(-webkit-fill-available - 16px);
-  overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .rack-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 8px;
+  padding: 4px 2px 2px;
 }
 
 .player-info {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .player-name {
@@ -1139,188 +1189,134 @@ export default {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .score-value {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   color: #60a5fa;
   font-weight: 700;
+  line-height: 1.1;
 }
 
 .turn-status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
   transition: all 0.3s ease;
 }
 
 .turn-status.active {
+  color: #bbf7d0;
   background: rgba(34, 197, 94, 0.25);
-  border-color: rgba(34, 197, 94, 0.5);
+  border-color: rgba(34, 197, 94, 0.55);
   box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
   animation: turnPulse 2s ease-in-out infinite;
 }
 
 @keyframes turnPulse {
-  0%, 100% { 
-    transform: scale(1);
-    box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.35);
   }
-  50% { 
-    transform: scale(1.1);
-    box-shadow: 0 0 25px rgba(34, 197, 94, 0.6);
+  50% {
+    box-shadow: 0 0 22px rgba(34, 197, 94, 0.65);
   }
 }
 
-.mini-board-section {
-  margin-bottom: 12px;
-}
-
-.mini-board {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 4px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.board-row {
-  display: flex;
-  gap: 2px;
-}
-
-.board-square {
-  position: relative;
-  width: calc((100%) / 7);
-  aspect-ratio: 1;
-  background: rgba(30, 30, 50, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-  font-weight: bold;
-  border-radius: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Colorblind-friendly colors matching desktop */
-.board-square.tw { background: rgba(219, 39, 119, 0.35); color: #f9a8d4; }
-.board-square.dw { background: rgba(244, 114, 182, 0.25); color: #fbcfe8; }
-.board-square.tl { background: rgba(37, 99, 235, 0.35); color: #93c5fd; }
-.board-square.dl { background: rgba(125, 211, 252, 0.25); color: #bfdbfe; }
-.board-square.center { background: rgba(236, 72, 153, 0.3); color: #f9a8d4; }
-.board-square.out-of-bounds { background: rgba(20, 20, 30, 0.8); }
-.board-square.locked { background: rgba(40, 40, 60, 0.6); }
-
-.board-square.drop-target-active {
-  box-shadow: 0 0 0 3px #86efac, inset 0 0 20px rgba(134, 239, 172, 0.6);
-  background: rgba(34, 197, 94, 0.5) !important;
-  transform: scale(1.08);
-  transition: all 0.15s ease;
-  z-index: 10;
-}
-
-.tile.reorder-target {
-  box-shadow: 0 0 0 3px #60a5fa;
-  background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(59, 130, 246, 0.3));
-  transform: scale(1.1);
-  transition: all 0.15s ease;
-}
-
-.board-letter {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #e4e4e7;
-  position: relative;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.board-letter.blank {
-  color: #fbbf24;
-  text-transform: uppercase;
-}
-
-.blank-indicator {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  font-size: 0.6rem;
-  color: #fbbf24;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-}
-
-.letter-points {
-  position: absolute;
-  bottom: -6px;
-  right: -6px;
-  font-size: 0.5rem;
-  color: #a1a1aa;
-}
-
-.square-label {
-  font-size: 0.55rem;
-  opacity: 0.7;
+.hint {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  color: #cbd5e1;
 }
 
 .tiles {
   display: flex;
   justify-content: center;
-  gap: 5px;
-  margin-bottom: 10px;
+  gap: 6px;
   flex-wrap: wrap;
+  padding: 4px 0;
 }
 
 .tile {
   position: relative;
-  width: 50px;
-  height: 50px;
-  background: linear-gradient(135deg, rgba(254, 240, 138, 0.9), rgba(252, 211, 77, 0.9));
-  border-radius: 6px;
+  flex: 0 1 54px;
+  min-width: 48px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(254, 240, 138, 0.95), rgba(252, 211, 77, 0.95));
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   touch-action: none;
-  cursor: grab;
+  cursor: pointer;
   border: 1px solid rgba(161, 98, 7, 0.3);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.tile.selected {
+  transform: translateY(-6px);
+  box-shadow: 0 0 0 3px #22c55e, 0 0 18px rgba(34, 197, 94, 0.8), 0 6px 12px rgba(0, 0, 0, 0.4);
 }
 
 .tile.dragging {
   opacity: 0.5;
 }
 
+.tile.reorder-target {
+  box-shadow: 0 0 0 3px #60a5fa;
+  transform: scale(1.08);
+}
+
 .tile .letter {
   font-size: 1.6rem;
   font-weight: 800;
   color: #1a1a2e;
+  line-height: 1;
 }
 
 .tile.blank-tile {
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.9), rgba(226, 232, 240, 0.9));
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(226, 232, 240, 0.95));
   border-color: rgba(100, 116, 139, 0.4);
 }
 
 .tile.blank-tile .letter {
-  color: #fbbf24;
-  font-size: 1.8rem;
+  color: #d97706;
+  font-size: 1.7rem;
 }
 
 .tile .value {
   position: absolute;
   bottom: 3px;
   right: 5px;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: #52525b;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (max-width: 380px) {
+  .mobile-rack-view {
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+  .tiles {
+    gap: 2px;
+  }
 }
 
 .ghost-tile {
@@ -1345,139 +1341,98 @@ export default {
   color: #666;
 }
 
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
+/* ---- bottom action bar ---- */
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 800;
+  padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  background: rgba(10, 14, 30, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.button-row {
+.action-bar-inner {
+  max-width: 560px;
+  margin: 0 auto;
   display: flex;
-  gap: 8px;
-  width: 100%;
+  gap: 6px;
 }
 
 .action-btn {
-  flex: 1;
-  padding: 12px 6px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--action-bar-height);
+  padding: 6px 2px;
   border: 1.5px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.25s ease;
-  background: rgba(20, 20, 40, 0.4);
-  backdrop-filter: blur(10px);
+  background: rgba(20, 20, 40, 0.6);
   color: #e4e4e7;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, background 0.2s ease;
 }
 
 .action-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
-  background: rgba(50, 50, 70, 0.2);
   box-shadow: none;
-  transform: none;
 }
 
-.action-btn:not(:disabled):hover {
-  transform: translateY(-3px);
+.action-btn:not(:disabled):active {
+  transform: scale(0.95);
 }
 
 .btn-icon {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   line-height: 1;
 }
 
 .btn-label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
-/* --- Play Button (Green) --- */
 .play-btn {
-  width: 100%;
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.4);
-  color: #a7f3d0;
-}
-.play-btn:not(:disabled):hover {
-  background: rgba(16, 185, 129, 0.3);
-  border-color: rgba(16, 185, 129, 0.6);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4), 0 4px 12px rgba(0,0,0,0.3);
-}
-.play-btn:not(:disabled):active {
-  transform: scale(0.97);
-  background: rgba(16, 185, 129, 0.4);
+  flex-grow: 1.3;
+  background: rgba(16, 185, 129, 0.35);
+  border-color: rgba(16, 185, 129, 0.7);
+  color: #d1fae5;
 }
 
-/* --- Recall Button (Amber) --- */
 .recall-btn {
   background: rgba(245, 158, 11, 0.2);
-  border-color: rgba(245, 158, 11, 0.4);
+  border-color: rgba(245, 158, 11, 0.45);
   color: #fde68a;
 }
-.recall-btn:not(:disabled):hover {
-  background: rgba(245, 158, 11, 0.3);
-  border-color: rgba(245, 158, 11, 0.6);
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0,0,0,0.3);
-}
-.recall-btn:not(:disabled):active {
-  transform: scale(0.97);
-  background: rgba(245, 158, 11, 0.4);
-}
 
-/* --- Shuffle Button (Pink) --- */
 .shuffle-btn {
   background: rgba(236, 72, 153, 0.2);
-  border-color: rgba(236, 72, 153, 0.4);
+  border-color: rgba(236, 72, 153, 0.45);
   color: #fbcfe8;
 }
-.shuffle-btn:not(:disabled):hover {
-  background: rgba(236, 72, 153, 0.3);
-  border-color: rgba(236, 72, 153, 0.6);
-  box-shadow: 0 0 20px rgba(236, 72, 153, 0.4), 0 4px 12px rgba(0,0,0,0.3);
-}
-.shuffle-btn:not(:disabled):active {
-  transform: scale(0.97);
-  background: rgba(236, 72, 153, 0.4);
-}
 
-/* --- Pass Button (Purple) --- */
-.pass-btn {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: rgba(139, 92, 246, 0.4);
-  color: #ddd6fe;
-}
-.pass-btn:not(:disabled):hover {
-  background: rgba(139, 92, 246, 0.3);
-  border-color: rgba(139, 92, 246, 0.6);
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4), 0 4px 12px rgba(0,0,0,0.3);
-}
-.pass-btn:not(:disabled):active {
-  transform: scale(0.97);
-  background: rgba(139, 92, 246, 0.4);
-}
-
-/* --- Exchange/Swap Button (Blue) --- */
 .exchange-btn {
   background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.45);
   color: #bfdbfe;
 }
-.exchange-btn:not(:disabled):hover {
-  background: rgba(59, 130, 246, 0.3);
-  border-color: rgba(59, 130, 246, 0.6);
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(0,0,0,0.3);
-}
-.exchange-btn:not(:disabled):active {
-  transform: scale(0.97);
-  background: rgba(59, 130, 246, 0.4);
+
+.pass-btn {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.45);
+  color: #ddd6fe;
 }
 
 .message-box {
@@ -1486,7 +1441,6 @@ export default {
   font-weight: 600;
   font-size: 0.85rem;
   text-align: center;
-  margin-top: 10px;
   backdrop-filter: blur(10px);
   border: 1px solid;
 }
