@@ -40,6 +40,9 @@ run(async () => {
   let s = await engine('return { score: e.getState().player1.score, turn: e.getState().currentPlayer, word: e.getState().board[7][7].letter }');
   assert.deepEqual(s, { score: 10, turn: 2, word: 'a' }); ok('Play button scored CAT = 10 and passed the turn');
   assert.match(await page.locator('[data-testid="turn-status"]').innerText(), /turn/i); ok('header shows whose turn it is: "' + (await page.locator('[data-testid="turn-status"]').innerText()).replace(/\s+/g, ' ') + '"');
+  const strip = await page.locator('[data-testid="score-strip"]').innerText();
+  assert.match(strip, /P1\s*10/); assert.match(strip, /P2\s*0/); ok(`compact strip shows every seat's score: "${strip.replace(/\s+/g, ' ')}"`);
+  assert.equal(await page.locator('[data-testid="score-strip"] .score-chip.current .chip-player').innerText(), 'P2'); ok('strip lights up the player whose turn it is (P2)');
 
   console.log('4. Recall (all) and Pass buttons');
   await page.goto(BASE + '/?debug#/rack/2'); await page.waitForTimeout(1000);

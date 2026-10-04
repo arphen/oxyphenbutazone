@@ -21,9 +21,18 @@
     
     <div class="rack-container">
       <header class="rack-header">
-        <div class="player-info">
-          <span class="player-name">{{ playerName }}</span>
-          <span class="score-value">{{ score }}</span>
+        <div v-if="gameState" class="score-strip" data-testid="score-strip" aria-label="Scores">
+          <span
+            v-for="entry in scoreEntries"
+            :key="entry.num"
+            class="score-chip"
+            :class="[`p${entry.num}`, { current: entry.isCurrent, me: entry.isMe }]"
+            :title="entry.name"
+          >
+            <span class="chip-dot" aria-hidden="true"></span>
+            <span class="chip-player">P{{ entry.num }}</span>
+            <span class="chip-score">{{ entry.score }}</span>
+          </span>
         </div>
         <div :class="['turn-status', { active: isCurrentPlayer }]" data-testid="turn-status">
           {{ isCurrentPlayer ? 'Your turn' : `${currentPlayerName}'s turn` }}
@@ -265,15 +274,34 @@ export default {
       const player = this.gameState[`player${this.playerId}`];
       return player?.playerName || '';
     },
+    /** Seats in this game (2-4); falls back to the players actually present. */
+    playerCount() {
+      const n = this.gameState?.playerCount;
+      if (Number.isInteger(n) && n >= 2 && n <= 4) return n;
+      let count = 0;
+      for (let i = 1; i <= 4; i++) {
+        if (this.gameState?.[`player${i}`]) count = i;
+      }
+      return Math.max(count, 2);
+    },
+    /** One compact chip per seat: identity (hue) + score, with turn state. */
+    scoreEntries() {
+      return Array.from({ length: this.playerCount }, (_, i) => {
+        const num = i + 1;
+        const player = this.gameState?.[`player${num}`] || {};
+        return {
+          num,
+          name: player.playerName || `Player ${num}`,
+          score: player.score || 0,
+          isCurrent: player.isCurrentPlayer || false,
+          isMe: num === Number(this.playerId),
+        };
+      });
+    },
     rack() {
       if (!this.gameState) return [];
       const player = this.gameState[`player${this.playerId}`];
       return player?.rack || [];
-    },
-    score() {
-      if (!this.gameState) return 0;
-      const player = this.gameState[`player${this.playerId}`];
-      return player?.score || 0;
     },
     isCurrentPlayer() {
       if (!this.gameState) return false;
@@ -1176,30 +1204,93 @@ export default {
   padding: 4px 2px 2px;
 }
 
-.player-info {
+/* Compact standings: one chip per seat. Quiet by default (hairline, muted
+   figures); color only carries identity (the dot, in the seat's hue) and
+   state (the current player's chip lights up). */
+.score-strip {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-}
-
-.player-name {
-  font-size: 0.9rem;
-  color: #a1a1aa;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
+  flex: 1 1 auto;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.score-value {
-  font-size: 1.6rem;
-  color: #60a5fa;
+.score-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chip-dot, #71717a);
+  opacity: 0.85;
+}
+
+.chip-player {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #8e8e99;
+}
+
+.chip-score {
+  font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.1;
+  color: #c9c9d4;
 }
+
+.score-chip.me {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.score-chip.me .chip-player {
+  color: #e4e4e7;
+}
+
+.score-chip.p1 { --chip-dot: #60a5fa; }
+.score-chip.p2 { --chip-dot: #4ade80; }
+.score-chip.p3 { --chip-dot: #fbbf24; }
+.score-chip.p4 { --chip-dot: #c084fc; }
+
+.score-chip.p1.current {
+  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+.score-chip.p1.current .chip-score { color: #bfdbfe; }
+
+.score-chip.p2.current {
+  border-color: rgba(74, 222, 128, 0.6);
+  background: rgba(34, 197, 94, 0.18);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+}
+.score-chip.p2.current .chip-score { color: #bbf7d0; }
+
+.score-chip.p3.current {
+  border-color: rgba(251, 191, 36, 0.6);
+  background: rgba(245, 158, 11, 0.18);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
+.score-chip.p3.current .chip-score { color: #fde68a; }
+
+.score-chip.p4.current {
+  border-color: rgba(192, 132, 252, 0.6);
+  background: rgba(168, 85, 247, 0.18);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.35);
+}
+.score-chip.p4.current .chip-score { color: #ddd6fe; }
 
 .turn-status {
   flex: 0 0 auto;
