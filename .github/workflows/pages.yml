@@ -1,0 +1,52 @@
+# Publishes the app as a static site on GitHub Pages (Settings -> Pages -> Source: "GitHub Actions").
+#
+# Word lists: CSW21 and NWL2023 are copyrighted, so they are NOT part of the published site. The site ships the open
+# ENABLE list and the Slovenian list. To publish the other two as well (only if you are entitled to), set the
+# repository variable PUBLISH_WORD_LISTS to "true" (Settings -> Secrets and variables -> Actions -> Variables).
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          OXY_EXCLUDE_LISTS: ${{ vars.PUBLISH_WORD_LISTS == 'true' && '' || 'csw21,nwl2023' }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

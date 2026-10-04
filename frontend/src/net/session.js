@@ -5,6 +5,7 @@ import { reactive } from 'vue';
 import { setBackend } from './api.js';
 import { createHostSession } from './hostSession.js';
 import { acceptInvite } from './guestSession.js';
+import { keepAwake } from '../utils/wakeLock.js';
 
 export const net = reactive({
   role: 'none', // 'none' | 'host' | 'guest'
@@ -35,6 +36,7 @@ export function startHosting({ online = false } = {}) {
       net.seats = { ...snapshot.seats };
     },
   });
+  keepAwake(true);
   net.role = 'host';
   net.room = host.room;
   net.seats = {};
@@ -47,6 +49,7 @@ export const hostAcceptAnswer = (text) => host.acceptAnswer(text);
 export function stopHosting() {
   host?.close();
   host = null;
+  keepAwake(false);
   net.role = 'none';
   net.seats = {};
 }
@@ -62,7 +65,12 @@ export async function joinWithInvite(text, { online = false } = {}) {
   session.onStatus((status) => {
     if (guest !== session) return;
     net.guestStatus = status;
-    if (status === 'open') setBackend(session.backend);
+    if (status === 'open') {
+      setBackend(session.backend);
+      keepAwake(true);
+    } else if (status === 'closed') {
+      keepAwake(false);
+    }
   });
   return answer;
 }
@@ -71,6 +79,7 @@ export async function joinWithInvite(text, { online = false } = {}) {
 export function leaveGame() {
   guest?.close();
   guest = null;
+  keepAwake(false);
   net.role = 'none';
   net.guestStatus = 'idle';
   net.seat = null;
