@@ -5,7 +5,7 @@ import { createLocalBackend } from './localBackend.js';
 import { createWordStore } from './wordStore.js';
 
 const freshStore = () => createWordStore({ indexedDB: new IDBFactory() });
-const NONE = { csw21: false, nwl2023: false, enable: false, slovenian: false };
+const NONE = { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: false };
 const only = (id) => ({ ...NONE, [id]: true });
 
 const ENABLE = 'cat\ndog\nbird';
@@ -13,7 +13,7 @@ const IMPORTED = 'AA a volcanic rock [n -S]\nZZYZX a made-up word\nCAT feline';
 
 /** A deployment shipping only the lists in `files` ({ id: text }), served through a stubbed fetch. */
 function shipping(files) {
-  const names = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
+  const names = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', friendly: 'FRIENDLY.txt', slovenian: 'SLOVENIAN.txt' };
   vi.stubGlobal('fetch', async (url) => {
     const file = String(url).split('/').pop();
     if (file === 'wordlists.json') return new Response(JSON.stringify({ lists: Object.fromEntries(Object.keys(files).map((id) => [id, { file: names[id] }])) }));
@@ -86,7 +86,7 @@ describe('listStatus', () => {
     expect(status.enable).toEqual({ shipped: true, imported: false, loaded: false, count: 0, persistent: true });
     expect(status.csw21).toEqual({ shipped: false, imported: false, loaded: false, count: 0, persistent: true });
     expect(status.slovenian.shipped).toBe(false);
-    expect(Object.keys(status)).toEqual(['csw21', 'nwl2023', 'enable', 'slovenian']);
+    expect(Object.keys(status)).toEqual(['csw21', 'nwl2023', 'enable', 'friendly', 'slovenian']);
   });
 
   it('flags lists as not persistent when the store has no IndexedDB', async () => {

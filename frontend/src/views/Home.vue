@@ -1,7 +1,7 @@
 <template>
   <div id="home">
     <div class="home-container">
-      <h1 class="game-title">Oxyphenbutazone</h1>
+      <h1 class="game-title" data-testid="home-title">Oxyphenbutazone</h1>
       <p class="game-subtitle">Choose Your Mode</p>
       
       <div class="mode-cards">
@@ -44,7 +44,7 @@
             </div>
           </div>
 
-          <button @click="goToGame" class="mode-button">
+          <button @click="goToGame" class="mode-button" data-testid="start-game-btn">
             Start {{ selectedPlayerCount }}-Player Game
           </button>
         </div>

@@ -2,9 +2,10 @@
 // The "SDP" is a valid minimal data-channel description carrying a random id, which is how the answering side finds
 // the host peer. Messages are delivered asynchronously, like a real channel.
 
-const registry = new Map(); // id -> FakeHostPeer
+const registry = new Map(); // host id -> FakeHostPeer
+const guests = new Map(); // guest token -> FakeGuestPeer
 
-const sdpFor = (id, role) =>
+const sdpFor = (id, role, extra = []) =>
   [
     'v=0',
     `o=- ${Math.floor(Math.random() * 1e9)} 2 IN IP4 127.0.0.1`,
@@ -13,6 +14,7 @@ const sdpFor = (id, role) =>
     'm=application 9 UDP/DTLS/SCTP webrtc-datachannel',
     'c=IN IP4 0.0.0.0',
     `a=ice-ufrag:${id}`,
+    ...extra,
     `a=setup:${role}`,
     'a=mid:0',
     'a=sctp-port:5000',
@@ -20,6 +22,9 @@ const sdpFor = (id, role) =>
   ].join('\r\n');
 
 const idOf = (sdp) => /a=ice-ufrag:(\w+)/.exec(sdp)?.[1];
+// Which guest peer produced an answer. A plain `a=` line, so it still passes
+// the real SDP validation the pairing blobs go through (see signal.js).
+const tokenOf = (sdp) => /a=x-guest:([A-Za-z0-9]+)/.exec(sdp)?.[1];
 
 class FakeBase {
   constructor() {
@@ -70,7 +75,12 @@ export class FakeHostPeer extends FakeBase {
     // Like the real HostPeer (see peer.js): applying the same answer twice
     // (double scan, double tap) is a no-op instead of a state error.
     if (this.applied) return;
-    const guest = this.guest;
+    // Pair with the guest that produced this answer (like real WebRTC, where
+    // the answer only fits its own peer), not merely the last guest that
+    // registered: two overlapping joins from one device must not steal each
+    // other's channel.
+    const token = tokenOf(sdp);
+    const guest = token ? guests.get(token) : this.guest;
     if (!guest || idOf(sdp) !== this.id) throw new Error('answer does not match this invite');
     this.applied = true;
     this.other = guest;
@@ -88,6 +98,8 @@ export class FakeGuestPeer extends FakeBase {
     const host = registry.get(idOf(sdp));
     if (!host) throw new Error('no such host');
     host.guest = this;
-    return sdpFor(host.id, 'active');
+    this.token = Math.random().toString(36).slice(2, 10);
+    guests.set(this.token, this);
+    return sdpFor(host.id, 'active', [`a=x-guest:${this.token}`]);
   }
 }

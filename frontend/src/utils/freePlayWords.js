@@ -8,9 +8,9 @@ const NONE = Object.fromEntries(DICTIONARY_IDS.map((id) => [id, false]));
 
 /**
  * The lists to start with: the ones the running game uses, else the best list available.
- * @param gameDictionaries  `dictionaries` from /api/game-state ({ csw21, nwl2023, enable, slovenian } booleans), or null
+ * @param gameDictionaries  `dictionaries` from /api/game-state ({ csw21, nwl2023, enable, friendly, slovenian } booleans), or null
  * @param installed         ids of the lists this device has, or null when every list may be asked for (laptop host)
- * @returns {{csw21: boolean, nwl2023: boolean, enable: boolean, slovenian: boolean}} all false when nothing is installed
+ * @returns {{csw21: boolean, nwl2023: boolean, enable: boolean, friendly: boolean, slovenian: boolean}} all false when nothing is installed
  */
 export function initialSelection(gameDictionaries, installed = null) {
   const usable = (id) => !installed || installed.includes(id);
@@ -19,7 +19,7 @@ export function initialSelection(gameDictionaries, installed = null) {
 
   const available = installed ? DICTIONARY_IDS.filter((id) => installed.includes(id)) : DICTIONARY_IDS;
   if (available.length === 0) return { ...NONE };
-  return { ...NONE, [available[0]]: true }; // DICTIONARY_IDS is ordered best first: CSW21, NWL2023, ENABLE, Slovenian
+  return { ...NONE, [available[0]]: true }; // DICTIONARY_IDS is ordered best first: CSW21, NWL2023, ENABLE, Friendly, Slovenian
 }
 
 /** The ids ticked in `selection`, in list order. */

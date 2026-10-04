@@ -1,27 +1,273 @@
+/* ============================================================================
+ * Oxyphenbutazone — Design Tokens & Base Layer ("quiet glass" for word games)
+ * ----------------------------------------------------------------------------
+ * Philosophy (borrowed from sibling project `crossword`, adapted):
+ * - Crossword encodes MEANING with color: selection vs related vs validation,
+ *   and validation always wins over selection. We do the same:
+ *   selection (accent/cursor) < related (premium tint) < validation (green/red).
+ * - Macro depth: blurred glass ONLY on large floating surfaces (badges,
+ *   modals, overlays). Board cells and tiles stay cheap: flat fills, 1px
+ *   inner glint, layered soft shadows. Never backdrop-blur per cell.
+ * - Mini states: every interactive element has visible hover / press / focus /
+ *   disabled / loading states. Focus is always a 2px ring + offset, never
+ *   `outline: none` without replacement.
+ * - Micro motion: transitions on transform / opacity / border-color /
+ *   background-color only, 150–250ms, one shared ease-out curve. Entrances
+ *   play ONCE (no infinite pulses). `prefers-reduced-motion` kills all motion.
+ * - Numbers/scores use tabular figures so totals never jitter.
+ *
+ * Deliberate divergences from crossword:
+ * - Crossword is dark-only desktop console with Across=orange / Down=blue.
+ *   We are mobile-first and support light + dark (prefers-color-scheme AND
+ *   [data-theme] override). No direction colors; instead PREMIUM semantics
+ *   (DL/TL/DW/TW/center) get the jewel-tone tints (yellow/amber/violet/teal).
+ * - Tiles are physical objects: they stay light "porcelain" in BOTH themes
+ *   with dark ink, so letter contrast is always AAA. Only their edge/glow
+ *   adapts to theme. This is the anti-Scrabble rule: no khaki (#f0e68c),
+ *   no beige (#f5f5dc), no brown/tan board imitation anywhere.
+ *
+ * Token table (see frontend/DESIGN_TOKENS.md for full docs + contrast notes):
+ *   --surface-0/1/2/3  layered backgrounds (page → floating)
+ *   --ink / --ink-muted / --ink-faint   text ladder
+ *   --accent / --accent-ink / --accent-soft  selection + primary actions
+ *   --success / --warn / --danger (+ *-soft fills)  validation & status
+ *   --tile-face-* / --tile-ink  the porcelain tile (theme-independent)
+ *   --board-*  board bezel, grid lines, empty-cell fill
+ *   --premium-dl/tl/dw/tw/center (+ *-ink)  premium-square tints
+ *   --focus-ring  keyboard focus color (AA against both surfaces)
+ *   --ease-out / --dur-quick / --dur-settle  the one motion contract
+ * ========================================================================== */
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  color-scheme: light dark;
+
+  /* ---- Motion contract (shared by every component) ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-quick: 160ms;
+  --dur-settle: 240ms;
+
+  /* ---- Shape ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* ---- Depth (macro): glints + layered shadows, glass only up top ---- */
+  --surface-glint: #ffffff14;
+  --cell-glint: #ffffff0d;
+  --shadow-sm: 0 2px 6px rgb(0 0 0 / 0.22);
+  --shadow-md: 0 8px 24px -12px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 18px 40px -18px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.25);
+
+  /* ---- Dark theme is the default (matches game-room lighting) ---- */
+  --surface-0: #0c1015; /* page */
+  --surface-1: #161c24; /* panels, cards */
+  --surface-2: #1f2732; /* raised: inputs, wells */
+  --surface-3: #28323f; /* floating: modals, popovers */
+  --surface-edge: #39434f; /* hairline borders */
+  --glass: rgb(22 28 36 / 0.82); /* large floating surfaces only */
+  --glass-edge: rgb(242 242 246 / 0.12);
+
+  --ink: #f2f2f6;
+  --ink-muted: #b9c1cc; /* AA on surface-0/1 (~9:1) */
+  --ink-faint: #8d97a3; /* large text / icons only (~5:1) */
+
+  --accent: #7aa8ff; /* selection, links, focus-adjacent highlights */
+  --accent-ink: #0c1015; /* text on accent fills */
+  --accent-soft: rgb(122 168 255 / 0.16);
+  --accent-edge: rgb(122 168 255 / 0.55);
+
+  --primary: #5b54e8; /* primary buttons; white on this is ~6.2:1 (AA) */
+  --primary-hover: #6c66f0;
+  --primary-pressed: #4a44d6;
+  --on-primary: #ffffff;
+
+  --success: #4ade80; /* text-grade on dark (~10:1) */
+  --success-deep: #178a4c; /* text-grade on light */
+  --success-soft: rgb(74 222 128 / 0.14);
+  --success-edge: rgb(74 222 128 / 0.55);
+
+  --warn: #fbbf24;
+  --warn-deep: #92600a;
+  --warn-soft: rgb(251 191 36 / 0.14);
+  --warn-edge: rgb(251 191 36 / 0.55);
+
+  --danger: #f87171;
+  --danger-deep: #b4232f;
+  --danger-soft: rgb(248 113 113 / 0.14);
+  --danger-edge: rgb(248 113 113 / 0.55);
+
+  --focus-ring: #8dc7ff; /* 2px ring, AA against both surfaces */
+
+  /* ---- Tiles: porcelain in every theme (dark ink on light face = AAA) ---- */
+  --tile-face-hi: #ffffff;
+  --tile-face-lo: #e9e6da;
+  --tile-ink: #1c2330;
+  --tile-sub: #5b6472; /* points pip */
+  --tile-edge: #2a323d;
+  --tile-glow: rgb(122 168 255 / 0.45);
+
+  /* ---- Board ---- */
+  --board-bezel: #151b21;
+  --board-edge: #4d5661;
+  --board-line: rgb(255 255 255 / 0.09);
+  --board-cell: rgb(32 40 52 / 0.72);
+  --board-cell-hover: rgb(44 54 70 / 0.8);
+
+  /* ---- Premium squares: jewel tints, never wood tones ---- */
+  --premium-dl: rgb(253 224 71 / 0.22);
+  --premium-dl-ink: #fef3c7;
+  --premium-tl: rgb(245 158 11 / 0.38);
+  --premium-tl-ink: #fef3c7;
+  --premium-dw: rgb(167 139 250 / 0.26);
+  --premium-dw-ink: #ede9fe;
+  --premium-tw: rgb(124 58 237 / 0.4);
+  --premium-tw-ink: #ede9fe;
+  --premium-center: rgb(20 184 166 / 0.36);
+  --premium-center-ink: #ccfbf1;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* ---- Explicit theme override wins over OS preference ---- */
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-glint: #ffffffd9;
+  --cell-glint: #ffffff;
+  --shadow-sm: 0 2px 6px rgb(35 59 48 / 0.1);
+  --shadow-md: 0 8px 24px -12px rgb(35 59 48 / 0.28), 0 2px 6px rgb(35 59 48 / 0.08);
+  --shadow-lg: 0 18px 40px -18px rgb(35 59 48 / 0.32), 0 2px 6px rgb(35 59 48 / 0.1);
+
+  --surface-0: #f4f5f2;
+  --surface-1: #e9ece8;
+  --surface-2: #dde3dd;
+  --surface-3: #ffffff;
+  --surface-edge: #bfc8c1;
+  --glass: rgb(255 255 255 / 0.86);
+  --glass-edge: rgb(38 52 48 / 0.12);
+
+  --ink: #1e2a26;
+  --ink-muted: #45534c; /* ~7:1 on surface-0 */
+  --ink-faint: #5f6d65; /* large text / icons only (~4.6:1) */
+
+  --accent: #1d4ed8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(29 78 216 / 0.1);
+  --accent-edge: rgb(29 78 216 / 0.5);
+
+  --primary: #4338ca; /* white on this is ~9:1 */
+  --primary-hover: #4f46e5;
+  --primary-pressed: #3730a3;
+
+  --success: #178a4c;
+  --success-soft: rgb(23 138 76 / 0.12);
+  --success-edge: rgb(23 138 76 / 0.5);
+  --warn: #92600a;
+  --warn-soft: rgb(146 96 10 / 0.12);
+  --warn-edge: rgb(146 96 10 / 0.5);
+  --danger: #b4232f;
+  --danger-soft: rgb(180 35 47 / 0.1);
+  --danger-edge: rgb(180 35 47 / 0.5);
+
+  --focus-ring: #1d4ed8;
+
+  --tile-edge: #8a938c;
+  --tile-glow: rgb(29 78 216 / 0.4);
+
+  --board-bezel: #d7ded8;
+  --board-edge: #b3beb6;
+  --board-line: rgb(38 52 48 / 0.14);
+  --board-cell: rgb(255 255 255 / 0.66);
+  --board-cell-hover: #ffffff;
+
+  --premium-dl: rgb(185 130 8 / 0.16);
+  --premium-dl-ink: #6b4a05;
+  --premium-tl: rgb(185 130 8 / 0.3);
+  --premium-tl-ink: #5c3d04;
+  --premium-dw: rgb(109 88 246 / 0.16);
+  --premium-dw-ink: #4634b5;
+  --premium-tw: rgb(109 40 217 / 0.22);
+  --premium-tw-ink: #4c1d95;
+  --premium-center: rgb(13 148 136 / 0.22);
+  --premium-center-ink: #0b5f56;
 }
 
-a:hover {
-  color: #535bf2;
+/* ---- OS preference only applies with no explicit override ---- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --surface-glint: #ffffffd9;
+    --cell-glint: #ffffff;
+    --shadow-sm: 0 2px 6px rgb(35 59 48 / 0.1);
+    --shadow-md: 0 8px 24px -12px rgb(35 59 48 / 0.28), 0 2px 6px rgb(35 59 48 / 0.08);
+    --shadow-lg: 0 18px 40px -18px rgb(35 59 48 / 0.32), 0 2px 6px rgb(35 59 48 / 0.1);
+    --surface-0: #f4f5f2;
+    --surface-1: #e9ece8;
+    --surface-2: #dde3dd;
+    --surface-3: #ffffff;
+    --surface-edge: #bfc8c1;
+    --glass: rgb(255 255 255 / 0.86);
+    --glass-edge: rgb(38 52 48 / 0.12);
+    --ink: #1e2a26;
+    --ink-muted: #45534c;
+    --ink-faint: #5f6d65;
+    --accent: #1d4ed8;
+    --accent-ink: #ffffff;
+    --accent-soft: rgb(29 78 216 / 0.1);
+    --accent-edge: rgb(29 78 216 / 0.5);
+    --primary: #4338ca;
+    --primary-hover: #4f46e5;
+    --primary-pressed: #3730a3;
+    --success: #178a4c;
+    --success-soft: rgb(23 138 76 / 0.12);
+    --success-edge: rgb(23 138 76 / 0.5);
+    --warn: #92600a;
+    --warn-soft: rgb(146 96 10 / 0.12);
+    --warn-edge: rgb(146 96 10 / 0.5);
+    --danger: #b4232f;
+    --danger-soft: rgb(180 35 47 / 0.1);
+    --danger-edge: rgb(180 35 47 / 0.5);
+    --focus-ring: #1d4ed8;
+    --tile-edge: #8a938c;
+    --tile-glow: rgb(29 78 216 / 0.4);
+    --board-bezel: #d7ded8;
+    --board-edge: #b3beb6;
+    --board-line: rgb(38 52 48 / 0.14);
+    --board-cell: rgb(255 255 255 / 0.66);
+    --board-cell-hover: #ffffff;
+    --premium-dl: rgb(185 130 8 / 0.16);
+    --premium-dl-ink: #6b4a05;
+    --premium-tl: rgb(185 130 8 / 0.3);
+    --premium-tl-ink: #5c3d04;
+    --premium-dw: rgb(109 88 246 / 0.16);
+    --premium-dw-ink: #4634b5;
+    --premium-tw: rgb(109 40 217 / 0.22);
+    --premium-tw-ink: #4c1d95;
+    --premium-center: rgb(13 148 136 / 0.22);
+    --premium-center-ink: #0b5f56;
+  }
 }
+
+/* ================= Base elements (mini states for everything) ============ */
 
 body {
   margin: 0;
@@ -31,15 +277,13 @@ body {
   width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  background: var(--surface-0);
+  color: var(--ink);
 }
 
 html {
   height: -webkit-fill-available;
+  background: var(--surface-0);
 }
 
 h1 {
@@ -47,25 +291,106 @@ h1 {
   line-height: 1.1;
 }
 
+a {
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* One focus treatment everywhere: 2px ring + offset, AA in both themes. */
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Buttons: shared motion curve, tactile press, honest disabled. */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-edge);
   padding: 0.6em 1.2em;
   font-size: 1em;
-  font-weight: 500;
+  font-weight: 550;
   font-family: inherit;
-  background-color: #1a1a1a;
+  color: var(--ink);
+  background: var(--surface-2);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    opacity var(--dur-quick) var(--ease-out);
 }
 
-button:hover {
-  border-color: #646cff;
+button:hover:not(:disabled) {
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 60ms;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-quick) var(--ease-out);
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--accent-edge);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Scores and tabular data never jitter. */
+.tnum,
+.score,
+.stat-value,
+.tile-points {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Skeleton shimmer for loading states (single pass-friendly, opacity-only). */
+@keyframes oxy-shimmer {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  animation: oxy-shimmer 900ms var(--ease-out) infinite alternate;
 }
 
 .card {
@@ -76,19 +401,25 @@ button:focus-visible {
   width: 100%;
   margin: 0;
   padding: 0;
+  background: var(--surface-0);
+  color: var(--ink);
 }
 
-@media (prefers-color-scheme: light) {
+/* Displays that ask for more contrast get harder edges, not brighter ink. */
+@media (prefers-contrast: more) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    --surface-edge: #6b7480;
+    --board-edge: #78818c;
+    --focus-ring: currentColor;
   }
+}
 
-  a:hover {
-    color: #747bff;
-  }
-
-  button {
-    background-color: #f9f9f9;
+/* Motion contract opt-out: nothing moves, entrances resolve to end state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

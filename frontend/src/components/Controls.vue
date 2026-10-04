@@ -105,12 +105,18 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
+/* One action row: buttons share the row equally and truncate instead of
+   pushing the row taller. Holds 4 compact actions on a 360px phone. */
 .button-row {
   display: flex;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
 }
 
 .preview {
@@ -179,8 +185,11 @@ export default {
 }
 
 button {
-  padding: 12px 18px;
-  font-size: 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 6px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -190,6 +199,22 @@ button {
   background: rgba(255, 255, 255, 0.05);
   color: #e4e4e7;
   backdrop-filter: blur(10px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Below 400px four truncated labels get unreadable, so fall back to a
+   compact 2x2 grid — still one block, still >=44px targets. */
+@media (max-width: 400px) {
+  .button-row {
+    flex-wrap: wrap;
+  }
+  .button-row button {
+    flex: 1 1 40%;
+  }
 }
 
 button:hover {

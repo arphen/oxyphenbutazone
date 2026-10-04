@@ -15,7 +15,7 @@ run(async () => {
   await A.page.getByRole('button', { name: /Invite player 2/ }).click();
   await A.page.locator('.signal-text').first().waitFor();
   const invite = await A.page.locator('.signal-text').first().inputValue();
-  assert.match(invite, /^OXY1\.[A-Za-z0-9_-]+$/); ok(`invite created (${invite.length} chars)`);
+  assert.match(invite, /^OXY[12]\.[A-Za-z0-9_-]+$/); ok(`invite created (${invite.length} chars)`);
   const qr = await A.page.locator('.signal-qr canvas, .signal-qr img').count(); assert.ok(qr > 0); ok('invite QR rendered');
 
   console.log('2. Guest pastes the invite, gets an answer');
@@ -24,7 +24,7 @@ run(async () => {
   await G.page.getByRole('button', { name: 'Join', exact: true }).click();
   await G.page.locator('.signal-text').waitFor();
   const answer = await G.page.locator('.signal-text').inputValue();
-  assert.match(answer, /^OXY1\./); ok(`answer created (${answer.length} chars)`);
+  assert.match(answer, /^OXY[12]\./); ok(`answer created (${answer.length} chars)`);
 
   console.log('3. Host pastes the answer -> real WebRTC data channel opens');
   await A.page.locator('textarea.paste').fill(answer);

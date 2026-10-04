@@ -236,8 +236,10 @@ export default {
   cursor: pointer;
   line-height: 1;
   padding: 0;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -432,5 +434,25 @@ export default {
 
 .total-row .score-cell.active {
   background: #2d9b5f !important;
+}
+
+/* Narrow screens: the 5-column table keeps its columns and scrolls
+   horizontally inside .table-container (overflow-x: auto already set);
+   just tighten padding/type so more fits. */
+@media (max-width: 640px) {
+  .modal-header h2 {
+    font-size: 1.05rem;
+  }
+  .score-table {
+    font-size: 0.8rem;
+    min-width: 520px;
+  }
+  .score-table th,
+  .score-table td {
+    padding: 6px 4px;
+  }
+  .player-col {
+    min-width: 140px;
+  }
 }
 </style>

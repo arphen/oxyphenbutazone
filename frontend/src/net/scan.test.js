@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import { extractCode } from './scan.js';
-import { encodeSignal, decodeSignal, SIGNAL_PREFIX } from './signal.js';
+import { encodeSignal, decodeSignal, SIGNAL_PREFIX_V2 } from './signal.js';
 
 // ------------------------------------------------------------------ helpers
 
@@ -88,6 +88,11 @@ describe('extractCode', () => {
     expect(extractCode(`https://example.com/#/join?c=${TOKEN}`)).toBe(`https://example.com/#/join?c=${TOKEN}`);
   });
 
+  it('accepts OXY2 tokens (base32, current) as well as OXY1 (legacy)', () => {
+    expect(extractCode('OXY2.ABCDEF234567')).toBe('OXY2.ABCDEF234567');
+    expect(extractCode('https://example.com/join?c=OXY2.ABCDEF234567')).toBe('https://example.com/join?c=OXY2.ABCDEF234567');
+  });
+
   it('trims surrounding whitespace and newlines', () => {
     expect(extractCode(`  ${TOKEN}\n`)).toBe(TOKEN);
     expect(extractCode(`\r\n\t https://example.com/join?c=${TOKEN} \n`)).toBe(`https://example.com/join?c=${TOKEN}`);
@@ -106,12 +111,12 @@ describe('extractCode', () => {
   it('rejects near misses', () => {
     expect(extractCode('OXY1.')).toBeNull(); // prefix only
     expect(extractCode('oxy1.abcdef')).toBeNull(); // wrong case
-    expect(extractCode('OXY2.abcdef')).toBeNull(); // other version
+    expect(extractCode('OXY3.abcdef')).toBeNull(); // other version
     expect(extractCode(' OXY1.abc def')).toBeNull(); // whitespace inside
     expect(extractCode('OXY1.abc+def/ghi=')).toBeNull(); // not base64url
     expect(extractCode('OXY1.abc\nOXY1.def')).toBeNull(); // two codes
     expect(extractCode(`see OXY1.abcdef`)).toBeNull(); // text before the token
-    expect(extractCode(`https://example.com/join?c=OXY2.abcdef`)).toBeNull();
+    expect(extractCode(`https://example.com/join?c=OXY3.abcdef`)).toBeNull();
     expect(extractCode(`https://example.com/join?c=`)).toBeNull();
     expect(extractCode(`https://example.com/join?c=oxy1.abcdef`)).toBeNull();
     expect(extractCode(`https://example.com/join?xc=${TOKEN}`)).toBeNull(); // parameter is not exactly c
@@ -134,9 +139,10 @@ describe('QR round trip with a real invite', () => {
     it(`decodes the raw ${role} token from its QR code`, async () => {
       const signal = { t: role, sdp: realisticSdp(role), room: 'abc123xy', seat: 2 };
       const token = await encodeSignal(signal);
-      expect(token.startsWith(SIGNAL_PREFIX)).toBe(true);
+      expect(token.startsWith(SIGNAL_PREFIX_V2)).toBe(true); // base32: QR alphanumeric mode, smaller code
       const { text, version } = decodeQr(token);
       console.log(`${role}: sdp ${signal.sdp.length} chars -> token ${token.length} chars, QR version ${version}`);
+      expect(version).toBeLessThan(21); // the realistic token used to need V21 with base64url
       expect(text).toBe(token);
       expect(extractCode(text)).toBe(token);
       expect(await decodeSignal(text)).toEqual(signal); // and the scanned text still decodes to the original signal

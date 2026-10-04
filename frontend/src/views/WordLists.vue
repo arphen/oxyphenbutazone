@@ -8,17 +8,27 @@
     <template v-else>
       <p class="hint">
         Some lists cannot be shared with this site, so you can import your own copy from a file on this device. Imported files stay on this
-        device only: they are never uploaded, and the installed offline app remembers them.
+        device only: they are never uploaded, and the installed offline app remembers them. You can also drag a
+        `.txt` file onto a list below.
       </p>
       <p v-if="status && !persistent && hasImported" class="warn">
         This browser is not saving data (private browsing?), so imported lists will be forgotten when you close the app.
       </p>
 
-      <section v-for="list in lists" :key="list.id" class="card" :data-list="list.id">
+      <section
+        v-for="list in lists"
+        :key="list.id"
+        class="card"
+        :class="{ dragover: dragging[list.id] }"
+        :data-list="list.id"
+        @dragover.prevent="dragging = { ...dragging, [list.id]: true }"
+        @dragleave="dragging = { ...dragging, [list.id]: false }"
+        @drop.prevent="onDrop(list.id, $event)"
+      >
         <h2>{{ list.label }}</h2>
         <p class="detail">{{ list.detail }}</p>
 
-        <p class="status" :class="statusOf(list.id).kind">
+        <p class="status" data-testid="word-status" :class="statusOf(list.id).kind">
           {{ statusOf(list.id).text }}<template v-if="loadedCount(list.id)"> · {{ loadedCount(list.id).toLocaleString('en') }} words</template>
         </p>
 
@@ -27,6 +37,7 @@
           type="file"
           accept=".txt,text/plain"
           class="file"
+          data-testid="word-import"
           :data-list="list.id"
           :aria-label="`Import ${list.label} from a file`"
           @change="onFile(list.id, $event)"
@@ -58,6 +69,7 @@ const LISTS = [
   { id: 'csw21', label: 'CSW21', detail: 'Collins word list 2021 (UK and international tournament play).' },
   { id: 'nwl2023', label: 'NWL2023', detail: 'NASPA Word List 2023 (North American tournament play).' },
   { id: 'enable', label: 'ENABLE (open list)', detail: 'A free word list, built in.' },
+  { id: 'friendly', label: 'Friendly (casual shorts)', detail: 'Built in: 2–3 letter words for between-friends play. New English games use ENABLE + Friendly together.' },
   { id: 'slovenian', label: 'Slovenian', detail: 'For games with Slovenian tiles, built in.' },
 ];
 
@@ -72,6 +84,7 @@ export default {
       busy: {},
       messages: {},
       confirming: null,
+      dragging: {},
     };
   },
   computed: {
@@ -108,6 +121,15 @@ export default {
       const file = input.files?.[0];
       input.value = ''; // so choosing the same file again still fires a change
       if (!file) return;
+      await this.importFile(id, file);
+    },
+    async onDrop(id, event) {
+      this.dragging = { ...this.dragging, [id]: false };
+      const file = event.dataTransfer?.files?.[0];
+      if (!file) return;
+      await this.importFile(id, file);
+    },
+    async importFile(id, file) {
       this.messages = { ...this.messages, [id]: null };
       this.busy = { ...this.busy, [id]: true };
       try {
@@ -164,6 +186,7 @@ export default {
 .status.missing { color: #fbbf24; }
 .status.pending { color: #cbd5e1; }
 .file { display: none; }
+.card.dragover { outline: 2px dashed #93c5fd; outline-offset: 4px; }
 .confirm { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 14px; color: #cbd5e1; }
 .hint { text-align: left; margin-bottom: 14px; }
 </style>

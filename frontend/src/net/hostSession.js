@@ -48,7 +48,10 @@ export function createHostSession(backend, { online = false, createPeer = (opts)
 
   function allowed(rec) {
     const t = now();
-    rec.tokens = Math.min(RATE_CAPACITY, rec.tokens + ((t - rec.lastRefill) / 1000) * RATE_PER_SECOND);
+    // Clamp the refill delta at zero: a phone clock stepping backwards (NTP,
+    // timezone, manual change) must not drain the bucket and drop a good guest.
+    const dt = Math.max(0, t - rec.lastRefill);
+    rec.tokens = Math.min(RATE_CAPACITY, rec.tokens + (dt / 1000) * RATE_PER_SECOND);
     rec.lastRefill = t;
     if (rec.tokens < 1) return false;
     rec.tokens -= 1;

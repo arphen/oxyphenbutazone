@@ -8,6 +8,29 @@
       <div class="desktop-layout">
         <!-- Board Section -->
         <div class="board-section">
+          <!-- Always-visible compact score strip: every seat, turn state,
+               last-move delta, tiles left. No modal needed. -->
+          <div class="score-topbar" aria-label="Scores" aria-live="polite">
+            <div class="top-chips">
+              <span
+                v-for="n in playerCount"
+                :key="n"
+                class="top-chip"
+                :class="{ active: gameState?.[`player${n}`]?.isCurrentPlayer }"
+                :aria-current="gameState?.[`player${n}`]?.isCurrentPlayer ? 'true' : undefined"
+                :title="`Player ${n}${gameState?.[`player${n}`]?.isCurrentPlayer ? ' — current turn' : ''}`"
+              >
+                <span class="top-dot" :class="`p${n}`" aria-hidden="true"></span>
+                <span class="top-name">P{{ n }}</span>
+                <span class="top-score">{{ gameState?.[`player${n}`]?.score || 0 }}</span>
+                <span v-if="lastDeltaByPlayer[n]" class="top-delta">+{{ lastDeltaByPlayer[n] }}</span>
+                <span v-if="gameState?.[`player${n}`]?.isCurrentPlayer" class="top-turn" aria-hidden="true">●</span>
+              </span>
+            </div>
+            <span class="tiles-pill" :class="getTilesRemainingClass()" title="Tiles remaining">
+              🎲 {{ tilesRemaining }}
+            </span>
+          </div>
           <Board 
             :board="gameState?.board || []" 
             :language="gameState?.language" 
@@ -235,6 +258,22 @@ export default {
       
       const tilesInPlay = totalRackSize + tilesOnBoard;
       return Math.max(0, 100 - tilesInPlay);
+    },
+    lastDeltaByPlayer() {
+      // Latest scoring move per seat (combinedHistory is most-recent-first).
+      const deltas = {};
+      for (let i = 1; i <= this.playerCount; i++) deltas[i] = 0;
+      const seen = new Set();
+      for (const entry of this.combinedHistory) {
+        const p = entry.player;
+        if (seen.has(p)) continue;
+        seen.add(p);
+        const s = Number(entry.totalScore);
+        if (!['pass', 'exchange', 'invalid'].includes(entry.action) && Number.isFinite(s) && s > 0) {
+          deltas[p] = s;
+        }
+      }
+      return deltas;
     },
     combinedHistory() {
       if (!this.gameState) return [];
@@ -609,12 +648,110 @@ export default {
 .board-section {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px 20px 20px;
   min-width: 0;
   height: 100vh;
   overflow: hidden;
+}
+
+/* Always-visible compact score strip: one row, chips left, tiles pill right.
+   Chips carry identity (dot hue), score, last-move delta, and a turn marker
+   (glow + ●, so turn state never depends on color alone). */
+.score-topbar {
+  width: 100%;
+  max-width: 940px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.top-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.top-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  opacity: 0.9;
+}
+.top-dot.p1 { background: #60a5fa; }
+.top-dot.p2 { background: #4ade80; }
+.top-dot.p3 { background: #fbbf24; }
+.top-dot.p4 { background: #c084fc; }
+
+.top-name {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #8e8e99;
+}
+
+.top-score {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #e4e4e7;
+}
+
+.top-delta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.top-turn {
+  font-size: 0.6rem;
+  line-height: 1;
+  color: #86efac;
+}
+
+.top-chip.active {
+  border-color: rgba(34, 197, 94, 0.6);
+  background: rgba(34, 197, 94, 0.15);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+
+.tiles-pill {
+  flex: 0 0 auto;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #a1a1aa;
+  white-space: nowrap;
 }
 
 .sidebar {
@@ -646,6 +783,8 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #e4e4e7;
   padding: 10px 15px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 1.2rem;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -1116,5 +1255,74 @@ export default {
   background: rgba(59, 130, 246, 0.2);
   color: #93c5fd;
   border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Narrow widths: stack board over sidebar so the board keeps a usable size
+   and scores/history stay reachable by scrolling the column (the score
+   strip at the top always stays visible). */
+@media (max-width: 920px) {
+  .desktop-layout {
+    flex-direction: column;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .board-section {
+    height: auto;
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 8px;
+  }
+
+  .score-topbar {
+    max-width: 100%;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .sidebar-header {
+    padding: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Compact the sidebar player cards into a denser strip; the topbar
+     already carries scores, so these shrink to identity + score. */
+  .players-container {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .player-card {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .player-badge {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+
+  .player-name {
+    font-size: 0.72rem;
+    margin-bottom: 2px;
+  }
+
+  .player-score {
+    font-size: 1.3rem;
+  }
+
+  .history-section {
+    max-height: 260px;
+  }
 }
 </style>

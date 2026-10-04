@@ -23,13 +23,16 @@ The definition and metadata are optional but recommended for the word definition
 | List | File (in `public/`) | Words | Ships with the public site? | Notes |
 |------|------|-------|---|-------|
 | **ENABLE** | `ENABLE.txt` | 168,551 | yes | Open English list (widely described as public domain; verify before relying on that). Entries over 15 letters are removed: they cannot fit the board. No definitions. |
+| **Friendly** | `FRIENDLY.txt` | ~1,100 | yes | Built-in casual 2–3 letter shorts for between-friends play (ZA, ZO, QI, XI, JA, …). Independent compilation from a player-contributed shorts list + Wiktionary-attested informal words; bare words only, no definitions/scores copied from any tournament list. No words excluded: the full short set plays. Rebuild with `python3 scripts/build_friendly.py`. |
 | **Slovenian** | `SLOVENIAN.txt` | 187,169 | yes | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž. Licence checked by the maintainer: fine to redistribute |
 | **CSW21** | `CSW21.txt` | 279,078 | **no** | Collins word list 2021, with definitions. Copyrighted. |
 | **NWL2023** | `NWL2023.txt` | 196,601 | **no** | NASPA Word List 2023, with definitions. Copyrighted. |
 
-Lists are optional: the app uses whichever it has. A build lists what it ships in `wordlists.json`, and the default English
-list is the first available of CSW21, NWL2023, ENABLE. If a chosen list turns out not to be installed (or a host answers
-for it with its HTML fallback page) the app switches to one that is and says so in the game message.
+Lists are optional: the app uses whichever it has. A build lists what it ships in `wordlists.json`, and a new English
+game defaults to ENABLE + Friendly together (a word in ANY selected list is valid, so ZA/ZO/QI play out of the box).
+With only one of them shipped it defaults to that one; otherwise the first available of CSW21, NWL2023, ENABLE. If a
+chosen list turns out not to be installed (or a host answers for it with its HTML fallback page) the app switches to
+one that is and says so in the game message.
 
 ## Installing Lists
 
@@ -67,7 +70,7 @@ Players can switch active dictionaries via the 📚 button (lists that are not i
 
 A dictionary change takes effect immediately for word validation. The **tile language** (English or Slovenian) is chosen on
 the home screen when a game starts and never changes mid-game. Starting a new Slovenian game selects the Slovenian list
-only; starting a new English game keeps your English choices (default: the best available of CSW21, NWL2023, ENABLE).
+only; starting a new English game keeps your English choices (default: ENABLE + Friendly together).
 A plain restart keeps the game's language and your selection (resetting it if it cannot suit the language).
 
 ## Slovenian dictionary

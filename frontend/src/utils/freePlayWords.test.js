@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildWordSet, fetchListWords, initialSelection, selectedIds } from './freePlayWords.js';
 
-const NONE = { csw21: false, nwl2023: false, enable: false, slovenian: false };
+const NONE = { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: false };
 
 // A fake /api/words: `lists` maps id -> words (lowercase, as the real endpoint returns them); an id that is not
 // there answers like the real backend for a list it does not have (an empty result). `calls` records every URL.
@@ -16,17 +16,17 @@ function fakeFetch(lists, calls = []) {
 
 describe('initialSelection', () => {
   it('starts with the lists the running game uses', () => {
-    const game = { csw21: false, nwl2023: true, enable: true, slovenian: false };
+    const game = { csw21: false, nwl2023: true, enable: true, friendly: false, slovenian: false };
     expect(initialSelection(game, ['nwl2023', 'enable', 'slovenian'])).toEqual({ ...NONE, nwl2023: true, enable: true });
   });
 
   it('drops game lists that are not installed, keeping the installed ones', () => {
-    const game = { csw21: true, nwl2023: false, enable: true, slovenian: false };
+    const game = { csw21: true, nwl2023: false, enable: true, friendly: false, slovenian: false };
     expect(initialSelection(game, ['enable', 'slovenian'])).toEqual({ ...NONE, enable: true });
   });
 
   it('falls back to the best installed list when the game uses none of them', () => {
-    const game = { csw21: true, nwl2023: false, enable: false, slovenian: false };
+    const game = { csw21: true, nwl2023: false, enable: false, friendly: false, slovenian: false };
     expect(initialSelection(game, ['enable', 'slovenian'])).toEqual({ ...NONE, enable: true }); // ENABLE beats Slovenian
     expect(initialSelection(null, ['nwl2023', 'enable'])).toEqual({ ...NONE, nwl2023: true }); // NWL2023 beats ENABLE
     expect(initialSelection(undefined, ['slovenian'])).toEqual({ ...NONE, slovenian: true });

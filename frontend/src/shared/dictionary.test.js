@@ -8,12 +8,12 @@ import {
   defaultSelectionFor,
 } from './dictionary.js';
 
-const sel = (csw21, nwl2023, slovenian, enable = false) => ({ csw21, nwl2023, enable, slovenian });
+const sel = (csw21, nwl2023, slovenian, enable = false, friendly = false) => ({ csw21, nwl2023, enable, friendly, slovenian });
 
 describe('constants', () => {
-  it('lists the four dictionaries in lookup-priority order with labels', () => {
-    expect(DICTIONARY_IDS).toEqual(['csw21', 'nwl2023', 'enable', 'slovenian']);
-    expect(DICTIONARY_LABELS).toEqual({ csw21: 'CSW21', nwl2023: 'NWL2023', enable: 'ENABLE', slovenian: 'Slovenian' });
+  it('lists the five dictionaries in lookup-priority order with labels', () => {
+    expect(DICTIONARY_IDS).toEqual(['csw21', 'nwl2023', 'enable', 'friendly', 'slovenian']);
+    expect(DICTIONARY_LABELS).toEqual({ csw21: 'CSW21', nwl2023: 'NWL2023', enable: 'ENABLE', friendly: 'Friendly', slovenian: 'Slovenian' });
   });
 });
 
@@ -415,9 +415,9 @@ describe('selectionForNewGame', () => {
     expect(selectionForNewGame('english', sel(true, true, true))).toEqual(sel(true, true, false));
   });
 
-  it('english with no english selection (slovenian only or nothing) defaults to csw21', () => {
-    expect(selectionForNewGame('english', sel(false, false, true))).toEqual(sel(true, false, false));
-    expect(selectionForNewGame('english', sel(false, false, false))).toEqual(sel(true, false, false));
+  it('english with no english selection (slovenian only or nothing) defaults to ENABLE + Friendly together', () => {
+    expect(selectionForNewGame('english', sel(false, false, true))).toEqual(sel(false, false, false, true, true));
+    expect(selectionForNewGame('english', sel(false, false, false))).toEqual(sel(false, false, false, true, true));
   });
 
   it('does not mutate the input', () => {
@@ -446,13 +446,13 @@ describe('defaultSelectionFor (plain restart)', () => {
     expect(defaultSelectionFor('english', sel(true, true, false))).toEqual(sel(true, true, false));
   });
 
-  it('english with only slovenian or nothing is repaired to csw21', () => {
-    expect(defaultSelectionFor('english', sel(false, false, true))).toEqual(sel(true, false, false));
-    expect(defaultSelectionFor('english', sel(false, false, false))).toEqual(sel(true, false, false));
+  it('english with only slovenian or nothing is repaired to ENABLE + Friendly', () => {
+    expect(defaultSelectionFor('english', sel(false, false, true))).toEqual(sel(false, false, false, true, true));
+    expect(defaultSelectionFor('english', sel(false, false, false))).toEqual(sel(false, false, false, true, true));
   });
 
   it('an unknown language is treated like english', () => {
-    expect(defaultSelectionFor('klingon', sel(false, false, true))).toEqual(sel(true, false, false));
+    expect(defaultSelectionFor('klingon', sel(false, false, true))).toEqual(sel(false, false, false, true, true));
     expect(defaultSelectionFor('klingon', sel(false, true, false))).toEqual(sel(false, true, false));
   });
 });
@@ -516,5 +516,50 @@ describe('ENABLE (the open English list) and availability-aware defaults', () =>
     store.load('slovenian', 'miza\n');
     expect(store.loadedFor('english')).toEqual(['nwl2023', 'enable']);
     expect(store.loadedFor('slovenian')).toEqual(['slovenian']);
+  });
+});
+
+describe('Friendly (casual shorts) and union defaults', () => {
+  it('skips # comment lines so shipped headers never become words', () => {
+    const map = parseDictionaryFile('# Friendly header\nZA\n# comment\nZO\n');
+    expect([...map.keys()]).toEqual(['za', 'zo']);
+  });
+
+  it('defaults a fresh English game to ENABLE + Friendly together when both ship', () => {
+    const none = sel(false, false, false);
+    expect(selectionForNewGame('english', none, ['enable', 'friendly', 'slovenian'])).toEqual(
+      sel(false, false, false, true, true)
+    );
+    expect(defaultSelectionFor('english', none, ['enable', 'friendly'])).toEqual(sel(false, false, false, true, true));
+  });
+
+  it('falls back to a single list when only one of ENABLE/Friendly ships', () => {
+    const none = sel(false, false, false);
+    expect(selectionForNewGame('english', none, ['enable', 'slovenian'])).toEqual(sel(false, false, false, true));
+    expect(selectionForNewGame('english', none, ['friendly', 'slovenian'])).toEqual(sel(false, false, false, false, true));
+  });
+
+  it('a word in ANY selected list is valid (union), e.g. Friendly-only ZA alongside ENABLE-only CAT', () => {
+    const store = createDictionaryStore();
+    store.load('enable', 'cat\ndog\n');
+    store.load('friendly', 'za\nzo\nqi\n');
+    store.setSelection(sel(false, false, false, true, true));
+    expect(store.has('ZA')).toBe(true);
+    expect(store.has('zo')).toBe(true);
+    expect(store.has('qi')).toBe(true);
+    expect(store.has('cat')).toBe(true);
+    expect(store.has('zzz')).toBe(false);
+  });
+
+  it('strict single-list selections still exclude the other list', () => {
+    const store = createDictionaryStore();
+    store.load('enable', 'cat\n');
+    store.load('friendly', 'za\n');
+    store.setSelection(sel(false, false, false, true));
+    expect(store.has('za')).toBe(false);
+    expect(store.has('cat')).toBe(true);
+    store.setSelection(sel(false, false, false, false, true));
+    expect(store.has('za')).toBe(true);
+    expect(store.has('cat')).toBe(false);
   });
 });

@@ -18,6 +18,10 @@
         <input type="checkbox" v-model="enableEnabled" :disabled="notInstalled('enable')" @change="handleChange" />
         <span>ENABLE (open list) 🌐<em v-if="notInstalled('enable')" class="not-installed"> (not installed)</em></span>
       </label>
+      <label class="checkbox-item" :class="{ unavailable: notInstalled('friendly') }">
+        <input type="checkbox" v-model="friendlyEnabled" :disabled="notInstalled('friendly')" @change="handleChange" />
+        <span>Friendly (casual shorts) 🤝<em v-if="notInstalled('friendly')" class="not-installed"> (not installed)</em></span>
+      </label>
       <label class="checkbox-item" :class="{ unavailable: notInstalled('slovenian') }">
         <input type="checkbox" v-model="slovenianEnabled" :disabled="notInstalled('slovenian')" @change="handleChange" />
         <span>Slovenian 🇸🇮<em v-if="notInstalled('slovenian')" class="not-installed"> (not installed)</em></span>
@@ -27,7 +31,9 @@
         <span v-if="activeDictionaryCount > 1">Using union of {{ activeDictionaryCount }} dictionaries</span>
         <span v-else-if="csw21Enabled">Using CSW21</span>
         <span v-else-if="nwl2023Enabled">Using NWL2023</span>
+        <span v-else-if="enableEnabled && friendlyEnabled">Using ENABLE + Friendly</span>
         <span v-else-if="enableEnabled">Using ENABLE</span>
+        <span v-else-if="friendlyEnabled">Using Friendly</span>
         <span v-else-if="slovenianEnabled">Using Slovenian</span>
         <span v-else class="warning">⚠️ Select at least one</span>
       </div>
@@ -51,7 +57,7 @@ export default {
     },
     selectedDictionaries: {
       type: Object,
-      default: () => ({ csw21: true, nwl2023: false, enable: false, slovenian: false })
+      default: () => ({ csw21: false, nwl2023: false, enable: true, friendly: true, slovenian: false })
     },
     // Ids of the lists this device has. When given, the others are shown disabled as "(not installed)".
     installed: {
@@ -65,6 +71,7 @@ export default {
       csw21Enabled: this.selectedDictionaries.csw21,
       nwl2023Enabled: this.selectedDictionaries.nwl2023,
       enableEnabled: !!this.selectedDictionaries.enable,
+      friendlyEnabled: !!this.selectedDictionaries.friendly,
       slovenianEnabled: this.selectedDictionaries.slovenian
     };
   },
@@ -74,6 +81,7 @@ export default {
       this.csw21Enabled = next.csw21;
       this.nwl2023Enabled = next.nwl2023;
       this.enableEnabled = !!next.enable;
+      this.friendlyEnabled = !!next.friendly;
       this.slovenianEnabled = next.slovenian;
     }
   },
@@ -83,6 +91,7 @@ export default {
       if (this.csw21Enabled) count++;
       if (this.nwl2023Enabled) count++;
       if (this.enableEnabled) count++;
+      if (this.friendlyEnabled) count++;
       if (this.slovenianEnabled) count++;
       return count;
     }
@@ -99,6 +108,7 @@ export default {
         csw21: this.csw21Enabled,
         nwl2023: this.nwl2023Enabled,
         enable: this.enableEnabled,
+        friendly: this.friendlyEnabled,
         slovenian: this.slovenianEnabled
       });
     }

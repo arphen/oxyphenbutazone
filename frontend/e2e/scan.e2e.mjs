@@ -150,7 +150,7 @@ const sdp = (role) =>
   await guest.getByRole('button', { name: 'Join' }).click();
   await guest.waitForSelector('textarea.signal-text', { timeout: 20000 });
   const answer = await guest.locator('textarea.signal-text').inputValue();
-  check('pairing: guest produced an answer after tapping Join', answer.startsWith('OXY1.'));
+  check('pairing: guest produced an answer after tapping Join', /^OXY[12]\./.test(answer));
 
   const ansQr = writeY4m(hostVideo, answer);
   await host.getByRole('button', { name: /Scan their answer/ }).click();

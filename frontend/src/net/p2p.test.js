@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createFraming, CHUNK_SIZE } from './framing.js';
-import { encodeSignal, decodeSignal, validateSdp, SIGNAL_PREFIX } from './signal.js';
+import { encodeSignal, decodeSignal, validateSdp, SIGNAL_PREFIX, SIGNAL_PREFIX_V2 } from './signal.js';
 import { createLocalBackend } from './localBackend.js';
 import { createHostSession } from './hostSession.js';
 import { acceptInvite, sanitizeResult } from './guestSession.js';
@@ -107,10 +107,23 @@ describe('signal codec', () => {
 
   it('round-trips an offer and an answer', async () => {
     const text = await encodeSignal(offer());
-    expect(text.startsWith(SIGNAL_PREFIX)).toBe(true);
+    expect(text.startsWith(SIGNAL_PREFIX_V2)).toBe(true); // base32: smaller QR than legacy base64url
     expect(await decodeSignal(text)).toEqual(offer());
     const answer = { ...offer(), t: 'answer', seat: 3 };
     expect(await decodeSignal(await encodeSignal(answer))).toEqual(answer);
+  });
+
+  it('still decodes legacy OXY1 (base64url) invites', async () => {
+    const json = JSON.stringify({ v: 1, ...offer() });
+    const stream = new CompressionStream('deflate-raw');
+    const writer = stream.writable.getWriter();
+    writer.write(new TextEncoder().encode(json));
+    writer.close();
+    const bytes = new Uint8Array(await new Response(stream.readable).arrayBuffer());
+    const legacy =
+      SIGNAL_PREFIX + btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+    expect(await decodeSignal(legacy)).toEqual(offer());
+    expect(await decodeSignal(`https://example.org/app/#/join?c=${legacy}`)).toEqual(offer());
   });
 
   it('accepts the token inside a link and tolerates surrounding whitespace', async () => {
@@ -354,7 +367,7 @@ describe('pairing and play', () => {
     expect(session.status).toBe('closed');
     expect(await session.backend.dispatch({ type: 'pass', playerId: 2 })).toMatchObject({ success: false, error: /lost/ });
     const invite = await host.invite(2);
-    expect(invite.startsWith(SIGNAL_PREFIX)).toBe(true);
+    expect(invite.startsWith(SIGNAL_PREFIX_V2)).toBe(true);
   });
 
   it('a twice-scanned answer fails friendly and still connects (no raw stable-state error)', async () => {
@@ -586,7 +599,7 @@ describe('word lists that are really an HTML fallback page', () => {
     await backend.ready;
     expect(backend.missingLists()).toEqual(['csw21']);
     const state = await backend.getState();
-    expect(state.dictionaries).toEqual({ csw21: false, nwl2023: false, enable: true, slovenian: false });
+    expect(state.dictionaries).toEqual({ csw21: false, nwl2023: false, enable: true, friendly: false, slovenian: false });
     expect(state.message).toBe('The chosen word list is not installed; using ENABLE instead.');
     expect((await backend.dispatch({ type: 'validate-word', word: 'cat' })).valid).toBe(true);
     expect((await backend.dispatch({ type: 'validate-word', word: 'html' })).valid).toBe(false); // the page's text did not become words

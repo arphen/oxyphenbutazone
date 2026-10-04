@@ -11,14 +11,24 @@ import { debug, logWarn } from '../utils/log.js';
 
 const OFFICIAL_IDS = ['csw21', 'nwl2023']; // the lists a public deployment cannot ship; players import them
 
-export const WORD_LIST_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
+export const WORD_LIST_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', friendly: 'FRIENDLY.txt', slovenian: 'SLOVENIAN.txt' };
 const SAVE_KEY = 'oxyphenbutazone_local_game_v1';
+const SAVE_SCHEMA = 1; // bump when the stored envelope changes; unknown versions are discarded, never trusted
 
 function readSaved() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const checked = trySanitizeGameState(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    // Current envelope: { v, state }. A bare state is a save from before
+    // envelopes existed and is still honoured. Anything else (unknown
+    // version, wrong shape) is discarded: the game restarts fresh rather
+    // than loading something untrusted or half-written.
+    const candidate = parsed && typeof parsed === 'object' && 'state' in parsed
+      ? (parsed.v === SAVE_SCHEMA ? parsed.state : null)
+      : parsed;
+    if (!candidate) return null;
+    const checked = trySanitizeGameState(candidate);
     return checked.ok ? checked.state : null; // anything malformed in storage is ignored, never trusted
   } catch {
     return null;
@@ -27,7 +37,7 @@ function readSaved() {
 
 function writeSaved(state) {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_SCHEMA, state }));
   } catch (error) {
     logWarn('[Local] Could not save game:', error?.message);
   }
