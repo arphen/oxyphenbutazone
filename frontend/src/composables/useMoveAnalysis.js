@@ -6,6 +6,7 @@
  */
 
 import { ref } from 'vue';
+import { debug, error } from '../utils/log';
 
 export function useMoveAnalysis() {
     const analyzing = ref(false);
@@ -31,11 +32,11 @@ export function useMoveAnalysis() {
         analysisError.value = null;
 
         try {
-            console.log('[MoveAnalysis] Finding best move for rack:', rack);
+            debug('[MoveAnalysis] Finding best move for rack:', rack);
 
             // Find all empty positions on the board where we could place tiles
             const placements = findValidPlacements(board);
-            console.log('[MoveAnalysis] Found', placements.length, 'potential placement positions');
+            debug('[MoveAnalysis] Found', placements.length, 'potential placement positions');
 
             let bestMove = null;
             let highestScore = 0;
@@ -72,7 +73,7 @@ export function useMoveAnalysis() {
                         if (move && move.score > highestScore) {
                             highestScore = move.score;
                             bestMove = move;
-                            console.log('[MoveAnalysis] New best move found:', move);
+                            debug('[MoveAnalysis] New best move found:', move);
                         }
 
                         // Stop if we found a bingo (7 tiles)
@@ -89,7 +90,7 @@ export function useMoveAnalysis() {
             analyzing.value = false;
 
             if (!bestMove) {
-                console.log('[MoveAnalysis] No valid moves found');
+                debug('[MoveAnalysis] No valid moves found');
                 return {
                     found: false,
                     message: 'No valid moves found. Consider passing or exchanging tiles.'
@@ -102,7 +103,7 @@ export function useMoveAnalysis() {
             };
 
         } catch (error) {
-            console.error('[MoveAnalysis] Error finding best move:', error);
+            error('[MoveAnalysis] Error finding best move:', error);
             analysisError.value = error.message;
             analyzing.value = false;
             return {

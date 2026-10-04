@@ -200,6 +200,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFlashcards } from '../composables/useFlashcards.js';
 import { generatePracticeScenario } from '../data/scenarioGenerator.js';
+import { debug } from '../utils/log';
 
 export default {
   name: 'FlashcardPractice',
@@ -622,8 +623,8 @@ export default {
       }
       
       const targetWord = currentFlashcard.value.word;
-      
-      console.log('[Flashcard] New words to validate:', newWords.map(w => w.word));
+
+      debug('[Flashcard] New words to validate:', newWords.map(w => w.word));
       
       // Validate ALL formed words against the dictionary
       try {
@@ -643,7 +644,7 @@ export default {
             }
             
             const result = await response.json();
-            console.log('[Flashcard] Validation:', wordObj.word, '=', result.valid);
+            debug('[Flashcard] Validation:', wordObj.word, '=', result.valid);
             return {
               word: wordObj.word,
               valid: result.valid,

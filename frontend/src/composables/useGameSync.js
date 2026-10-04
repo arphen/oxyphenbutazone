@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue';
+import { debug, error } from '../utils/log';
 
 const ws = ref(null);
 const connected = ref(false);
@@ -13,7 +14,7 @@ export function useGameSync() {
     ws.value = new WebSocket(wsUrl);
     
     ws.value.onopen = () => {
-      console.log('WebSocket connected');
+      debug('WebSocket connected');
       connected.value = true;
     };
     
@@ -24,17 +25,17 @@ export function useGameSync() {
           gameState.value = data.payload;
         }
       } catch (e) {
-        console.error('Error parsing WebSocket message:', e);
+        error('Error parsing WebSocket message:', e);
       }
     };
     
     ws.value.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      error('WebSocket error:', error);
       connected.value = false;
     };
     
     ws.value.onclose = () => {
-      console.log('WebSocket closed');
+      debug('WebSocket closed');
       connected.value = false;
       // Attempt to reconnect after 3 seconds
       setTimeout(connect, 3000);

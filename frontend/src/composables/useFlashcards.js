@@ -7,6 +7,7 @@ import {
     getBucketStats,
     selectNextWord
 } from '../data/wordCategories.js';
+import { debug, warn, error } from '../utils/log';
 
 const STORAGE_KEY = 'scrabble-flashcards';
 
@@ -25,7 +26,7 @@ export function useFlashcards() {
                 flashcardsByCategory.value = JSON.parse(stored);
             }
         } catch (error) {
-            console.error('Failed to load flashcards:', error);
+            error('Failed to load flashcards:', error);
         }
     };
 
@@ -34,7 +35,7 @@ export function useFlashcards() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(flashcardsByCategory.value));
         } catch (error) {
-            console.error('Failed to save flashcards:', error);
+            error('Failed to save flashcards:', error);
         }
     };
 
@@ -44,7 +45,7 @@ export function useFlashcards() {
         const category = WORD_CATEGORIES[categoryId];
 
         if (!category) {
-            console.error('Unknown category:', categoryId);
+            error('Unknown category:', categoryId);
             isLoading.value = false;
             return;
         }
@@ -72,7 +73,7 @@ export function useFlashcards() {
                 }
             }
 
-            console.log(`[Flashcards] Loaded ${allWords.size} words for category: ${category.name}`);
+            debug(`[Flashcards] Loaded ${allWords.size} words for category: ${category.name}`);
 
             // Validate all words are actually in the dictionary by checking the API
             const validatedWords = new Set();
@@ -86,11 +87,11 @@ export function useFlashcards() {
                 if (result.valid) {
                     validatedWords.add(word);
                 } else {
-                    console.warn(`[Flashcards] Filtered out invalid word: ${word}`);
+                    warn(`[Flashcards] Filtered out invalid word: ${word}`);
                 }
             }
 
-            console.log(`[Flashcards] After validation: ${validatedWords.size} valid words (filtered ${allWords.size - validatedWords.size})`);
+            debug(`[Flashcards] After validation: ${validatedWords.size} valid words (filtered ${allWords.size - validatedWords.size})`);
 
             // Create flashcards if category doesn't exist
             if (!flashcardsByCategory.value[categoryId]) {
@@ -106,7 +107,7 @@ export function useFlashcards() {
                 const removedCount = existingFlashcards.length - validFlashcards.length;
 
                 if (removedCount > 0) {
-                    console.log(`[Flashcards] Removed ${removedCount} invalid words from cached data`);
+                    debug(`[Flashcards] Removed ${removedCount} invalid words from cached data`);
                     flashcardsByCategory.value[categoryId] = validFlashcards;
                 }
 
@@ -120,7 +121,7 @@ export function useFlashcards() {
                     flashcardsByCategory.value[categoryId].push(
                         ...newWords.map(word => createFlashcard(word, categoryId))
                     );
-                    console.log(`[Flashcards] Added ${newWords.length} new words to category`);
+                    debug(`[Flashcards] Added ${newWords.length} new words to category`);
                 }
 
                 if (removedCount > 0 || newWords.length > 0) {
@@ -130,7 +131,7 @@ export function useFlashcards() {
 
             currentCategory.value = categoryId;
         } catch (error) {
-            console.error('Failed to initialize category:', error);
+            error('Failed to initialize category:', error);
         } finally {
             isLoading.value = false;
         }
