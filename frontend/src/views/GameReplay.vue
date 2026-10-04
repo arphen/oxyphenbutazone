@@ -22,7 +22,7 @@
         <!-- Board View -->
         <div class="board-section">
           <div class="board-container">
-            <Board :key="currentMoveIndex" :board="currentBoardState" @cell-click="() => {}" />
+            <Board :key="currentMoveIndex" :board="currentBoardState" :language="game?.metadata?.language" @cell-click="() => {}" />
           </div>
 
           <!-- Move Controls -->

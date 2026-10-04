@@ -82,7 +82,8 @@ Format: `WORD definition [metadata]` (definition is optional for validation).
 ## Known Limitations
 
 - **Game state is in-memory**: Restarting the server loses all game state
-- **English letter values only**: Mobile/board display shows English letter point values even in Slovenian mode
+- **Practice modes use English values**: Free play, practice and flashcards always show English letter points (the live game, phone racks and replays use the game's language)
+- **Persistence records two players only**: saved history/replay captures players 1 and 2, so 3–4 player games are not fully recorded
 
 ## Tech Stack
 

@@ -10,6 +10,7 @@
         <div class="board-section">
           <Board 
             :board="gameState?.board || []" 
+            :language="gameState?.language" 
             @cell-click="handleCellClick" 
           />
         </div>

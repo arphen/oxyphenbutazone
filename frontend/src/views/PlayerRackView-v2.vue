@@ -147,6 +147,7 @@
     <SwapTilesModal
       :isVisible="showSwapModal"
       :rack="rack"
+      :language="gameState?.language"
       @close="showSwapModal = false"
       @swap="handleSwapTiles"
     />
@@ -164,6 +165,7 @@
 import GameOverModal from '../components/GameOverModal.vue';
 import BlankLetterPicker from '../components/BlankLetterPicker.vue';
 import SwapTilesModal from '../components/SwapTilesModal.vue';
+import { letterValue } from '../shared/rules';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
 import { isDebug, debug, logWarn, logError } from '../utils/log';
@@ -331,17 +333,7 @@ export default {
       }
     },
     getLetterValue(letter) {
-      const values = {
-        'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
-        'd': 2, 'g': 2,
-        'b': 3, 'c': 3, 'm': 3, 'p': 3,
-        'f': 4, 'h': 4, 'v': 4, 'w': 4, 'y': 4,
-        'k': 5,
-        'j': 8, 'x': 8,
-        'q': 10, 'z': 10,
-        '': 0
-      };
-      return values[letter?.toLowerCase()] || 0;
+      return letterValue(this.gameState?.language, letter);
     },
     async shuffleRack() {
       if (!this.rack || this.rack.length < 2) return;
