@@ -1,22 +1,29 @@
 // Word lists and word queries. Pure: callers load list text (from fs, fetch or an imported file).
 
-export const DICTIONARY_IDS = ['csw21', 'nwl2023', 'slovenian'];
-export const DICTIONARY_LABELS = { csw21: 'CSW21', nwl2023: 'NWL2023', slovenian: 'Slovenian' };
+export const DICTIONARY_IDS = ['csw21', 'nwl2023', 'enable', 'slovenian'];
+export const ENGLISH_IDS = ['csw21', 'nwl2023', 'enable'];
+export const DICTIONARY_LABELS = { csw21: 'CSW21', nwl2023: 'NWL2023', enable: 'ENABLE', slovenian: 'Slovenian' };
+
+const NONE = { csw21: false, nwl2023: false, enable: false, slovenian: false };
+const only = (id) => ({ ...NONE, [id]: true });
+
+// The English list to use when the player has not chosen one: CSW21, else NWL2023, else ENABLE (open list), from what
+// this deployment actually has. With nothing known it is CSW21 (the laptop host's default).
+const defaultEnglish = (available) => ENGLISH_IDS.find((id) => available.includes(id)) ?? 'csw21';
 
 // Dictionaries for a game whose language was chosen explicitly: Slovenian has a single list; English keeps the
-// player's CSW21/NWL2023 preference (dropping Slovenian), defaulting to CSW21.
-export function selectionForNewGame(language, current) {
-  if (language === 'slovenian') return { csw21: false, nwl2023: false, slovenian: true };
-  if (current.csw21 || current.nwl2023) return { csw21: current.csw21, nwl2023: current.nwl2023, slovenian: false };
-  return { csw21: true, nwl2023: false, slovenian: false };
+// player's English choices (dropping Slovenian), defaulting to the best available English list.
+export function selectionForNewGame(language, current, available = DICTIONARY_IDS) {
+  if (language === 'slovenian') return only('slovenian');
+  const keep = ENGLISH_IDS.filter((id) => current[id]);
+  if (keep.length) return { ...NONE, ...Object.fromEntries(keep.map((id) => [id, true])) };
+  return only(defaultEnglish(available));
 }
 
 // Dictionaries for a plain restart: keep the selection unless it cannot suit the language.
-export function defaultSelectionFor(language, current) {
-  if (language === 'slovenian') {
-    return current.slovenian ? current : { csw21: false, nwl2023: false, slovenian: true };
-  }
-  return current.csw21 || current.nwl2023 ? current : { csw21: true, nwl2023: false, slovenian: false };
+export function defaultSelectionFor(language, current, available = DICTIONARY_IDS) {
+  if (language === 'slovenian') return current.slovenian ? current : only('slovenian');
+  return ENGLISH_IDS.some((id) => current[id]) ? current : only(defaultEnglish(available));
 }
 
 // Parse a list: one entry per line, either `WORD` or `WORD definition [metadata]`. Returns Map(word -> definition|null).
@@ -33,9 +40,10 @@ export function parseDictionaryFile(content) {
 }
 
 export function createDictionaryStore() {
-  const lists = { csw21: new Map(), nwl2023: new Map(), slovenian: new Map() };
+  const lists = Object.fromEntries(DICTIONARY_IDS.map((id) => [id, new Map()]));
+  const declared = new Set(); // lists this deployment can supply even if not loaded yet
   let active = new Set();
-  let selection = { csw21: true, nwl2023: false, slovenian: false };
+  let selection = { ...NONE, csw21: true };
 
   const rebuild = () => {
     active = new Set();
@@ -53,14 +61,18 @@ export function createDictionaryStore() {
       return lists[id].size;
     },
     isLoaded: (id) => lists[id]?.size > 0,
+    /** Say which lists this deployment ships (they may not be loaded yet). */
+    declare(ids) {
+      ids.filter((id) => DICTIONARY_IDS.includes(id)).forEach((id) => declared.add(id));
+    },
+    /** Lists that are loaded or declared available, in DICTIONARY_IDS order. */
+    available: () => DICTIONARY_IDS.filter((id) => declared.has(id) || lists[id].size > 0),
+    /** The loaded lists that suit `language`, best first; used when a chosen list turns out to be unavailable. */
+    loadedFor: (language) => (language === 'slovenian' ? ['slovenian'] : ENGLISH_IDS).filter((id) => lists[id].size > 0),
     size: (id) => lists[id]?.size ?? 0,
     getSelection: () => ({ ...selection }),
     setSelection(next) {
-      selection = {
-        csw21: Boolean(next.csw21),
-        nwl2023: Boolean(next.nwl2023),
-        slovenian: Boolean(next.slovenian),
-      };
+      selection = Object.fromEntries(DICTIONARY_IDS.map((id) => [id, Boolean(next[id])]));
       rebuild();
     },
     /** Is `word` valid in the currently selected dictionaries? */

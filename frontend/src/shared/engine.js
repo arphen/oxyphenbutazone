@@ -599,7 +599,8 @@ export function createEngine(dict, { random = Math.random } = {}) {
                 const languageChosen = Object.hasOwn(TILE_DISTRIBUTIONS, action.language);
                 const language = languageChosen ? action.language : (gameState?.language || 'english');
                 const current = dict.getSelection();
-                dict.setSelection(languageChosen ? selectionForNewGame(language, current) : defaultSelectionFor(language, current));
+                const available = dict.available();
+                dict.setSelection(languageChosen ? selectionForNewGame(language, current, available) : defaultSelectionFor(language, current, available));
                 debug(`[Restart] Creating new game with ${playerCount} players, language: ${language}`);
                 startGame(playerCount, language);
                 result = { success: true };

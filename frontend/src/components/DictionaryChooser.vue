@@ -15,6 +15,10 @@
         <span>NWL2023 🇺🇸</span>
       </label>
       <label class="checkbox-item">
+        <input type="checkbox" v-model="enableEnabled" @change="handleChange" />
+        <span>ENABLE (open list) 🌐</span>
+      </label>
+      <label class="checkbox-item">
         <input type="checkbox" v-model="slovenianEnabled" @change="handleChange" />
         <span>Slovenian 🇸🇮</span>
       </label>
@@ -22,6 +26,7 @@
         <span v-if="activeDictionaryCount > 1">Using union of {{ activeDictionaryCount }} dictionaries</span>
         <span v-else-if="csw21Enabled">Using CSW21</span>
         <span v-else-if="nwl2023Enabled">Using NWL2023</span>
+        <span v-else-if="enableEnabled">Using ENABLE</span>
         <span v-else-if="slovenianEnabled">Using Slovenian</span>
         <span v-else class="warning">⚠️ Select at least one</span>
       </div>
@@ -45,7 +50,7 @@ export default {
     },
     selectedDictionaries: {
       type: Object,
-      default: () => ({ csw21: true, nwl2023: false, slovenian: false })
+      default: () => ({ csw21: true, nwl2023: false, enable: false, slovenian: false })
     }
   },
   data() {
@@ -53,6 +58,7 @@ export default {
       showDropdown: false,
       csw21Enabled: this.selectedDictionaries.csw21,
       nwl2023Enabled: this.selectedDictionaries.nwl2023,
+      enableEnabled: !!this.selectedDictionaries.enable,
       slovenianEnabled: this.selectedDictionaries.slovenian
     };
   },
@@ -61,6 +67,7 @@ export default {
     selectedDictionaries(next) {
       this.csw21Enabled = next.csw21;
       this.nwl2023Enabled = next.nwl2023;
+      this.enableEnabled = !!next.enable;
       this.slovenianEnabled = next.slovenian;
     }
   },
@@ -69,6 +76,7 @@ export default {
       let count = 0;
       if (this.csw21Enabled) count++;
       if (this.nwl2023Enabled) count++;
+      if (this.enableEnabled) count++;
       if (this.slovenianEnabled) count++;
       return count;
     }
@@ -81,6 +89,7 @@ export default {
       this.$emit('update', {
         csw21: this.csw21Enabled,
         nwl2023: this.nwl2023Enabled,
+        enable: this.enableEnabled,
         slovenian: this.slovenianEnabled
       });
     }

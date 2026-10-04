@@ -191,7 +191,7 @@ export default {
       showQR: false,
       isMobileView: false,
       pollInterval: null,
-      selectedDictionaries: { csw21: true, nwl2023: false, slovenian: false },
+      selectedDictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: false },
       lastServerDictionaries: null,
       playerCount: 4, // Default to 4 players, can be changed from route params
     };
@@ -543,7 +543,7 @@ export default {
     },
     async handleDictionaryUpdate(selection) {
       // Ensure at least one is selected
-      if (!selection.csw21 && !selection.nwl2023 && !selection.slovenian) {
+      if (!selection.csw21 && !selection.nwl2023 && !selection.enable && !selection.slovenian) {
         alert('At least one dictionary must be selected');
         return;
       }

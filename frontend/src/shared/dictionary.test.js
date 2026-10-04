@@ -8,12 +8,12 @@ import {
   defaultSelectionFor,
 } from './dictionary.js';
 
-const sel = (csw21, nwl2023, slovenian) => ({ csw21, nwl2023, slovenian });
+const sel = (csw21, nwl2023, slovenian, enable = false) => ({ csw21, nwl2023, enable, slovenian });
 
 describe('constants', () => {
-  it('lists the three dictionaries in lookup-priority order with labels', () => {
-    expect(DICTIONARY_IDS).toEqual(['csw21', 'nwl2023', 'slovenian']);
-    expect(DICTIONARY_LABELS).toEqual({ csw21: 'CSW21', nwl2023: 'NWL2023', slovenian: 'Slovenian' });
+  it('lists the four dictionaries in lookup-priority order with labels', () => {
+    expect(DICTIONARY_IDS).toEqual(['csw21', 'nwl2023', 'enable', 'slovenian']);
+    expect(DICTIONARY_LABELS).toEqual({ csw21: 'CSW21', nwl2023: 'NWL2023', enable: 'ENABLE', slovenian: 'Slovenian' });
   });
 });
 
@@ -454,5 +454,56 @@ describe('defaultSelectionFor (plain restart)', () => {
   it('an unknown language is treated like english', () => {
     expect(defaultSelectionFor('klingon', sel(false, false, true))).toEqual(sel(true, false, false));
     expect(defaultSelectionFor('klingon', sel(false, true, false))).toEqual(sel(false, true, false));
+  });
+});
+
+describe('ENABLE (the open English list) and availability-aware defaults', () => {
+  it('is its own selectable list, with no definitions, after the Collins/NASPA lists in lookup order', () => {
+    const store = createDictionaryStore();
+    store.load('enable', 'aa\nzzz\n');
+    store.load('nwl2023', 'zzz a long definition\n');
+    store.setSelection({ enable: true });
+    expect(store.has('aa')).toBe(true);
+    expect(store.activeSize).toBe(2);
+    expect(store.definition('zzz')).toBe('a long definition'); // nwl2023 answers before enable
+    expect(store.definition('aa')).toBeNull();
+  });
+
+  it('a selection naming only ENABLE keeps ENABLE when english is chosen, and drops slovenian', () => {
+    expect(selectionForNewGame('english', sel(false, false, true, true))).toEqual(sel(false, false, false, true));
+    expect(selectionForNewGame('english', sel(true, false, false, true))).toEqual(sel(true, false, false, true));
+  });
+
+  it('with no english choice the default is the best AVAILABLE english list', () => {
+    const none = sel(false, false, true);
+    expect(selectionForNewGame('english', none, ['csw21', 'enable', 'slovenian'])).toEqual(sel(true, false, false));
+    expect(selectionForNewGame('english', none, ['nwl2023', 'enable'])).toEqual(sel(false, true, false));
+    expect(selectionForNewGame('english', none, ['enable', 'slovenian'])).toEqual(sel(false, false, false, true));
+    expect(selectionForNewGame('english', none, [])).toEqual(sel(true, false, false)); // nothing known: csw21
+    expect(defaultSelectionFor('english', none, ['enable'])).toEqual(sel(false, false, false, true));
+  });
+
+  it('a plain restart keeps an ENABLE-only selection', () => {
+    const current = sel(false, false, false, true);
+    expect(defaultSelectionFor('english', current, ['csw21', 'enable'])).toBe(current);
+  });
+
+  it('declare() and available() track lists a deployment ships, plus anything loaded', () => {
+    const store = createDictionaryStore();
+    expect(store.available()).toEqual([]);
+    store.declare(['slovenian', 'enable', 'bogus']);
+    expect(store.available()).toEqual(['enable', 'slovenian']); // unknown ids ignored, canonical order
+    store.load('csw21', 'cat\n');
+    expect(store.available()).toEqual(['csw21', 'enable', 'slovenian']);
+  });
+
+  it('loadedFor() lists only loaded lists that suit the language, best first', () => {
+    const store = createDictionaryStore();
+    store.declare(['csw21']); // declared but not loaded does not count
+    store.load('enable', 'aa\n');
+    store.load('nwl2023', 'bb\n');
+    store.load('slovenian', 'miza\n');
+    expect(store.loadedFor('english')).toEqual(['nwl2023', 'enable']);
+    expect(store.loadedFor('slovenian')).toEqual(['slovenian']);
   });
 });

@@ -19,3 +19,10 @@ if (mode === 'local') {
 }
 
 createApp(App).use(router).mount('#app')
+
+// Installed/offline use: cache the whole app (including word lists) so it runs with no network
+if (mode === 'local' && import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch((error) => {
+    console.warn('Offline support unavailable:', error?.message)
+  })
+}

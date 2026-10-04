@@ -387,10 +387,10 @@ describe('sanitizeAction: update-viewport', () => {
 describe('sanitizeAction: update-dictionary', () => {
   it('rebuilds a valid action exactly with all three keys as booleans', () => {
     expect(
-      sanitizeAction({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: true } })
+      sanitizeAction({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: true } })
     ).toEqual({
       ok: true,
-      action: { type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: true } },
+      action: { type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: true } },
     });
   });
 
@@ -403,7 +403,7 @@ describe('sanitizeAction: update-dictionary', () => {
       })
     ).toEqual({
       ok: true,
-      action: { type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, slovenian: false } },
+      action: { type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, enable: false, slovenian: false } },
     });
   });
 
@@ -413,7 +413,7 @@ describe('sanitizeAction: update-dictionary', () => {
     ['array dictionaries', { dictionaries: [true] }],
     ['string dictionaries', { dictionaries: 'csw21' }],
     ['empty selection', { dictionaries: {} }],
-    ['all false', { dictionaries: { csw21: false, nwl2023: false, slovenian: false } }],
+    ['all false', { dictionaries: { csw21: false, nwl2023: false, enable: false, slovenian: false } }],
     ['only unknown keys', { dictionaries: { other: true } }],
     ['truthy non-true values only', { dictionaries: { csw21: 1, nwl2023: 'true', slovenian: {} } }],
   ])('rejects %s', (_label, fields) => {
@@ -726,7 +726,7 @@ describe('sanitizeGameState: field dropping, truncation and cleaning', () => {
     expect(clean.board[0][0].isNew).toBe(false);
     expect(clean.board[0][0].locked).toBe(false);
     expect(clean.player1.isCurrentPlayer).toBe(false);
-    expect(clean.dictionaries).toEqual({ csw21: false, nwl2023: true, slovenian: false });
+    expect(clean.dictionaries).toEqual({ csw21: false, nwl2023: true, enable: false, slovenian: false });
   });
 
   it('applies defaults for optional fields', () => {
@@ -743,7 +743,7 @@ describe('sanitizeGameState: field dropping, truncation and cleaning', () => {
     expect(clean.messageType).toBe('');
     expect(clean.finalScores).toBeNull();
     expect(clean.winner).toBeNull();
-    expect(clean.dictionaries).toEqual({ csw21: false, nwl2023: false, slovenian: false });
+    expect(clean.dictionaries).toEqual({ csw21: false, nwl2023: false, enable: false, slovenian: false });
   });
 
   it('fills missing cell fields with defaults', () => {

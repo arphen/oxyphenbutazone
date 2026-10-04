@@ -1,13 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { createEngine } from './src/shared/engine.js';
-import { createDictionaryStore, DICTIONARY_IDS } from './src/shared/dictionary.js';
+import { createDictionaryStore, defaultSelectionFor, DICTIONARY_IDS } from './src/shared/dictionary.js';
 import { safeJsonParse, cleanString, MAX_ACTION_BYTES } from './src/shared/protocol.js';
 
 // Laptop-host mode: a thin HTTP shell around the shared engine. All rules live in src/shared/engine.js, which the
 // phones also run in their browsers for peer-to-peer play. Bodies are size-capped and parsed with safeJsonParse.
 
-const DICTIONARY_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', slovenian: 'SLOVENIAN.txt' };
+const DICTIONARY_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
 const MAX_BODY_BYTES = 16 * 1024;
 
 const oddOneOutSessions = new Map(); // sessionId -> sessionState
@@ -16,12 +16,14 @@ function loadDictionaries(store) {
     for (const id of DICTIONARY_IDS) {
         const file = path.join(process.cwd(), 'public', DICTIONARY_FILES[id]);
         if (fs.existsSync(file)) {
+            store.declare([id]);
             console.log(`[Game API] ${DICTIONARY_FILES[id]} loaded: ${store.load(id, fs.readFileSync(file, 'utf-8'))} words`);
         } else {
             console.warn(`[Game API] ${DICTIONARY_FILES[id]} not found`);
         }
     }
-    store.setSelection({ csw21: true, nwl2023: false, slovenian: false });
+    // CSW21 when present, otherwise the best list that is
+    store.setSelection(defaultSelectionFor('english', {}, store.available()));
 }
 
 /** Read and safely parse a JSON body; responds with 4xx and resolves null when it is too large or invalid. */
@@ -107,6 +109,18 @@ export function gameApiPlugin() {
                     engine.debugSetRack(body.playerId, body.rack);
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));
+                    return;
+                }
+
+                // GET /wordlists.json - which lists exist (the static build ships the same file; used by ?mode=local in dev)
+                if (url === '/wordlists.json' && req.method === 'GET') {
+                    const lists = {};
+                    for (const [id, file] of Object.entries(DICTIONARY_FILES)) {
+                        const full = path.join(process.cwd(), 'public', file);
+                        if (fs.existsSync(full)) lists[id] = { file, bytes: fs.statSync(full).size };
+                    }
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ lists }));
                     return;
                 }
 

@@ -83,7 +83,7 @@ describe('initial state', () => {
     expect(s.playerCount).toBe(4);
     expect(s.language).toBe('english');
     expect(s.currentPlayer).toBe(1);
-    expect(s.dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: false });
+    expect(s.dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: false });
     expect(s.gameOver).toBe(false);
     expect(s.winner).toBeNull();
     expect(s.finalScores).toBeNull();
@@ -1211,7 +1211,7 @@ describe('dispatch with ctx.playerId (seat pinning)', () => {
     expect(engine.getState().viewportCenter).toEqual({ row: 3, col: 4 });
     expect(engine.dispatch({ type: 'validate-word', word: 'cat' }, { playerId: 2 })).toMatchObject({ success: true, valid: true });
     expect(
-      engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, slovenian: false } }, { playerId: 2 }).success
+      engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, enable: false, slovenian: false } }, { playerId: 2 }).success
     ).toBe(true);
     place(engine, 1, 'c', 7, 7);
     // set-blank-letter carries no seat of its own, but only the player on turn may change a blank: seat 2 is refused
@@ -1241,7 +1241,7 @@ describe('restart: players, language and dictionaries', () => {
     const s = engine.getState();
     expect(s.language).toBe('slovenian');
     expect(s.playerCount).toBe(3);
-    expect(s.dictionaries).toEqual({ csw21: false, nwl2023: false, slovenian: true });
+    expect(s.dictionaries).toEqual({ csw21: false, nwl2023: false, enable: false, slovenian: true });
     expect(s.currentPlayer).toBe(1);
     expect(s.consecutivePasses).toBe(0);
     expect(s.player1.history).toEqual([]);
@@ -1273,8 +1273,8 @@ describe('restart: players, language and dictionaries', () => {
     const engine = newGame(2, 'slovenian');
     const s = engine.getState();
     expect(s.language).toBe('slovenian');
-    expect(s.dictionaries).toEqual({ csw21: false, nwl2023: false, slovenian: true });
-    expect(engine.dictionary.getSelection()).toEqual({ csw21: false, nwl2023: false, slovenian: true });
+    expect(s.dictionaries).toEqual({ csw21: false, nwl2023: false, enable: false, slovenian: true });
+    expect(engine.dictionary.getSelection()).toEqual({ csw21: false, nwl2023: false, enable: false, slovenian: true });
     expect(engine.dictionary.has('miza')).toBe(true);
     expect(engine.dictionary.has('cat')).toBe(false);
     const alphabet = getAlphabet('slovenian');
@@ -1297,55 +1297,55 @@ describe('restart: players, language and dictionaries', () => {
     const engine = newGame(2, 'slovenian');
     engine.dispatch({ type: 'restart', language: 'english' });
     expect(engine.getState().language).toBe('english');
-    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: false });
+    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: false });
     expect(engine.dictionary.has('cat')).toBe(true);
     expect(engine.dictionary.has('miza')).toBe(false);
   });
 
   it('english restart keeps an existing NWL2023 preference', () => {
     const engine = newGame(2);
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, slovenian: false } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, enable: false, slovenian: false } });
     engine.dispatch({ type: 'restart', language: 'english' });
-    expect(engine.getState().dictionaries).toEqual({ csw21: false, nwl2023: true, slovenian: false });
+    expect(engine.getState().dictionaries).toEqual({ csw21: false, nwl2023: true, enable: false, slovenian: false });
     expect(engine.dictionary.has('dog')).toBe(true);
     expect(engine.dictionary.has('cot')).toBe(false);
   });
 
   it('english restart drops slovenian from a mixed selection', () => {
     const engine = newGame(2);
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: true } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: true } });
     engine.dispatch({ type: 'restart', language: 'english' });
-    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: false });
+    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: false });
   });
 
   it('a plain restart of an english game with a mixed selection keeps it (only repairs unsuitable ones)', () => {
     const engine = newGame(2);
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: true } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: true } });
     engine.dispatch({ type: 'restart' });
-    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: true });
+    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: true });
   });
 
   it('a plain restart repairs a selection that cannot suit the language (english with slovenian only)', () => {
     const engine = newGame(2);
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: false, slovenian: true } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: false, enable: false, slovenian: true } });
     engine.dispatch({ type: 'restart' });
     expect(engine.getState().language).toBe('english');
-    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: false });
+    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: false });
   });
 
   it('a plain restart repairs a slovenian game whose selection lost slovenian', () => {
     const engine = newGame(2, 'slovenian');
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: false } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: false } });
     engine.dispatch({ type: 'restart' });
     expect(engine.getState().language).toBe('slovenian');
-    expect(engine.getState().dictionaries).toEqual({ csw21: false, nwl2023: false, slovenian: true });
+    expect(engine.getState().dictionaries).toEqual({ csw21: false, nwl2023: false, enable: false, slovenian: true });
   });
 
   it('a plain restart of a slovenian game keeps a selection that includes slovenian', () => {
     const engine = newGame(2, 'slovenian');
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: true } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: true } });
     engine.dispatch({ type: 'restart' });
-    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: true });
+    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: true });
   });
 
   it('rejects an unknown language or bad player counts without changing the game', () => {
@@ -1373,7 +1373,7 @@ describe('update-dictionary', () => {
     expect(rejected).toMatchObject({ success: false, error: 'Invalid words' });
 
     // player 2's turn now; switch dictionaries and let player 2 try again
-    const update = engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, slovenian: false } });
+    const update = engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, enable: false, slovenian: false } });
     expect(update.success).toBe(true);
     expect(engine.dispatch({ type: 'validate-word', word: 'dog' }).valid).toBe(true);
     engine.debugSetRack(2, ['d', 'o', 'g', 'q', 'q', 'q', 'q']);
@@ -1384,9 +1384,9 @@ describe('update-dictionary', () => {
 
   it('updates gameState.dictionaries but never gameState.language', () => {
     const engine = newGame(2);
-    const result = engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: false, slovenian: true } });
+    const result = engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: false, enable: false, slovenian: true } });
     expect(result.success).toBe(true);
-    expect(engine.getState().dictionaries).toEqual({ csw21: false, nwl2023: false, slovenian: true });
+    expect(engine.getState().dictionaries).toEqual({ csw21: false, nwl2023: false, enable: false, slovenian: true });
     expect(engine.getState().language).toBe('english');
     // tiles keep the english distribution, even though only the slovenian list is active
     expect(engine.getState().player1.rack.every((t) => t === '' || getAlphabet('english').includes(t))).toBe(true);
@@ -1394,7 +1394,7 @@ describe('update-dictionary', () => {
 
   it('a slovenian game keeps language slovenian when english dictionaries are selected', () => {
     const engine = newGame(2, 'slovenian');
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, slovenian: false } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: false } });
     expect(engine.getState().language).toBe('slovenian');
     expect(engine.getState().dictionaries.csw21).toBe(true);
     expect(engine.dictionary.has('cat')).toBe(true);
@@ -1403,7 +1403,7 @@ describe('update-dictionary', () => {
   it('does not affect tiles, scores or turn order', () => {
     const engine = newGame(2);
     const rack = [...engine.getState().player1.rack];
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, slovenian: false } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, enable: false, slovenian: false } });
     expect(engine.getState().player1.rack).toEqual(rack);
     expect(engine.getState().currentPlayer).toBe(1);
   });
@@ -1412,13 +1412,13 @@ describe('update-dictionary', () => {
     const engine = newGame(2);
     const result = engine.dispatch({ type: 'update-dictionary', dictionaries: {} });
     expect(result.success).toBe(false);
-    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, slovenian: false });
+    expect(engine.getState().dictionaries).toEqual({ csw21: true, nwl2023: false, enable: false, slovenian: false });
     expect(engine.dictionary.has('cat')).toBe(true);
   });
 
   it('a union of lists accepts words from either', () => {
     const engine = newGame(2);
-    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, slovenian: false } });
+    engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, enable: false, slovenian: false } });
     expect(engine.dispatch({ type: 'validate-word', word: 'dog' }).valid).toBe(true);
     expect(engine.dispatch({ type: 'validate-word', word: 'cottage' }).valid).toBe(true);
   });

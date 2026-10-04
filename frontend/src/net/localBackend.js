@@ -2,12 +2,12 @@
 // Used for the static build (no server) and by the phone that hosts a peer-to-peer game.
 
 import { createEngine } from '../shared/engine.js';
-import { createDictionaryStore, DICTIONARY_IDS } from '../shared/dictionary.js';
+import { createDictionaryStore, defaultSelectionFor, DICTIONARY_IDS } from '../shared/dictionary.js';
 import { trySanitizeGameState } from '../shared/protocol.js';
 import { assetUrl } from '../utils/url.js';
 import { debug, logWarn } from '../utils/log.js';
 
-export const WORD_LIST_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', slovenian: 'SLOVENIAN.txt' };
+export const WORD_LIST_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
 const SAVE_KEY = 'oxyphenbutazone_local_game_v1';
 
 function readSaved() {
@@ -38,10 +38,11 @@ export function clearSavedGame() {
 }
 
 /**
- * @param options.loadList  async (id) => text | null  - supplies a word list (defaults to fetching public/ files)
- * @param options.persist   save the game to localStorage after every action (default true)
+ * @param options.loadList   async (id) => text | null  - supplies a word list (defaults to fetching public/ files)
+ * @param options.listIds    async () => string[]  - which lists this deployment ships (defaults to wordlists.json)
+ * @param options.persist    save the game to localStorage after every action (default true)
  */
-export function createLocalBackend({ loadList = defaultLoadList, persist = true } = {}) {
+export function createLocalBackend({ loadList = defaultLoadList, listIds = defaultListIds, persist = true } = {}) {
   const store = createDictionaryStore();
   const engine = createEngine(store);
   const listeners = new Set();
@@ -71,7 +72,32 @@ export function createLocalBackend({ loadList = defaultLoadList, persist = true 
     store.setSelection(saved.dictionaries);
   }
 
-  const ready = ensureSelection(store.getSelection());
+  /** If the chosen lists turned out not to be installed, switch to a loaded one so words can be played at all. */
+  function repairSelection() {
+    if (store.activeSize > 0) return;
+    const state = engine.getState();
+    const [fallback] = store.loadedFor(state.language);
+    if (!fallback) {
+      state.message = 'No word list is installed yet, so no word can be checked.';
+      state.messageType = 'error';
+      return;
+    }
+    store.setSelection({ [fallback]: true });
+    state.message = `The chosen word list is not installed; using ${fallback.toUpperCase()} instead.`;
+    state.messageType = 'info';
+    state.dictionaries = store.getSelection();
+  }
+
+  const ready = (async () => {
+    store.declare(await listIds());
+    // Fresh start: the best English list this deployment ships (CSW21 when present, otherwise the open list)
+    if (!saved) {
+      store.setSelection(defaultSelectionFor('english', {}, store.available()));
+      engine.getState().dictionaries = store.getSelection();
+    }
+    await ensureSelection(store.getSelection());
+    repairSelection();
+  })();
   let queue = Promise.resolve();
 
   const notify = () => listeners.forEach((fn) => fn(engine.getState()));
@@ -105,6 +131,7 @@ export function createLocalBackend({ loadList = defaultLoadList, persist = true 
         const result = engine.dispatch(action, ctx);
         // The action may have selected a list that is not loaded yet (e.g. switching to Slovenian)
         await ensureSelection(store.getSelection());
+        repairSelection();
         if (action?.type !== 'validate-word') {
           if (persist) writeSaved(engine.getState());
           notify();
@@ -128,5 +155,16 @@ async function defaultLoadList(id) {
     return await response.text();
   } catch {
     return null;
+  }
+}
+
+async function defaultListIds() {
+  try {
+    const response = await fetch(assetUrl('wordlists.json'));
+    if (!response.ok) return [];
+    const { lists } = await response.json();
+    return Object.keys(lists || {});
+  } catch {
+    return [];
   }
 }
