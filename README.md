@@ -56,12 +56,13 @@ frontend/
 │   ├── components/       # Board, Rack, Controls, QR, ScoreHistory
 │   ├── views/            # GameBoard-v2, PlayerRackView-v2, FreePlay, etc.
 │   ├── composables/      # useGamePersistence, useFlashcards, useMoveAnalysis
+│   ├── shared/rules.js   # Pure game rules (scoring, placement, tile bags)
 │   ├── router/index.js   # All routes
 │   └── main.js
 ├── public/
-│   ├── CSW21.txt         # Collins Scrabble Words (352k+ words)
-│   ├── NWL2023.txt       # NASPA Word List (184k+ words)
-│   └── SLOVENIAN.txt     # Slovenian (254k+ words)
+│   ├── CSW21.txt         # Collins Scrabble Words (~279k lines)
+│   ├── NWL2023.txt       # NASPA Word List (~197k lines)
+│   └── SLOVENIAN.txt     # Slovenian (~203k lines)
 ├── vite-plugin-game-api-v2.js   # API middleware, game state, dictionaries
 └── vite.config.js
 ```
@@ -73,7 +74,7 @@ Place dictionary files (one word per line, with optional definition) in `public/
 ```
 CSW21.txt       Collins Scrabble Words 2021 (international)
 NWL2023.txt     NASPA Word List 2023 (North America)
-SLOVENIAN.txt   Slovenian Scrabble (254k words, special characters: Č, Š, Ž)
+SLOVENIAN.txt   Slovenian Scrabble (special characters: Č, Š, Ž)
 ```
 
 Format: `WORD definition [metadata]` (definition is optional for validation).
@@ -81,12 +82,11 @@ Format: `WORD definition [metadata]` (definition is optional for validation).
 ## Known Limitations
 
 - **Game state is in-memory**: Restarting the server loses all game state
-- **No continuity check**: Placed tiles are not validated to form a single connected line
 - **English letter values only**: Mobile/board display shows English letter point values even in Slovenian mode
 
 ## Tech Stack
 
-Vue 3, Vite, Vue Router, qrcode-vue3, CSS Modules.
+Vue 3, Vite, Vue Router, qrcode-vue3, scoped component CSS.
 
 ## Author
 
