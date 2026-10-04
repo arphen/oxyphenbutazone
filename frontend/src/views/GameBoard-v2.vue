@@ -461,7 +461,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'pass',
-            playerId: String(currentPlayer)
+            playerId: Number(currentPlayer)
           })
         });
         
