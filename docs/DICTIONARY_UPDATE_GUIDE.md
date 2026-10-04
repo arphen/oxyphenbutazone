@@ -18,7 +18,7 @@ AD an {advertisement=n} [n ADS]
 
 ## File Locations
 Place your dictionary files in the `public` folder:
-- `/public/CSW21.txt` - Collins Scrabble Words 2021
+- `/public/CSW21.txt` - Collins word list (2021)
 - `/public/NWL2023.txt` - NASPA Word List 2023
 
 The old files (`sowpods.txt` and `twl.txt`) can be removed after you've placed the new ones.

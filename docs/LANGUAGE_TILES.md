@@ -1,7 +1,7 @@
 # Language-Specific Tile Distributions
 
 ## Overview
-The Scrabble game now supports **language-specific tile distributions** that automatically adjust based on the selected dictionary.
+Oxyphenbutazone supports **language-specific tile distributions** that automatically adjust based on the selected dictionary.
 
 ## Supported Languages
 
@@ -17,7 +17,7 @@ The Scrabble game now supports **language-specific tile distributions** that aut
 - **Blanks**: 2×0
 
 ### 2. Slovenian 🇸🇮
-**100 tiles total** (Official Slovenian Scrabble distribution)
+**100 tiles total** (Official Slovenian word-game distribution)
 - **1 point**: E×11, A×10, I×9, O×8, N×7, R×6, S×6, J×4, L×4, T×4
 - **2 points**: D×4, V×4
 - **3 points**: K×3, M×2, P×2, U×2
@@ -28,7 +28,7 @@ The Scrabble game now supports **language-specific tile distributions** that aut
 - **10 points**: F×1, Ž×1
 - **Blanks**: 2×0
 
-**Note**: Q, W, X, and Y are absent in Slovenian Scrabble as they're not used in standard Slovenian.
+**Note**: Q, W, X, and Y are absent in Slovenian as they're not used in standard Slovenian.
 
 ## How It Works
 
@@ -44,8 +44,8 @@ The game automatically determines which tile distribution to use based on your d
 ### Dictionary Selection Interface
 1. Click the **📚** button in the game controls
 2. Select your dictionary/dictionaries:
-   - ✅ CSW21 🇬🇧 (Collins Scrabble Words 2021)
-   - ✅ NWL2023 🇺🇸 (NASPA Word List 2023)
+   - ✅ CSW21 🇬🇧 (Collins word list)
+   - ✅ NWL2023 🇺🇸 (North American word list)
    - ✅ Slovenian 🇸🇮 (254,562 words)
 3. See which tile set is active in the dropdown:
    - **TILES: 🇸🇮 Slovenian alphabet** - When only Slovenian is selected
@@ -120,4 +120,4 @@ updateActiveDictionary(selection) {
 - Show remaining tiles by language
 
 ## Source
-Slovenian distribution based on official Slovenian Scrabble rules from Wikipedia's comprehensive Scrabble letter distributions article.
+Slovenian distribution based on standard Slovenian word-game tile rules from Wikipedia's comprehensive tile distribution reference.

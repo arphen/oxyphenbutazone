@@ -8,7 +8,7 @@ import {
     selectNextWord
 } from '../data/wordCategories.js';
 
-const STORAGE_KEY = 'scrabble-flashcards';
+const STORAGE_KEY = 'oxyphenbutazone-flashcards';
 
 // Global flashcard state
 const flashcardsByCategory = ref({});

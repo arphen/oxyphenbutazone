@@ -1,7 +1,7 @@
 # Word Practice / Flashcard Mode 📚
 
 ## Overview
-A new game mode that helps players learn and master Scrabble words using a **Karteikarten (flashcard)** system with spaced repetition.
+A game mode that helps players learn and master words using a **Karteikarten (flashcard)** system with spaced repetition.
 
 ## Features
 

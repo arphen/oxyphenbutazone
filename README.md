@@ -1,13 +1,15 @@
-# Scrabble Trainer - Two-Player Game
+# Oxyphenbutazone
 
-A full-featured two-player Scrabble game with mobile rack viewing and real-time synchronization.
+A word-tile game for two to four players with mobile rack viewing and real-time synchronization. Oxyphenbutazone is an independent hobby project and is not affiliated with or endorsed by any game publisher. The name is a playful nod to the longest words players aspire to play.
+
+**Plays offline** — all game logic runs locally in your browser with no server required.
 
 ## Features
 
 ### Core Gameplay
-- **15x15 Scrabble Board** with all premium squares (Triple Word, Double Word, Triple Letter, Double Letter)
-- **Two-Player Turn System** with visual indicators
-- **SOWPODS Dictionary** validation (267,751 official Scrabble words)
+- **15x15 Board** with all premium squares (Triple Word, Double Word, Triple Letter, Double Letter)
+- **Multi-Player Support** — play with 2, 3, or 4 players
+- **Dictionary Validation** — SOWPODS (CSW21) and NWL2023 (267,000+ words)
 - **Complete Scoring System**:
   - Letter point values (1-10 points)
   - Premium square multipliers
@@ -34,7 +36,7 @@ A full-featured two-player Scrabble game with mobile rack viewing and real-time 
 
 - **Frontend**: Vue.js 3, Vite, Vue Router
 - **QR Codes**: qrcode-vue3
-- **Dictionary**: SOWPODS wordlist (public/sowpods.txt)
+- **Dictionaries**: Collins word list and NWL
 - **Backend**: Django 5.2.6 (scaffolded, not currently used)
 - **Styling**: Scoped CSS with gradient backgrounds
 
@@ -109,7 +111,8 @@ oxyphenbutazone/
 │   │   │   └── index.js            # Route configuration
 │   │   └── main.js                 # App entry point
 │   ├── public/
-│   │   └── sowpods.txt            # Scrabble dictionary
+│   │   ├── CSW21.txt              # Collins word list
+│   │   └── NWL2023.txt            # North American word list
 │   ├── vite-plugin-game-api-v2.js # Custom API middleware
 │   └── vite.config.js             # Vite configuration
 └── backend/                        # Django (not currently used)

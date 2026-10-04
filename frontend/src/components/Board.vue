@@ -170,36 +170,36 @@ export default {
   letter-spacing: 0.5px;
 }
 
-/* Colorblind-friendly premium squares */
-/* Double Letter - Light Blue */
-.dl { 
-  background: rgba(125, 211, 252, 0.25);
-  box-shadow: inset 0 0 12px rgba(125, 211, 252, 0.3);
-  color: #e0f2fe;
+/* Premium square palette */
+/* Double Letter - Yellow */
+.dl {
+  background: rgba(253, 224, 71, 0.24);
+  box-shadow: inset 0 0 12px rgba(253, 224, 71, 0.3);
+  color: #fef3c7;
 }
-/* Triple Letter - Dark Blue */
-.tl { 
-  background: rgba(37, 99, 235, 0.35);
-  box-shadow: inset 0 0 12px rgba(37, 99, 235, 0.4);
-  color: #dbeafe;
+/* Triple Letter - Amber */
+.tl {
+  background: rgba(245, 158, 11, 0.40);
+  box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.5);
+  color: #fef3c7;
 }
-/* Double Word - Light Pink */
-.dw { 
-  background: rgba(244, 114, 182, 0.25);
-  box-shadow: inset 0 0 12px rgba(244, 114, 182, 0.3);
-  color: #fce7f3;
+/* Double Word - Light Violet */
+.dw {
+  background: rgba(167, 139, 250, 0.28);
+  box-shadow: inset 0 0 12px rgba(167, 139, 250, 0.35);
+  color: #ede9fe;
 }
-/* Triple Word - Dark Pink */
-.tw { 
-  background: rgba(219, 39, 119, 0.35);
-  box-shadow: inset 0 0 12px rgba(219, 39, 119, 0.4);
-  color: #fbcfe8;
+/* Triple Word - Violet */
+.tw {
+  background: rgba(124, 58, 237, 0.42);
+  box-shadow: inset 0 0 12px rgba(124, 58, 237, 0.5);
+  color: #ede9fe;
 }
-/* Center - Pink accent */
-.center { 
-  background: rgba(236, 72, 153, 0.3);
-  box-shadow: inset 0 0 15px rgba(236, 72, 153, 0.4);
-  color: #fce7f3;
+/* Center - Teal accent */
+.center {
+  background: rgba(20, 184, 166, 0.38);
+  box-shadow: inset 0 0 15px rgba(20, 184, 166, 0.45);
+  color: #ccfbf1;
 }
 
 .has-tile {

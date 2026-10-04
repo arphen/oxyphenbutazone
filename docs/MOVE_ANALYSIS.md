@@ -159,6 +159,6 @@ const testMove = async (rack, board, startRow, startCol, length, direction, game
 
 ## References
 
-- Scrabble AI algorithms: https://en.wikipedia.org/wiki/Scrabble#Strategy
+- Word-game AI algorithms: https://en.wikipedia.org/wiki/Scrabble#Strategy
 - DAWG data structures: https://en.wikipedia.org/wiki/Deterministic_acyclic_finite_state_automaton
-- Maven (strongest Scrabble AI): http://pages.cs.wisc.edu/~sheppard/papers/maven.pdf
+- Maven (advanced tile-game AI): http://pages.cs.wisc.edu/~sheppard/papers/maven.pdf

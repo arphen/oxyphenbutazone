@@ -209,7 +209,7 @@ export default {
     tilesRemaining() {
       if (!this.gameState) return 100;
       
-      // Standard Scrabble has 100 tiles total
+      // Standard word-tile game has 100 tiles total
       // Calculate tiles in play: on board + in racks
       let totalRackSize = 0;
       for (let i = 1; i <= this.playerCount; i++) {

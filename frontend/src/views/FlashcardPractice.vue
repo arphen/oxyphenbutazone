@@ -1162,11 +1162,11 @@ export default {
   background: linear-gradient(135deg, #cbd5e1, #94a3b8);
 }
 
-.board-cell.tw { background: rgba(219, 39, 119, 0.3); }
-.board-cell.dw { background: rgba(244, 114, 182, 0.25); }
-.board-cell.tl { background: rgba(37, 99, 235, 0.3); }
-.board-cell.dl { background: rgba(125, 211, 252, 0.25); }
-.board-cell.center { background: rgba(236, 72, 153, 0.3); }
+.board-cell.tw { background: rgba(124, 58, 237, 0.42); }
+.board-cell.dw { background: rgba(167, 139, 250, 0.28); }
+.board-cell.tl { background: rgba(245, 158, 11, 0.40); }
+.board-cell.dl { background: rgba(253, 224, 71, 0.24); }
+.board-cell.center { background: rgba(20, 184, 166, 0.38); }
 
 .cell-letter {
   font-size: 1.3rem;

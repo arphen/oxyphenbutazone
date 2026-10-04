@@ -9,9 +9,9 @@ The Slovenian word list (`SLOVENIAN.txt`) is sourced from the [slovenske-besede]
 - **Repository**: https://github.com/unjica/slovenske-besede
 
 ## Usage
-This dictionary can be used alongside or instead of the official Scrabble dictionaries (CSW21, NWL2023). It provides comprehensive coverage of the Slovenian language for casual play.
+This dictionary can be used alongside or instead of the standard word lists (CSW21, NWL2023). It provides comprehensive coverage of the Slovenian language for casual play.
 
 ## Notes
-- This is not an official Scrabble dictionary
+- This is a community-contributed word list
 - Suitable for casual games and learning Slovenian vocabulary
 - Can be combined with English dictionaries for multilingual games
