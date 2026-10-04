@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clean frontend/public/SLOVENIAN.txt for use as a Scrabble dictionary.
+"""Clean frontend/public/SLOVENIAN.txt for use as a word-game dictionary.
 
 The upstream list (unjica/slovenske-besede) was originally committed with the wrong text encoding:
 ISO-8859-2 bytes had been read as Latin-1, so every word containing č, š or ž was corrupted

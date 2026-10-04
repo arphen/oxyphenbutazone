@@ -9,7 +9,8 @@ import {
 } from '../data/wordCategories.js';
 import { debug, logWarn, logError } from '../utils/log';
 
-const STORAGE_KEY = 'scrabble-flashcards';
+const STORAGE_KEY = 'oxyphenbutazone-flashcards';
+const LEGACY_STORAGE_KEY = 'scrabble-flashcards'; // progress saved before the rename is carried over, not lost
 
 // Global flashcard state
 const flashcardsByCategory = ref({});
@@ -21,7 +22,11 @@ export function useFlashcards() {
     // Load flashcards from localStorage
     const loadFlashcards = () => {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
+            let stored = localStorage.getItem(STORAGE_KEY);
+            if (!stored) {
+                stored = localStorage.getItem(LEGACY_STORAGE_KEY);
+                if (stored) localStorage.setItem(STORAGE_KEY, stored); // the old copy is left untouched
+            }
             if (stored) {
                 flashcardsByCategory.value = JSON.parse(stored);
             }

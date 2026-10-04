@@ -1,6 +1,8 @@
-# Scrabble Trainer
+# Oxyphenbutazone
 
-A Vue 3 + Vite game for 2–4 players to play Scrabble offline on a local network. One laptop hosts the game state via a Vite plugin; phones access `/rack/:playerId` to see their racks and place tiles.
+A Vue 3 + Vite word-tile game for 2–4 players, playable offline on a local network.
+
+> Oxyphenbutazone is an independent hobby project and is not affiliated with or endorsed by any game publisher. One laptop hosts the game state via a Vite plugin; phones access `/rack/:playerId` to see their racks and place tiles.
 
 ## Features
 
@@ -60,7 +62,7 @@ frontend/
 │   ├── router/index.js   # All routes
 │   └── main.js
 ├── public/
-│   ├── CSW21.txt         # Collins Scrabble Words (~279k lines)
+│   ├── CSW21.txt         # Collins word list (~279k lines)
 │   ├── NWL2023.txt       # NASPA Word List (~197k lines)
 │   └── SLOVENIAN.txt     # Slovenian (~203k lines)
 ├── vite-plugin-game-api-v2.js   # API middleware, game state, dictionaries
@@ -72,9 +74,9 @@ frontend/
 Place dictionary files (one word per line, with optional definition) in `public/`:
 
 ```
-CSW21.txt       Collins Scrabble Words 2021 (international)
+CSW21.txt       Collins word list 2021 (international)
 NWL2023.txt     NASPA Word List 2023 (North America)
-SLOVENIAN.txt   Slovenian word list, cleaned by scripts/clean_slovenian.py (Č, Š, Ž; not an official Scrabble list)
+SLOVENIAN.txt   Slovenian word list, cleaned by scripts/clean_slovenian.py (Č, Š, Ž; not an official tournament word list)
 ```
 
 Format: `WORD definition [metadata]` (definition is optional for validation).

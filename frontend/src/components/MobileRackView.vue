@@ -89,7 +89,7 @@ export default {
     },
     loadGameData() {
       try {
-        const gameData = localStorage.getItem(`scrabble_game_${this.gameId}`);
+        const gameData = localStorage.getItem(`oxyphenbutazone_game_${this.gameId}`);
         if (gameData) {
           const data = JSON.parse(gameData);
           if (this.playerId === '1') {

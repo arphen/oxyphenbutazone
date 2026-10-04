@@ -27,7 +27,7 @@ Games are automatically saved with move-by-move history (board state before/afte
 
 ## Flashcards: Word Practice with Spaced Repetition
 
-A game mode for learning Scrabble words. Pre-defined categories include 3-letter words with V/Q/J, all 2-letter words, and Q-without-U words. Words are organized into 4 buckets:
+A game mode for learning words. Pre-defined categories include 3-letter words with V/Q/J, all 2-letter words, and Q-without-U words. Words are organized into 4 buckets:
 
 - **New**: Unseen words
 - **Learning**: 1–2 consecutive correct answers

@@ -24,7 +24,7 @@ Place the following files in `public/`:
 
 | File | Words | Region | Notes |
 |------|-------|--------|-------|
-| **CSW21.txt** | 279,078 | International | Collins Scrabble Words 2021 |
+| **CSW21.txt** | 279,078 | International | Collins word list 2021 |
 | **NWL2023.txt** | 196,601 | North America | NASPA Word List 2023 |
 | **SLOVENIAN.txt** | 187,169 | Slovenia | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž |
 
@@ -65,7 +65,7 @@ A dictionary change takes effect immediately for word validation. The **tile lan
 
 ## Slovenian dictionary
 
-`SLOVENIAN.txt` comes from [unjica/slovenske-besede](https://github.com/unjica/slovenske-besede) and is a general-language word-form list, **not** an official Scrabble list. The version first committed to this repo had the wrong text encoding (every word with č, š, ž was corrupted, e.g. `Ajdi¹ek`), so those words could never be played. `scripts/clean_slovenian.py` repairs the encoding and keeps only playable words (2–15 letters from the Slovenian tile alphabet; proper nouns, unit abbreviations and foreign letters q/w/x/y removed). It is idempotent: `python3 scripts/clean_slovenian.py` can be re-run on the cleaned file. Tests in `src/shared/slovenian.test.js` fail if the file is corrupted again.
+`SLOVENIAN.txt` comes from [unjica/slovenske-besede](https://github.com/unjica/slovenske-besede) and is a general-language word-form list, **not** an official tournament word list. The version first committed to this repo had the wrong text encoding (every word with č, š, ž was corrupted, e.g. `Ajdi¹ek`), so those words could never be played. `scripts/clean_slovenian.py` repairs the encoding and keeps only playable words (2–15 letters from the Slovenian tile alphabet; proper nouns, unit abbreviations and foreign letters q/w/x/y removed). It is idempotent: `python3 scripts/clean_slovenian.py` can be re-run on the cleaned file. Tests in `src/shared/slovenian.test.js` fail if the file is corrupted again.
 
 Known gaps: the list may still contain words or abbreviations a tournament list would reject, and may omit valid forms.
 

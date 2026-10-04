@@ -543,7 +543,7 @@ export const practiceScenarios = [
             }
         ],
         hints: [
-            'ZA is valid Scrabble word (slang for pizza)',
+            'ZA is a valid word (slang for pizza)',
             'It\'s one of the most useful 2-letter words',
             'Position it on a premium square!'
         ]

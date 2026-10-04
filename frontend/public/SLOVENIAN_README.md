@@ -12,5 +12,5 @@ The original copy committed here had the wrong text encoding (ISO-8859-2 read as
 Re-running the script on the cleaned file changes nothing.
 
 ## Notes
-- This is a general-language list, **not** an official Scrabble dictionary. It may contain words or abbreviations a tournament list would reject and may omit valid forms.
+- This is a general-language list, **not** an official tournament dictionary. It may contain words or abbreviations a tournament list would reject and may omit valid forms.
 - Suitable for casual games. Tests in `frontend/src/shared/slovenian.test.js` guard the file's integrity.
