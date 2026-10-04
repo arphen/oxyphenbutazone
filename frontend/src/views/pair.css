@@ -21,3 +21,4 @@ h2 { margin: 0 0 8px; font-size: 18px; }
 .hint, .wait, .or { color: #cbd5e1; margin: 0; font-size: 14px; text-align: center; }
 .footer { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 .resume { display: flex; flex-direction: column; gap: 8px; }
+.secondary { min-height: 48px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08); color: #fff; font-size: 16px; cursor: pointer; padding: 0 18px; }
