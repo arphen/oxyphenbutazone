@@ -388,3 +388,28 @@ describe('importing an official list while on the open list', () => {
     expect(await valid(backend, 'zzyzx')).toBe(true);
   });
 });
+
+describe('word queries for a list that is not the one being played with', () => {
+  it('loads a shipped list on demand instead of answering with nothing', async () => {
+    shipping({ enable: ENABLE, slovenian: 'miza\nstol\ndom' });
+    const backend = await backendFor(freshStore());
+    // an English game on ENABLE: the Slovenian list is shipped but has not been loaded
+    expect((await backend.getState()).dictionaries).toEqual(only('enable'));
+    expect(backend.store.isLoaded('slovenian')).toBe(false);
+    const result = await backend.words({ dictionary: 'slovenian', length: 4 });
+    expect(result.words.sort()).toEqual(['miza', 'stol']);
+    expect(result.count).toBe(2);
+    expect(backend.store.isLoaded('slovenian')).toBe(true);
+    // the game's own rules are unchanged by a practice query
+    expect((await backend.getState()).dictionaries).toEqual(only('enable'));
+    expect(await valid(backend, 'miza')).toBe(false);
+    expect(await valid(backend, 'bird')).toBe(true);
+  });
+
+  it('a query without a list uses the active selection, and an unknown list is empty', async () => {
+    shipping({ enable: ENABLE });
+    const backend = await backendFor(freshStore());
+    expect((await backend.words({ length: 3 })).words.sort()).toEqual(['cat', 'dog']);
+    expect((await backend.words({ dictionary: 'nwl2023' })).words).toEqual([]); // not installed anywhere
+  });
+});

@@ -253,6 +253,8 @@ export function createLocalBackend({ loadList, listIds, persist = true, wordStor
     },
     async words(query) {
       await ready;
+      // A query for one specific list (practice modes) must work even if that list is not the one being played with
+      if (query?.dictionary && DICTIONARY_IDS.includes(query.dictionary)) await ensureList(query.dictionary);
       return store.words(query);
     },
   };

@@ -5,7 +5,6 @@
  * Categories help players practice specific skills like unusual letters, short words, etc.
  */
 
-import { generatedScenarios } from './generatedScenarios';
 
 export const practiceCategories = {
     'v-words': {
@@ -551,7 +550,6 @@ export const practiceScenarios = [
 ];
 
 // Add generated scenarios
-practiceScenarios.push(...generatedScenarios);
 
 /**
  * Get scenarios by category

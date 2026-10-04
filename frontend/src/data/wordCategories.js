@@ -1,12 +1,11 @@
 // Word categories for flashcard practice system
-// Each category has filtering criteria and associated dictionary
+// Each category is a filter over the active word list (see useFlashcards.js)
 
 export const WORD_CATEGORIES = {
     'three-letter-v': {
         id: 'three-letter-v',
         name: '3-Letter Words with V',
         description: 'All three-letter words containing the letter V',
-        dictionaries: ['csw21', 'nwl2023'], // Which dictionaries to pull from
         apiQuery: {
             length: 3,
             contains: 'V'
@@ -18,7 +17,6 @@ export const WORD_CATEGORIES = {
         id: 'three-letter-q',
         name: '3-Letter Words with Q',
         description: 'All three-letter words containing the letter Q',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             length: 3,
             contains: 'Q'
@@ -30,7 +28,6 @@ export const WORD_CATEGORIES = {
         id: 'three-letter-j',
         name: '3-Letter Words with J',
         description: 'All three-letter words containing the letter J',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             length: 3,
             contains: 'J'
@@ -42,7 +39,6 @@ export const WORD_CATEGORIES = {
         id: 'two-letter-all',
         name: 'All 2-Letter Words',
         description: 'Master all valid 2-letter words',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             length: 2
         },
@@ -53,7 +49,6 @@ export const WORD_CATEGORIES = {
         id: 'q-without-u',
         name: 'Q without U',
         description: 'Words with Q but no U',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             contains: 'Q',
             excludes: 'U'
@@ -65,7 +60,6 @@ export const WORD_CATEGORIES = {
         id: 'three-letter-x',
         name: '3-Letter Words with X',
         description: 'All three-letter words containing the letter X',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             length: 3,
             contains: 'X'
@@ -77,7 +71,6 @@ export const WORD_CATEGORIES = {
         id: 'three-letter-z',
         name: '3-Letter Words with Z',
         description: 'All three-letter words containing the letter Z',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             length: 3,
             contains: 'Z'
@@ -89,7 +82,6 @@ export const WORD_CATEGORIES = {
         id: 'four-letter-high-value',
         name: '4-Letter High Value',
         description: '4-letter words with J, Q, X, or Z',
-        dictionaries: ['csw21', 'nwl2023'],
         apiQuery: {
             length: 4,
             containsAny: 'J,Q,X,Z' // Contains at least one of these

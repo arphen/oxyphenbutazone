@@ -59,23 +59,13 @@ export function useFlashcards() {
             // Fetch and filter words from dictionaries using API query parameters
             const allWords = new Set();
 
-            for (const dict of category.dictionaries) {
-                // Build query string from category.apiQuery
-                const queryParams = new URLSearchParams({
-                    dictionary: dict,
-                    ...category.apiQuery
-                });
-
-                const response = await fetch(`/api/words?${queryParams}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const words = data.words || [];
-
-                    // Add all words from this dictionary
-                    words.forEach(word => {
-                        allWords.add(word.toUpperCase());
-                    });
-                }
+            // One query against the word list(s) currently selected (ENABLE on the public site, or whichever list
+            // the player imported/selected); categories no longer name a specific list.
+            const queryParams = new URLSearchParams({ ...category.apiQuery });
+            const response = await fetch(`/api/words?${queryParams}`);
+            if (response.ok) {
+                const data = await response.json();
+                (data.words || []).forEach(word => allWords.add(word.toUpperCase()));
             }
 
             debug(`[Flashcards] Loaded ${allWords.size} words for category: ${category.name}`);
