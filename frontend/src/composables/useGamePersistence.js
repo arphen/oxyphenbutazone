@@ -36,7 +36,7 @@ export function useGamePersistence() {
             metadata: {
                 player1Name: gameState.player1?.playerName || 'Player 1',
                 player2Name: gameState.player2?.playerName || 'Player 2',
-                dictionary: gameState.dictionary || { sowpods: true, twl: false },
+                dictionary: gameState.dictionaries || { csw21: true, nwl2023: false, slovenian: false },
                 language: gameState.language || 'english'
             }
         };

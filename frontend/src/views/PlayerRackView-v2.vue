@@ -155,6 +155,7 @@
     <!-- Blank Letter Picker -->
     <BlankLetterPicker
       v-if="showBlankPicker"
+      :alphabet="alphabet"
       @select="handleBlankLetterSelect"
       @cancel="showBlankPicker = false"
     />
@@ -165,7 +166,7 @@
 import GameOverModal from '../components/GameOverModal.vue';
 import BlankLetterPicker from '../components/BlankLetterPicker.vue';
 import SwapTilesModal from '../components/SwapTilesModal.vue';
-import { letterValue } from '../shared/rules';
+import { letterValue, getAlphabet } from '../shared/rules';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
 import { isDebug, debug, logWarn, logError } from '../utils/log';
@@ -230,6 +231,9 @@ export default {
     };
   },
   computed: {
+    alphabet() {
+      return getAlphabet(this.gameState?.language);
+    },
     playerName() {
       if (!this.gameState) return '';
       const player = this.gameState[`player${this.playerId}`];

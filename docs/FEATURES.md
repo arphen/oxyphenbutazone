@@ -8,18 +8,14 @@ Words played in-game display their definitions on hover in the Game History tabl
 
 ## Language-Specific Tile Distributions
 
-The game automatically adjusts tile distribution based on selected dictionaries:
+The tile language is chosen on the home screen when a game starts and is fixed for that game:
 
-- **English tiles** (CSW21/NWL2023): 100 tiles with English point values (A=1, Q/Z=10, etc.)
-- **Slovenian tiles** (Slovenian only): 100 tiles with Slovenian point values (J=1 point, C=8 points, etc., includes Č, Š, Ž)
+- **English tiles**: 100 tiles with English point values (A=1, Q/Z=10, etc.)
+- **Slovenian tiles**: 100 tiles with Slovenian point values (J=1 point, C=8 points, etc., includes Č, Š, Ž; no Q, W, X, Y)
 
-Choosing dictionaries:
-1. Click the 📚 button in game controls
-2. Select CSW21, NWL2023, Slovenian, or any combination
-3. When only Slovenian is selected, the next new game uses Slovenian tiles
-4. Mixed dictionary selections use English tiles
+A blank tile can only stand for a letter of the game's alphabet (the picker shows Č Š Ž in Slovenian games, and the server rejects anything else).
 
-Changing dictionaries mid-game does not affect tiles already in play; new games apply the selected distribution.
+Choosing dictionaries (📚 button) changes which words are valid immediately but never the tiles. See [DICTIONARIES.md](DICTIONARIES.md) for how a new game picks its dictionary.
 
 ## Game Persistence & Replay
 

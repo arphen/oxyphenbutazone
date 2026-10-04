@@ -1,17 +1,16 @@
 # Slovenian Dictionary
 
 ## Source
-The Slovenian word list (`SLOVENIAN.txt`) is sourced from the [slovenske-besede](https://github.com/unjica/slovenske-besede) repository by unjica.
+The word list (`SLOVENIAN.txt`) derives from [unjica/slovenske-besede](https://github.com/unjica/slovenske-besede) (listed upstream as MIT-licensed; verify before redistributing).
 
-- **Words**: 253,061+ Slovenian words
-- **Format**: One word per line (lowercase)
-- **License**: MIT License
-- **Repository**: https://github.com/unjica/slovenske-besede
+## Cleaning
+The original copy committed here had the wrong text encoding (ISO-8859-2 read as Latin-1), which corrupted every word containing č, š or ž. `scripts/clean_slovenian.py` repairs it and keeps only playable words:
 
-## Usage
-This dictionary can be used alongside or instead of the official Scrabble dictionaries (CSW21, NWL2023). It provides comprehensive coverage of the Slovenian language for casual play.
+- 187,169 words, lowercase, 2-15 letters, alphabet `abcčdefghijklmnoprsštuvzž`
+- removed: proper nouns, unit abbreviations (cm, km, mg, ml), words with q/w/x/y/digits/punctuation, words longer than 15 letters
+
+Re-running the script on the cleaned file changes nothing.
 
 ## Notes
-- This is not an official Scrabble dictionary
-- Suitable for casual games and learning Slovenian vocabulary
-- Can be combined with English dictionaries for multilingual games
+- This is a general-language list, **not** an official Scrabble dictionary. It may contain words or abbreviations a tournament list would reject and may omit valid forms.
+- Suitable for casual games. Tests in `frontend/src/shared/slovenian.test.js` guard the file's integrity.

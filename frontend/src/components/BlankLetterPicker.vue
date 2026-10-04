@@ -8,12 +8,12 @@
       
       <div class="letter-grid">
         <button
-          v-for="letter in letters"
+          v-for="letter in alphabet"
           :key="letter"
           @click="selectLetter(letter)"
           class="letter-btn"
         >
-          {{ letter }}
+          {{ letter.toUpperCase() }}
         </button>
       </div>
     </div>
@@ -21,14 +21,18 @@
 </template>
 
 <script>
+import { getAlphabet } from '../shared/rules';
+
 export default {
   name: 'BlankLetterPicker',
-  emits: ['select', 'cancel'],
-  data() {
-    return {
-      letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-    };
+  props: {
+    // Letters the blank may stand for; defaults to the English alphabet
+    alphabet: {
+      type: Array,
+      default: () => getAlphabet('english'),
+    },
   },
+  emits: ['select', 'cancel'],
   methods: {
     selectLetter(letter) {
       this.$emit('select', letter.toLowerCase());

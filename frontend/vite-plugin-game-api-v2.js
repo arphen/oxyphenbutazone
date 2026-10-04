@@ -5,6 +5,8 @@ import {
     createTileBag,
     getWordsFromBoard,
     scoreWord,
+    getAlphabet,
+    TILE_DISTRIBUTIONS,
     validatePlacement,
     calculateFinalScores as computeFinalScores,
     RACK_SIZE,
@@ -20,12 +22,26 @@ let csw21Dictionary = new Map(); // word -> definition
 let nwl2023Dictionary = new Map(); // word -> definition
 let slovenianDictionary = new Map(); // word -> definition
 let activeDictionary = new Set(); // combined active words
+let activeSelection = { csw21: true, nwl2023: false, slovenian: false }; // which dictionaries are in activeDictionary
+
+// Dictionaries for a game whose language was chosen explicitly: Slovenian has a single list; English keeps the
+// player's CSW21/NWL2023 preference (dropping Slovenian), defaulting to CSW21.
+function selectionForNewGame(language, current) {
+    if (language === 'slovenian') return { csw21: false, nwl2023: false, slovenian: true };
+    if (current.csw21 || current.nwl2023) return { csw21: current.csw21, nwl2023: current.nwl2023, slovenian: false };
+    return { csw21: true, nwl2023: false, slovenian: false };
+}
+
+// Dictionaries for a plain restart: keep the selection unless it cannot suit the language.
+function defaultSelectionFor(language, current) {
+    if (language === 'slovenian') {
+        return current.slovenian ? current : { csw21: false, nwl2023: false, slovenian: true };
+    }
+    return current.csw21 || current.nwl2023 ? current : { csw21: true, nwl2023: false, slovenian: false };
+}
 
 // Initialize game state
 function createInitialGameState(playerCount = 4, language = 'english') {
-    // Update current language
-    currentLanguage = language;
-
     const state = {
         board: createBoard(),
         tileBag: createTileBag(language),
@@ -33,6 +49,7 @@ function createInitialGameState(playerCount = 4, language = 'english') {
         currentPlayer: 1,
         playerCount: playerCount,
         language: language,
+        dictionaries: { ...activeSelection },
         consecutivePasses: 0,
         gameOver: false,
         winner: null,
@@ -61,9 +78,6 @@ function generateGameId() {
 }
 
 
-
-// Current language for tile distribution
-let currentLanguage = 'english';
 
 
 function fillRack(player) {
@@ -98,6 +112,10 @@ function handlePlaceTile(playerId, letter, rackIndex, row, col, chosenLetter = n
 
     // Check if it's a blank tile
     const isBlank = letter === '';
+
+    if (isBlank && chosenLetter && !getAlphabet(gameState.language).includes(chosenLetter.toLowerCase())) {
+        return { success: false, error: `'${chosenLetter}' is not a letter in this game's alphabet` };
+    }
 
     // Place tile
     if (isBlank) {
@@ -158,7 +176,7 @@ function handleSetBlankLetter(row, col, chosenLetter) {
         return { success: false, error: 'Cannot change locked blank' };
     }
 
-    if (!chosenLetter || chosenLetter.length !== 1) {
+    if (!chosenLetter || chosenLetter.length !== 1 || !getAlphabet(gameState.language).includes(chosenLetter.toLowerCase())) {
         return { success: false, error: 'Invalid letter' };
     }
 
@@ -603,21 +621,15 @@ function updateActiveDictionary(selection) {
     if (selection.nwl2023) activeNames.push('NWL2023');
     if (selection.slovenian) activeNames.push('Slovenian 🇸🇮');
 
-    // Determine language based on dictionary selection
-    // If only Slovenian is selected, use Slovenian tiles
-    // If mixed or only English dictionaries, use English tiles
-    const newLanguage = (selection.slovenian && !selection.csw21 && !selection.nwl2023) ? 'slovenian' : 'english';
+    activeSelection = {
+        csw21: Boolean(selection.csw21),
+        nwl2023: Boolean(selection.nwl2023),
+        slovenian: Boolean(selection.slovenian),
+    };
+    // The tile language is fixed for the life of a game; only the dictionaries can change mid-game.
+    if (gameState) gameState.dictionaries = { ...activeSelection };
 
-    // If language changed and game is in progress, warn that tiles won't change mid-game
-    if (newLanguage !== currentLanguage && gameState) {
-        console.log(`[Game API] Language changed from ${currentLanguage} to ${newLanguage}. Tile distribution will apply to next game.`);
-        currentLanguage = newLanguage;
-        if (gameState) {
-            gameState.language = newLanguage;
-        }
-    }
-
-    console.log(`[Game API] Active dictionary updated: ${activeDictionary.size} words (${activeNames.join(' + ')}), Language: ${currentLanguage}`);
+    console.log(`[Game API] Active dictionary updated: ${activeDictionary.size} words (${activeNames.join(' + ')})`);
 }
 
 // Get definition for a word from active dictionaries
@@ -695,9 +707,13 @@ export function gameApiPlugin() {
                                     gameState.viewportCenter = action.viewportCenter;
                                     result = { success: true };
                                     break;
-                                case 'restart':
+                                case 'restart': {
                                     const playerCount = action.playerCount || gameState.playerCount || 4;
-                                    const language = action.language || currentLanguage || 'english';
+                                    const languageChosen = Object.hasOwn(TILE_DISTRIBUTIONS, action.language);
+                                    const language = languageChosen ? action.language : (gameState?.language || 'english');
+                                    updateActiveDictionary(
+                                        languageChosen ? selectionForNewGame(language, activeSelection) : defaultSelectionFor(language, activeSelection)
+                                    );
                                     console.log(`[Restart] Creating new game with ${playerCount} players, language: ${language}`);
                                     gameState = createInitialGameState(playerCount, language);
                                     for (let i = 1; i <= gameState.playerCount; i++) {
@@ -706,6 +722,7 @@ export function gameApiPlugin() {
                                     console.log(`[Restart] Game created. Current player: ${gameState.currentPlayer}, Language: ${gameState.language}, Available players:`, Object.keys(gameState).filter(k => k.startsWith('player')));
                                     result = { success: true };
                                     break;
+                                }
                                 case 'reorder-rack':
                                     const player = gameState[`player${action.playerId}`];
                                     if (player && Array.isArray(action.newRack)) {

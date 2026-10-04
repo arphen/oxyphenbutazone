@@ -17,7 +17,7 @@ export function isDebug() {
     if (typeof localStorage !== 'undefined') {
       return localStorage.getItem('debug') === '1';
     }
-  } catch (e) {
+  } catch {
     // localStorage might be disabled or unavailable
   }
 

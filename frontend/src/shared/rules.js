@@ -58,6 +58,16 @@ export const TILE_DISTRIBUTIONS = {
   },
 };
 
+/** Letters a blank tile may stand for (and that words may contain), in alphabetical order. */
+export const ALPHABETS = {
+  english: 'abcdefghijklmnopqrstuvwxyz'.split(''),
+  slovenian: 'abcčdefghijklmnoprsštuvzž'.split(''),
+};
+
+export function getAlphabet(language) {
+  return ALPHABETS[language] || ALPHABETS.english;
+}
+
 export function getDistribution(language) {
   return TILE_DISTRIBUTIONS[language] || TILE_DISTRIBUTIONS.english;
 }

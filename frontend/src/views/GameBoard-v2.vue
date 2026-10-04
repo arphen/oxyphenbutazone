@@ -27,6 +27,7 @@
             </button>
             <DictionaryChooser 
               :selectedDictionaries="selectedDictionaries"
+              :language="gameState?.language"
               @update="handleDictionaryUpdate"
             />
             <button @click="restartGame" class="icon-button" title="Restart Game">
@@ -191,6 +192,7 @@ export default {
       isMobileView: false,
       pollInterval: null,
       selectedDictionaries: { csw21: true, nwl2023: false, slovenian: false },
+      lastServerDictionaries: null,
       playerCount: 4, // Default to 4 players, can be changed from route params
     };
   },
@@ -295,7 +297,8 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             type: 'restart',
-            playerCount: this.playerCount 
+            playerCount: this.playerCount,
+            language: this.$route.query.language
           })
         });
         
@@ -402,6 +405,14 @@ export default {
           }
 
           this.gameState = newGameState;
+
+          // Mirror the server's dictionary selection, but only when the server's value changed,
+          // so a poll can't flicker a checkbox the user just toggled.
+          const serverDicts = JSON.stringify(newGameState.dictionaries || null);
+          if (newGameState.dictionaries && serverDicts !== this.lastServerDictionaries) {
+            this.lastServerDictionaries = serverDicts;
+            this.selectedDictionaries = { ...newGameState.dictionaries };
+          }
           
           // Check if game just ended
           if (newGameState.gameOver && this.gamePersistence.currentGameId.value) {

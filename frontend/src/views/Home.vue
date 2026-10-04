@@ -27,6 +27,23 @@
             </div>
           </div>
           
+          <!-- Language Selector: fixed for the whole game -->
+          <div class="player-selector">
+            <div class="player-selector-label">Language (tiles &amp; dictionary):</div>
+            <div class="player-buttons">
+              <button
+                v-for="lang in languages"
+                :key="lang.id"
+                class="player-count-btn"
+                :class="{ active: selectedLanguage === lang.id }"
+                @click.stop="selectedLanguage = lang.id"
+              >
+                <span class="player-count-number">{{ lang.flag }}</span>
+                <span class="player-count-icon">{{ lang.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <button @click="goToGame" class="mode-button">
             Start {{ selectedPlayerCount }}-Player Game
           </button>
@@ -77,6 +94,11 @@ export default {
   data() {
     return {
       selectedPlayerCount: 4, // Default to 4 players
+      selectedLanguage: 'english',
+      languages: [
+        { id: 'english', flag: '🇬🇧', label: 'English' },
+        { id: 'slovenian', flag: '🇸🇮', label: 'Slovenščina' },
+      ],
     };
   },
   methods: {
@@ -85,6 +107,7 @@ export default {
         path: '/game',
         query: { 
           players: this.selectedPlayerCount,
+          language: this.selectedLanguage,
           newGame: 'true'
         }
       });

@@ -6,7 +6,7 @@ A Vue 3 + Vite game for 2–4 players to play Scrabble offline on a local networ
 
 - **15×15 Board** with all premium squares (Triple Word, Double Word, Triple/Double Letter)
 - **2–4 Player Turns** with visual indicators
-- **Dictionary Support**: CSW21, NWL2023, Slovenian (with automatic tile distribution)
+- **Dictionary Support**: CSW21, NWL2023, Slovenian; the tile language (English or Slovenian) is chosen per game on the home screen
 - **Scoring**: Letter values, premium multipliers, BINGO bonus (+50 for all 7 tiles)
 - **Mobile Rack View**: Real-time sync, drag-and-drop tile placement and reordering
 - **Word Definitions**: Hover over played words in history to see definitions
@@ -74,7 +74,7 @@ Place dictionary files (one word per line, with optional definition) in `public/
 ```
 CSW21.txt       Collins Scrabble Words 2021 (international)
 NWL2023.txt     NASPA Word List 2023 (North America)
-SLOVENIAN.txt   Slovenian Scrabble (special characters: Č, Š, Ž)
+SLOVENIAN.txt   Slovenian word list, cleaned by scripts/clean_slovenian.py (Č, Š, Ž; not an official Scrabble list)
 ```
 
 Format: `WORD definition [metadata]` (definition is optional for validation).

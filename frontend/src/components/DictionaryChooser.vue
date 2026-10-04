@@ -22,13 +22,13 @@
         <span v-if="activeDictionaryCount > 1">Using union of {{ activeDictionaryCount }} dictionaries</span>
         <span v-else-if="csw21Enabled">Using CSW21</span>
         <span v-else-if="nwl2023Enabled">Using NWL2023</span>
-        <span v-else-if="slovenianEnabled">Using Slovenian (254k words)</span>
+        <span v-else-if="slovenianEnabled">Using Slovenian</span>
         <span v-else class="warning">⚠️ Select at least one</span>
       </div>
       <div class="tile-info">
         <span class="tile-label">Tiles:</span>
-        <span v-if="slovenianEnabled && !csw21Enabled && !nwl2023Enabled" class="tile-language">🇸🇮 Slovenian alphabet</span>
-        <span v-else class="tile-language">🇬🇧 English alphabet</span>
+        <span v-if="language === 'slovenian'" class="tile-language">🇸🇮 Slovenian (fixed for this game)</span>
+        <span v-else class="tile-language">🇬🇧 English (fixed for this game)</span>
       </div>
     </div>
   </div>
@@ -38,6 +38,11 @@
 export default {
   name: 'DictionaryChooser',
   props: {
+    // Tile language of the running game; chosen when the game starts
+    language: {
+      type: String,
+      default: 'english'
+    },
     selectedDictionaries: {
       type: Object,
       default: () => ({ csw21: true, nwl2023: false, slovenian: false })
@@ -50,6 +55,14 @@ export default {
       nwl2023Enabled: this.selectedDictionaries.nwl2023,
       slovenianEnabled: this.selectedDictionaries.slovenian
     };
+  },
+  watch: {
+    // Follow the server's selection (e.g. after a new game switches to Slovenian)
+    selectedDictionaries(next) {
+      this.csw21Enabled = next.csw21;
+      this.nwl2023Enabled = next.nwl2023;
+      this.slovenianEnabled = next.slovenian;
+    }
   },
   computed: {
     activeDictionaryCount() {

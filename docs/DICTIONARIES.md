@@ -24,9 +24,9 @@ Place the following files in `public/`:
 
 | File | Words | Region | Notes |
 |------|-------|--------|-------|
-| **CSW21.txt** | 352k+ | International | Collins Scrabble Words 2021 |
-| **NWL2023.txt** | 184k+ | North America | NASPA Word List 2023 |
-| **SLOVENIAN.txt** | 254k+ | Slovenia | Includes Č, Š, Ž |
+| **CSW21.txt** | 279,078 | International | Collins Scrabble Words 2021 |
+| **NWL2023.txt** | 196,601 | North America | NASPA Word List 2023 |
+| **SLOVENIAN.txt** | 187,169 | Slovenia | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž |
 
 Alternatively, set only the dictionaries you need; the game will load whichever files exist.
 
@@ -59,9 +59,15 @@ Players can switch active dictionaries via the 📚 button:
 
 - **Single dictionary** (CSW21 only): Only CSW21 words are valid
 - **Multiple dictionaries** (CSW21 + NWL2023): Word is valid if in either
-- **Slovenian only**: Uses Slovenian dictionary and Slovenian tile distribution
+- **Slovenian**: Slovenian words are valid (usually together with Slovenian tiles, see below)
 
-Changing dictionaries does NOT affect the current game (only applies to the next restart).
+A dictionary change takes effect immediately for word validation. The **tile language** (English or Slovenian) is chosen on the home screen when a game starts and never changes mid-game. Starting a new Slovenian game selects the Slovenian dictionary only; starting a new English game keeps your CSW21/NWL2023 choice (default CSW21). A plain restart keeps the game's language and your selection (resetting it if it cannot suit the language).
+
+## Slovenian dictionary
+
+`SLOVENIAN.txt` comes from [unjica/slovenske-besede](https://github.com/unjica/slovenske-besede) and is a general-language word-form list, **not** an official Scrabble list. The version first committed to this repo had the wrong text encoding (every word with č, š, ž was corrupted, e.g. `Ajdi¹ek`), so those words could never be played. `scripts/clean_slovenian.py` repairs the encoding and keeps only playable words (2–15 letters from the Slovenian tile alphabet; proper nouns, unit abbreviations and foreign letters q/w/x/y removed). It is idempotent: `python3 scripts/clean_slovenian.py` can be re-run on the cleaned file. Tests in `src/shared/slovenian.test.js` fail if the file is corrupted again.
+
+Known gaps: the list may still contain words or abbreviations a tournament list would reject, and may omit valid forms.
 
 ## Backend Implementation
 
