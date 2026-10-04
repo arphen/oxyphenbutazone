@@ -1,5 +1,15 @@
 import fs from 'fs';
 import path from 'path';
+import {
+    createBoard,
+    createTileBag,
+    getWordsFromBoard,
+    scoreWord,
+    validatePlacement,
+    calculateFinalScores as computeFinalScores,
+    RACK_SIZE,
+    BINGO_BONUS,
+} from './src/shared/rules.js';
 
 // Single source of truth - all game state lives here
 let gameState = null;
@@ -17,8 +27,8 @@ function createInitialGameState(playerCount = 4, language = 'english') {
     currentLanguage = language;
 
     const state = {
-        board: createInitialBoard(),
-        tileBag: initializeTileBag(language),
+        board: createBoard(),
+        tileBag: createTileBag(language),
         viewportCenter: { row: 7, col: 7 },
         currentPlayer: 1,
         playerCount: playerCount,
@@ -50,198 +60,19 @@ function generateGameId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-function createInitialBoard() {
-    const board = Array(15).fill(null).map(() =>
-        Array(15).fill(null).map(() => ({
-            letter: '',
-            type: '',
-            isNew: false,
-            locked: false,
-            isBlank: false,
-            chosenLetter: ''
-        }))
-    );
 
-    const specialSquares = {
-        tw: [[0, 0], [0, 7], [0, 14], [7, 0], [7, 14], [14, 0], [14, 7], [14, 14]],
-        dw: [[1, 1], [2, 2], [3, 3], [4, 4], [1, 13], [2, 12], [3, 11], [4, 10], [13, 1], [12, 2], [11, 3], [10, 4], [13, 13], [12, 12], [11, 11], [10, 10]],
-        tl: [[1, 5], [1, 9], [5, 1], [5, 5], [5, 9], [5, 13], [9, 1], [9, 5], [9, 9], [9, 13], [13, 5], [13, 9]],
-        dl: [[0, 3], [0, 11], [2, 6], [2, 8], [3, 0], [3, 7], [3, 14], [6, 2], [6, 6], [6, 8], [6, 12], [7, 3], [7, 11], [8, 2], [8, 6], [8, 8], [8, 12], [11, 0], [11, 7], [11, 14], [12, 6], [12, 8], [14, 3], [14, 11]],
-        center: [[7, 7]]
-    };
-
-    Object.entries(specialSquares).forEach(([type, positions]) => {
-        positions.forEach(([row, col]) => {
-            board[row][col].type = type;
-        });
-    });
-
-    return board;
-}
-
-// Tile distributions for different languages
-const TILE_DISTRIBUTIONS = {
-    english: {
-        tiles: [
-            { letter: 'e', count: 12 }, { letter: 'a', count: 9 }, { letter: 'i', count: 9 },
-            { letter: 'o', count: 8 }, { letter: 'n', count: 6 }, { letter: 'r', count: 6 },
-            { letter: 't', count: 6 }, { letter: 'l', count: 4 }, { letter: 's', count: 4 },
-            { letter: 'u', count: 4 }, { letter: 'd', count: 4 }, { letter: 'g', count: 3 },
-            { letter: 'b', count: 2 }, { letter: 'c', count: 2 }, { letter: 'm', count: 2 },
-            { letter: 'p', count: 2 }, { letter: 'f', count: 2 }, { letter: 'h', count: 2 },
-            { letter: 'v', count: 2 }, { letter: 'w', count: 2 }, { letter: 'y', count: 2 },
-            { letter: 'k', count: 1 }, { letter: 'j', count: 1 }, { letter: 'x', count: 1 },
-            { letter: 'q', count: 1 }, { letter: 'z', count: 1 }, { letter: '', count: 2 }
-        ],
-        values: {
-            'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
-            'd': 2, 'g': 2, 'b': 3, 'c': 3, 'm': 3, 'p': 3,
-            'f': 4, 'h': 4, 'v': 4, 'w': 4, 'y': 4, 'k': 5,
-            'j': 8, 'x': 8, 'q': 10, 'z': 10, '': 0
-        }
-    },
-    slovenian: {
-        tiles: [
-            { letter: 'e', count: 11 }, { letter: 'a', count: 10 }, { letter: 'i', count: 9 },
-            { letter: 'o', count: 8 }, { letter: 'n', count: 7 }, { letter: 'r', count: 6 },
-            { letter: 's', count: 6 }, { letter: 'j', count: 4 }, { letter: 'l', count: 4 },
-            { letter: 't', count: 4 }, { letter: 'd', count: 4 }, { letter: 'v', count: 4 },
-            { letter: 'k', count: 3 }, { letter: 'm', count: 2 }, { letter: 'p', count: 2 },
-            { letter: 'u', count: 2 }, { letter: 'b', count: 2 }, { letter: 'g', count: 2 },
-            { letter: 'z', count: 2 }, { letter: 'č', count: 1 }, { letter: 'h', count: 1 },
-            { letter: 'š', count: 1 }, { letter: 'c', count: 1 }, { letter: 'f', count: 1 },
-            { letter: 'ž', count: 1 }, { letter: '', count: 2 }
-        ],
-        values: {
-            'e': 1, 'a': 1, 'i': 1, 'o': 1, 'n': 1, 'r': 1, 's': 1, 'j': 1, 'l': 1, 't': 1,
-            'd': 2, 'v': 2, 'k': 3, 'm': 3, 'p': 3, 'u': 3,
-            'b': 4, 'g': 4, 'z': 4, 'č': 5, 'h': 5, 'š': 6, 'c': 8, 'f': 10, 'ž': 10, '': 0
-        }
-    }
-};
 
 // Current language for tile distribution
 let currentLanguage = 'english';
 
-function initializeTileBag(language = currentLanguage) {
-    const distribution = TILE_DISTRIBUTIONS[language] || TILE_DISTRIBUTIONS.english;
-    const letterDistribution = distribution.tiles;
-
-    const bag = [];
-    letterDistribution.forEach(({ letter, count }) => {
-        for (let i = 0; i < count; i++) {
-            bag.push(letter);
-        }
-    });
-
-    // Shuffle
-    for (let i = bag.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [bag[i], bag[j]] = [bag[j], bag[i]];
-    }
-
-    return bag;
-}
 
 function fillRack(player) {
-    while (player.rack.length < 7 && gameState.tileBag.length > 0) {
+    while (player.rack.length < RACK_SIZE && gameState.tileBag.length > 0) {
         player.rack.push(gameState.tileBag.pop());
     }
 }
 
-function getLetterValue(letter) {
-    const distribution = TILE_DISTRIBUTIONS[currentLanguage] || TILE_DISTRIBUTIONS.english;
-    return distribution.values[letter?.toLowerCase()] || 0;
-}
 
-function getWordsFromBoard() {
-    const words = [];
-    const board = gameState.board;
-
-    // Check horizontal words
-    for (let row = 0; row < 15; row++) {
-        let word = '';
-        let tiles = [];
-        for (let col = 0; col < 15; col++) {
-            const square = board[row][col];
-            if (square.letter || square.isBlank) {
-                // Use chosenLetter for blanks, otherwise use letter
-                const letterForWord = square.isBlank ? square.chosenLetter : square.letter;
-                word += letterForWord;
-                tiles.push({
-                    row,
-                    col,
-                    letter: letterForWord,
-                    isNew: square.isNew,
-                    isBlank: square.isBlank
-                });
-            } else {
-                if (word.length > 1) {
-                    words.push({ word, tiles: [...tiles], direction: 'horizontal' });
-                }
-                word = '';
-                tiles = [];
-            }
-        }
-        if (word.length > 1) {
-            words.push({ word, tiles, direction: 'horizontal' });
-        }
-    }
-
-    // Check vertical words
-    for (let col = 0; col < 15; col++) {
-        let word = '';
-        let tiles = [];
-        for (let row = 0; row < 15; row++) {
-            const square = board[row][col];
-            if (square.letter || square.isBlank) {
-                // Use chosenLetter for blanks, otherwise use letter
-                const letterForWord = square.isBlank ? square.chosenLetter : square.letter;
-                word += letterForWord;
-                tiles.push({
-                    row,
-                    col,
-                    letter: letterForWord,
-                    isNew: square.isNew,
-                    isBlank: square.isBlank
-                });
-            } else {
-                if (word.length > 1) {
-                    words.push({ word, tiles: [...tiles], direction: 'vertical' });
-                }
-                word = '';
-                tiles = [];
-            }
-        }
-        if (word.length > 1) {
-            words.push({ word, tiles, direction: 'vertical' });
-        }
-    }
-
-    return words;
-}
-
-function calculateWordScore(wordObj) {
-    let score = 0;
-    let wordMultiplier = 1;
-
-    wordObj.tiles.forEach(tile => {
-        // Blank tiles are always worth 0 points
-        let letterScore = tile.isBlank ? 0 : getLetterValue(tile.letter);
-        const square = gameState.board[tile.row][tile.col];
-
-        if (tile.isNew) {
-            if (square.type === 'dl') letterScore *= 2;
-            if (square.type === 'tl') letterScore *= 3;
-            if (square.type === 'dw' || square.type === 'center') wordMultiplier *= 2;
-            if (square.type === 'tw') wordMultiplier *= 3;
-        }
-
-        score += letterScore;
-    });
-
-    return score * wordMultiplier;
-}
 
 function handlePlaceTile(playerId, letter, rackIndex, row, col, chosenLetter = null) {
     const player = gameState[`player${playerId}`];
@@ -415,39 +246,12 @@ function switchToNextPlayer() {
 }
 
 function calculateFinalScores() {
-    const finalScores = {};
-    const remainingValues = {};
-    const exportRemaining = {};
-    let playerWithEmptyRack = null;
-    let totalRemaining = 0;
-
-    // Calculate remaining tile values for each player
-    for (let i = 1; i <= gameState.playerCount; i++) {
-        const player = gameState[`player${i}`];
-        const remaining = player.rack.reduce((sum, letter) => sum + getLetterValue(letter), 0);
-        remainingValues[`player${i}`] = remaining;
-        exportRemaining[`player${i}Remaining`] = remaining;
-
-        if (player.rack.length === 0 && !playerWithEmptyRack) {
-            playerWithEmptyRack = i;
-        }
-        totalRemaining += remaining;
-    }
-
-    // Calculate final scores
-    for (let i = 1; i <= gameState.playerCount; i++) {
-        const player = gameState[`player${i}`];
-        let finalScore = player.score - remainingValues[`player${i}`];
-
-        // If this player used all tiles, they get all opponents' remaining values
-        if (playerWithEmptyRack === i) {
-            finalScore += totalRemaining;
-        }
-
-        finalScores[`player${i}`] = finalScore;
-    }
-
-    return { ...finalScores, ...exportRemaining };
+    const players = Array.from({ length: gameState.playerCount }, (_, i) => gameState[`player${i + 1}`]);
+    const { finalScores, remaining } = computeFinalScores(players, gameState.language);
+    const result = {};
+    finalScores.forEach((score, i) => { result[`player${i + 1}`] = score; });
+    remaining.forEach((value, i) => { result[`player${i + 1}Remaining`] = value; });
+    return result;
 }
 
 function endGame() {
@@ -525,19 +329,16 @@ function handlePlayWord(playerId) {
         return { success: false, error: 'Unassigned blanks', unassignedBlanks };
     }
 
-    // Check first move uses center
-    const hasLockedTiles = gameState.board.some(row => row.some(cell => cell.letter && cell.locked));
-    if (!hasLockedTiles) {
-        const usesCenterSquare = newTiles.some(tile => tile.row === 7 && tile.col === 7);
-        if (!usesCenterSquare) {
-            gameState.message = 'First word must use the center square (★)!';
-            gameState.messageType = 'error';
-            return { success: false, error: 'Must use center square' };
-        }
+    // Placement legality: one line, no gaps, centre on first move, connected afterwards
+    const placement = validatePlacement(gameState.board);
+    if (!placement.ok) {
+        gameState.message = placement.message;
+        gameState.messageType = 'error';
+        return { success: false, error: placement.message, code: placement.code };
     }
 
     // Get words and validate
-    const allWords = getWordsFromBoard();
+    const allWords = getWordsFromBoard(gameState.board);
     const newWords = allWords.filter(wordObj => wordObj.tiles.some(tile => tile.isNew));
 
     if (newWords.length === 0) {
@@ -590,7 +391,7 @@ function handlePlayWord(playerId) {
     // Calculate score
     let totalScore = 0;
     const wordScores = newWords.map(wordObj => {
-        const score = calculateWordScore(wordObj);
+        const score = scoreWord(gameState.board, wordObj, gameState.language);
         totalScore += score;
         const definition = getDefinition(wordObj.word);
         return {
@@ -601,7 +402,7 @@ function handlePlayWord(playerId) {
     });
 
     // Bingo bonus
-    const bingoBonus = newTiles.length === 7 ? 50 : 0;
+    const bingoBonus = newTiles.length === RACK_SIZE ? BINGO_BONUS : 0;
     totalScore += bingoBonus;
 
     // Update history
