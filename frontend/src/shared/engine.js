@@ -131,6 +131,10 @@ export function createEngine(dict, { random = Math.random } = {}) {
             return { success: false, error: `Player ${playerId} not found` };
         }
 
+        if (!player.isCurrentPlayer) {
+            return { success: false, error: 'Not your turn' };
+        }
+
         // Find all new tiles and return to rack
         for (let row = 0; row < 15; row++) {
             for (let col = 0; col < 15; col++) {
@@ -471,6 +475,17 @@ export function createEngine(dict, { random = Math.random } = {}) {
             return { success: false, error: 'No tiles selected for exchange' };
         }
 
+        // Like passing, an exchange ends the turn, so tiles still placed on the board must be cleared first
+        if (gameState.board.some(row => row.some(cell => cell.isNew))) {
+            gameState.message = 'Cannot exchange with tiles placed on board. Clear them first.';
+            gameState.messageType = 'error';
+            return { success: false, error: 'Tiles on board' };
+        }
+
+        if (indices.some(index => index >= player.rack.length)) {
+            return { success: false, error: 'Selected tile is not in your rack' };
+        }
+
         if (gameState.tileBag.length < indices.length) {
             gameState.message = 'Not enough tiles in the bag to exchange.';
             gameState.messageType = 'error';
@@ -548,6 +563,14 @@ export function createEngine(dict, { random = Math.random } = {}) {
 
         if (ctx.playerId !== undefined && action.playerId !== undefined && action.playerId !== ctx.playerId) {
             return { success: false, error: 'That is not your seat', gameState };
+        }
+
+        const MOVES = ['place-tile', 'set-blank-letter', 'recall', 'play-word', 'pass', 'exchange-tiles'];
+        if (gameState.gameOver && MOVES.includes(action.type)) {
+            return { success: false, error: 'The game is over', gameState };
+        }
+        if (action.type === 'set-blank-letter' && ctx.playerId !== undefined && ctx.playerId !== gameState.currentPlayer) {
+            return { success: false, error: 'Not your turn', gameState };
         }
 
         let result;

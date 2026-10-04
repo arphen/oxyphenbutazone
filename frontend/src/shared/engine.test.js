@@ -772,9 +772,7 @@ describe('recall', () => {
     expect(engine.getState().player2.rack).toHaveLength(7);
   });
 
-  // POSSIBLE BUG: handleRecallTiles has no "is it your turn" check, so the waiting player can "recall" the current
-  // player's tiles into their own rack (stealing/duplicating tiles). place-tile, pass, play-word and exchange all check.
-  it.fails('a player who is not on turn cannot recall the current player\'s tiles', () => {
+  it('a player who is not on turn cannot recall the current player\'s tiles', () => {
     const engine = newGame(2);
     engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
     place(engine, 1, 'c', 7, 7);
@@ -903,9 +901,7 @@ describe('pass and game end by passing', () => {
     expect(s.message).toMatch(/tie between Player 1 and Player 2 at -1 points/);
   });
 
-  // POSSIBLE BUG: the engine does not refuse actions once gameOver is true (a pass/play after the game ended is still
-  // processed and can even re-score), so a late or malicious client can keep mutating a finished game.
-  it.fails('actions after game over are refused', () => {
+  it('actions after game over are refused', () => {
     const engine = newGame(2);
     pass(engine, 1);
     pass(engine, 2);
@@ -997,10 +993,7 @@ describe('exchange-tiles', () => {
     expect(JSON.stringify(engine.getState())).toBe(before);
   });
 
-  // POSSIBLE BUG: exchange is not blocked while tiles are placed on the board (pass is: 'Tiles on board'). The turn then
-  // passes with the previous player's tiles still marked isNew on the board, so the next player's play-word would pick up
-  // (and score) tiles that are not theirs.
-  it.fails('refuses an exchange while tiles are placed on the board', () => {
+  it('refuses an exchange while tiles are placed on the board', () => {
     const engine = newGame(2);
     engine.debugSetRack(1, ['c', 'a', 't', 'x', 'y', 'z', 'q']);
     place(engine, 1, 'c', 7, 7);
@@ -1009,9 +1002,7 @@ describe('exchange-tiles', () => {
     expect(engine.getState().currentPlayer).toBe(1);
   });
 
-  // POSSIBLE BUG: an index beyond the actual rack length (rack shorter than 7 because tiles are on the board, or late
-  // in the game) is silently skipped, so the exchange "succeeds" with count 0 and still ends the turn.
-  it.fails('refuses an exchange index that is not a tile in the current rack', () => {
+  it('refuses an exchange index that is not a tile in the current rack', () => {
     const engine = newGame(2);
     engine.debugSetRack(1, ['a', 'b', 'c']);
     const result = engine.dispatch({ type: 'exchange-tiles', playerId: 1, indices: [6] });
@@ -1223,9 +1214,14 @@ describe('dispatch with ctx.playerId (seat pinning)', () => {
       engine.dispatch({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: true, slovenian: false } }, { playerId: 2 }).success
     ).toBe(true);
     place(engine, 1, 'c', 7, 7);
+    // set-blank-letter carries no seat of its own, but only the player on turn may change a blank: seat 2 is refused
+    // for turn reasons (not as "not your seat"), while the player on turn reaches the handler
     expect(
       engine.dispatch({ type: 'set-blank-letter', row: 7, col: 7, chosenLetter: 'x' }, { playerId: 2 })
-    ).toMatchObject({ success: false, error: 'Not a blank tile' }); // reached the handler, was not refused as a seat error
+    ).toMatchObject({ success: false, error: 'Not your turn' });
+    expect(
+      engine.dispatch({ type: 'set-blank-letter', row: 7, col: 7, chosenLetter: 'x' }, { playerId: 1 })
+    ).toMatchObject({ success: false, error: 'Not a blank tile' });
     expect(engine.dispatch({ type: 'restart', playerCount: 3 }, { playerId: 2 }).success).toBe(true);
     expect(engine.getState().playerCount).toBe(3);
   });
