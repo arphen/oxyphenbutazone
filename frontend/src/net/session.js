@@ -26,6 +26,9 @@ export function initNet(localBackend) {
 export const hasLocalBackend = () => local !== null;
 
 export function startHosting({ online = false } = {}) {
+  if (!local) {
+    throw new Error('Phone-to-phone hosting needs the standalone app. With the laptop dev server, open the page with ?mode=local.');
+  }
   host?.close();
   guest?.close();
   setBackend(local);
