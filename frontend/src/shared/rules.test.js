@@ -172,44 +172,13 @@ describe('scoreWord', () => {
 
   it('two word multipliers multiply: dw * dw = 4', () => {
     const board = R.createBoard();
-    put(board, 1, 1, 'a'); // dw at [1,1]
-    put(board, 1, 2, 'b');
-    put(board, 1, 3, 'c'); // dw at [1,13]? no, that's different row
-    // But [2,2] is also dw, let's use a horizontal line through [1,1] and we can check
-    // Actually, we need both tiles to be on dw squares
-    // Let me place one word at [1,1] to [1,3]: a, b, c where [1,1] is dw
-    // Then place a crossing word at [1,13] to [3,13] which includes [1,13] (dw) and [2,13]
-    // Wait, that's not how it works. Let me re-read.
-    // "two word multipliers in one word multiply" means in a single word, if two tiles are on dw squares
-    // But that can't happen since each tile is placed once.
-    // I think this means: if the main word has a dw square and a cross-word has a dw square,
-    // the main word's dw and cross-word's dw are both applied.
-    // Or it could mean a single word that happens to have 2 dw squares under its new tiles.
-    // Let me check the test case more carefully.
-    // Actually, looking at the Scrabble rules, you can't have two word multipliers apply to the same word
-    // unless you place multiple tiles. Let me create a scenario:
-    // Place tiles at [1,1] (dw), [1,2], [1,3] (dw) - wait, [1,3] is not dw.
-    // [1,1] is dw and [2,2] is dw, but they're not in the same line.
-    // Let me check the special squares... [1,1] and [1,13] are both dw on the same row.
-    // Actually, re-reading: "two word multipliers in one word multiply (dw*dw=4)"
-    // This means if I place all my tiles such that the word formed goes through TWO dw squares
-    // (which is possible for a 7-tile play).
-    // Let me place: row 1, cols 1-7: a b c d e f g
-    // [1,1] is dw, [1,13] is not on row 1... wait.
-    // [1,1] and [2,2] are both dw, but on a diagonal. Let me check...
-    // dw: [[1, 1], [2, 2], [3, 3], [4, 4], [1, 13], [2, 12], [3, 11], [4, 10], ...]
-    // So on row 1: [1,1] and [1,13] are both dw!
-    // Let me place tiles to span both: from col 1 to col 13 would be 13 tiles, but RACK_SIZE is 7.
-    // Alternative: place a shorter word that goes through both? No, can't.
-    // Maybe the test is about: place word at row 1 starting col 1, so it goes through [1,1] (dw).
-    // Then the cross-word formed in column 1 also goes through another dw? Let me see...
-    // If I place tile at [1,1] and another at [2,1], the vertical word in column 1 would be:
-    // [?] [1,1] [2,1] [?] - if [2,1] is not a dw, then only [1,1] gets the multiplier...
-    // Actually, wait. [2,2] is dw, not [2,1].
-    // I think the test might be academic - just checking that if a single word happens to cover
-    // two dw squares, the multipliers are applied. But in practice this is hard.
-    // Let me instead just test: place tiles such that the main word uses one dw, and manually verify.
-    // Actually, let me focus on testable scenarios.
+    // Row 4 has double-word squares at cols 4 and 10 and no letter premiums,
+    // so a 7-tile word across cols 4-10 is worth (face value) * 2 * 2.
+    'reading'.split('').forEach((letter, i) => put(board, 4, 4 + i, letter));
+    const words = R.getWordsFromBoard(board).filter((w) => w.tiles.some((t) => t.isNew));
+    expect(words).toHaveLength(1);
+    // r1 + e1 + a1 + d2 + i1 + n1 + g2 = 9, times 4
+    expect(R.scoreWord(board, words[0], 'english')).toBe(36);
   });
 
   it('triple-word multiplier only when new tile on it', () => {
