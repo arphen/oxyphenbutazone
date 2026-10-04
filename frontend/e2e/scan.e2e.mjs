@@ -1,19 +1,15 @@
-/* global process, Buffer */
 // End-to-end check of the in-app QR scanner in real Chromium with a FAKE camera that plays a y4m video of a QR code.
-// Needs the dev server running (npx vite --port 5199; the script opens ?mode=local so the game runs in the browser) and a global Playwright install.
-//   APP=http://localhost:5199 node scripts/e2e-scan-camera.mjs
-// Writes QR videos to a temp dir. Exits non-zero if any check fails.
+// Run by `npm run e2e` (it needs the built site served; E2E_BASE points at it). Writes QR videos to a temp dir.
+// Exits non-zero if any check fails. The fake camera supplies a clean, centred QR: real focus/glare is not covered.
 
-import { createRequire } from 'node:module';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import QRCode from 'qrcode';
 import { encodeSignal } from '../src/net/signal.js';
+import { launch as launchChromium, BASE } from './lib.mjs';
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright');
-const APP = process.env.APP || 'http://localhost:5199';
+const APP = BASE;
 const dir = mkdtempSync(join(tmpdir(), 'qrcam-'));
 
 // ---- QR -> y4m (I420, 640x480, 10 frames, black modules on white, centred)
@@ -51,10 +47,7 @@ const check = (name, ok, detail = '') => {
 };
 
 const launch = (video) =>
-  chromium.launch({
-    executablePath: process.env.CHROMIUM || undefined,
-    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${video}`, '--no-sandbox'],
-  });
+  launchChromium(['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${video}`]);
 
 // Track every MediaStreamTrack the page obtains so we can see that they are stopped afterwards.
 const trackSpy = () => {
@@ -114,7 +107,7 @@ const sdp = (role) =>
 
 // ================= 3. camera denied -> message tells the user to paste
 {
-  const browser = await chromium.launch({ args: ['--no-sandbox'] });
+  const browser = await launchChromium();
   const page = await (await browser.newContext()).newPage();
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' }));

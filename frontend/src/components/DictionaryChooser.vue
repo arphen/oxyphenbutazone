@@ -6,22 +6,23 @@
     
     <div v-if="showDropdown" class="dropdown-panel">
       <div class="dropdown-header">Dictionary</div>
-      <label class="checkbox-item">
-        <input type="checkbox" v-model="csw21Enabled" @change="handleChange" />
-        <span>CSW21 🇬🇧</span>
+      <label class="checkbox-item" :class="{ unavailable: notInstalled('csw21') }">
+        <input type="checkbox" v-model="csw21Enabled" :disabled="notInstalled('csw21')" @change="handleChange" />
+        <span>CSW21 🇬🇧<em v-if="notInstalled('csw21')" class="not-installed"> (not installed)</em></span>
       </label>
-      <label class="checkbox-item">
-        <input type="checkbox" v-model="nwl2023Enabled" @change="handleChange" />
-        <span>NWL2023 🇺🇸</span>
+      <label class="checkbox-item" :class="{ unavailable: notInstalled('nwl2023') }">
+        <input type="checkbox" v-model="nwl2023Enabled" :disabled="notInstalled('nwl2023')" @change="handleChange" />
+        <span>NWL2023 🇺🇸<em v-if="notInstalled('nwl2023')" class="not-installed"> (not installed)</em></span>
       </label>
-      <label class="checkbox-item">
-        <input type="checkbox" v-model="enableEnabled" @change="handleChange" />
-        <span>ENABLE (open list) 🌐</span>
+      <label class="checkbox-item" :class="{ unavailable: notInstalled('enable') }">
+        <input type="checkbox" v-model="enableEnabled" :disabled="notInstalled('enable')" @change="handleChange" />
+        <span>ENABLE (open list) 🌐<em v-if="notInstalled('enable')" class="not-installed"> (not installed)</em></span>
       </label>
-      <label class="checkbox-item">
-        <input type="checkbox" v-model="slovenianEnabled" @change="handleChange" />
-        <span>Slovenian 🇸🇮</span>
+      <label class="checkbox-item" :class="{ unavailable: notInstalled('slovenian') }">
+        <input type="checkbox" v-model="slovenianEnabled" :disabled="notInstalled('slovenian')" @change="handleChange" />
+        <span>Slovenian 🇸🇮<em v-if="notInstalled('slovenian')" class="not-installed"> (not installed)</em></span>
       </label>
+      <a v-if="installed" class="manage-link" href="#/words">Word lists…</a>
       <div class="dictionary-info">
         <span v-if="activeDictionaryCount > 1">Using union of {{ activeDictionaryCount }} dictionaries</span>
         <span v-else-if="csw21Enabled">Using CSW21</span>
@@ -51,6 +52,11 @@ export default {
     selectedDictionaries: {
       type: Object,
       default: () => ({ csw21: true, nwl2023: false, enable: false, slovenian: false })
+    },
+    // Ids of the lists this device has. When given, the others are shown disabled as "(not installed)".
+    installed: {
+      type: Array,
+      default: null
     }
   },
   data() {
@@ -82,6 +88,9 @@ export default {
     }
   },
   methods: {
+    notInstalled(id) {
+      return Boolean(this.installed) && !this.installed.includes(id);
+    },
     toggleDropdown() {
       this.showDropdown = !this.showDropdown;
     },
@@ -172,6 +181,26 @@ export default {
   color: #e4e4e7;
   font-size: 0.95rem;
   transition: color 0.2s ease;
+}
+
+.checkbox-item.unavailable {
+  cursor: default;
+  color: #71717a;
+}
+
+.checkbox-item.unavailable input[type="checkbox"] {
+  cursor: default;
+}
+
+.not-installed {
+  font-size: 0.8rem;
+}
+
+.manage-link {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #93c5fd;
 }
 
 .checkbox-item:hover {

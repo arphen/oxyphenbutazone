@@ -20,34 +20,34 @@ The definition and metadata are optional but recommended for the word definition
 
 ## Available Dictionaries
 
-Place the following files in `public/`:
+| List | File (in `public/`) | Words | Ships with the public site? | Notes |
+|------|------|-------|---|-------|
+| **ENABLE** | `ENABLE.txt` | 168,551 | yes | Open English list (widely described as public domain; verify before relying on that). Entries over 15 letters are removed: they cannot fit the board. No definitions. |
+| **Slovenian** | `SLOVENIAN.txt` | 187,169 | yes | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž |
+| **CSW21** | `CSW21.txt` | 279,078 | **no** | Collins word list 2021, with definitions. Copyrighted. |
+| **NWL2023** | `NWL2023.txt` | 196,601 | **no** | NASPA Word List 2023, with definitions. Copyrighted. |
 
-| File | Words | Region | Notes |
-|------|-------|--------|-------|
-| **CSW21.txt** | 279,078 | International | Collins word list 2021 |
-| **NWL2023.txt** | 196,601 | North America | NASPA Word List 2023 |
-| **SLOVENIAN.txt** | 187,169 | Slovenia | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž |
+Lists are optional: the app uses whichever it has. A build lists what it ships in `wordlists.json`, and the default English
+list is the first available of CSW21, NWL2023, ENABLE. If a chosen list turns out not to be installed (or a host answers
+for it with its HTML fallback page) the app switches to one that is and says so in the game message.
 
-Alternatively, set only the dictionaries you need; the game will load whichever files exist.
+## Installing Lists
 
-## Updating Dictionaries
-
-1. Download or create your dictionary file
-2. Ensure format is one word per line (definition optional)
-3. Place in `public/` with the matching filename
-4. Restart the dev server
-5. Check console for "Dictionary loaded: X words"
-
-If dictionaries are not found at startup, the game will log warnings and use only available dictionaries.
+- **Standalone app (phones, GitHub Pages):** open *Word lists* (link on the home screen) and import a `.txt` file for CSW21,
+  NWL2023 or any other list. It is validated (2–15 letters per entry, junk and HTML refused, 40 MB limit), stored in the
+  browser's IndexedDB, and remembered; it never leaves the device. Remove it again from the same screen.
+- **Laptop host:** put the file in `frontend/public/` with the exact name from the table and restart the dev server.
+- **Publishing:** `OXY_EXCLUDE_LISTS=csw21,nwl2023` leaves those two out of a build (the GitHub Pages workflow does this
+  unless the repository variable `PUBLISH_WORD_LISTS` is `true`). See [DEPLOY.md](DEPLOY.md).
 
 ## Testing Dictionary Changes
 
 1. Start dev server: `cd frontend && npm run dev`
 2. Check console for dictionary load messages:
    ```
-   [Game API] CSW21 Dictionary loaded: 352123 words
-   [Game API] NWL2023 Dictionary loaded: 184567 words
-   [Game API] Active dictionary updated: 352123 words
+   [Game API] CSW21.txt loaded: 279078 words
+   [Game API] ENABLE.txt loaded: 168551 words
+   [Game API] Active dictionary updated: 279078 words (CSW21)
    ```
 3. Click the 📚 button in game controls to toggle dictionaries
 4. Play a word and hover over it in Game History to see its definition
@@ -55,13 +55,16 @@ If dictionaries are not found at startup, the game will log warnings and use onl
 
 ## In-Game Dictionary Selection
 
-Players can switch active dictionaries via the 📚 button:
+Players can switch active dictionaries via the 📚 button (lists that are not installed are shown disabled):
 
-- **Single dictionary** (CSW21 only): Only CSW21 words are valid
-- **Multiple dictionaries** (CSW21 + NWL2023): Word is valid if in either
-- **Slovenian**: Slovenian words are valid (usually together with Slovenian tiles, see below)
+- **Single list**: only its words are valid
+- **Several lists**: a word is valid if it is in any of them
+- Definitions come from the first selected list that has one (CSW21, then NWL2023, ENABLE has none, then Slovenian)
 
-A dictionary change takes effect immediately for word validation. The **tile language** (English or Slovenian) is chosen on the home screen when a game starts and never changes mid-game. Starting a new Slovenian game selects the Slovenian dictionary only; starting a new English game keeps your CSW21/NWL2023 choice (default CSW21). A plain restart keeps the game's language and your selection (resetting it if it cannot suit the language).
+A dictionary change takes effect immediately for word validation. The **tile language** (English or Slovenian) is chosen on
+the home screen when a game starts and never changes mid-game. Starting a new Slovenian game selects the Slovenian list
+only; starting a new English game keeps your English choices (default: the best available of CSW21, NWL2023, ENABLE).
+A plain restart keeps the game's language and your selection (resetting it if it cannot suit the language).
 
 ## Slovenian dictionary
 
@@ -69,26 +72,27 @@ A dictionary change takes effect immediately for word validation. The **tile lan
 
 Known gaps: the list may still contain words or abbreviations a tournament list would reject, and may omit valid forms.
 
-## Backend Implementation
+## Implementation
 
-The `vite-plugin-game-api-v2.js` plugin:
-
-1. **Loads** dictionaries on server startup into Maps: `csw21Dictionary`, `nwl2023Dictionary`, `slovenianDictionary`
-2. **Parses** each line: word (key) → definition (value)
-3. **Combines** selected dictionaries into `activeDictionary` (Set) for validation
-4. **Returns** definitions in `handlePlayWord()` and via `getDefinition(word)`
-5. **Filters** word lists on `GET /api/words?dictionary=csw21|nwl2023|slovenian` with params like `?length=`, `?contains=`, `?startsWith=`, etc.
+- `src/shared/dictionary.js`: the list store (parse, union of selected lists, definition lookup, word queries for the
+  practice modes) and the selection rules. Pure code, used everywhere.
+- `src/shared/wordlist.js`: validation of a list a player imports.
+- `src/net/localBackend.js`: standalone app: loads lists from IndexedDB (imported) or the shipped files, picks the default,
+  falls back when a list is missing, imports/removes lists.
+- `src/net/wordStore.js`: IndexedDB storage for imported lists (in-memory fallback in private mode, which the screen warns about).
+- `vite-plugin-game-api-v2.js`: laptop-host mode: loads whichever `public/*.txt` files exist and serves `GET /api/words`
+  with the same filters (`?dictionary=`, `?length=`, `?contains=`, `?startsWith=`, `?endsWith=`, `?excludes=`).
+- `vite-plugin-offline.js`: at build time writes `wordlists.json` and removes lists named in `OXY_EXCLUDE_LISTS`.
 
 ## Troubleshooting
 
 **Definitions not showing?**
-- Verify CSW21.txt and NWL2023.txt exist in `/public/`
-- Check console for load messages
+- Definitions only exist in CSW21 and NWL2023 (ENABLE has none); make sure one of them is installed and selected
 - Ensure format is `WORD definition [metadata]`
 - Hard refresh browser cache
 
 **Words not validating?**
-- Ensure at least one dictionary is selected (📚 button)
+- Ensure at least one dictionary is selected (📚 button) and that it is installed (*Word lists* screen)
 - Check that the word exists in the selected dictionary
 - Look at console for validation messages
 

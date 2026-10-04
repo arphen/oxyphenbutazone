@@ -65,6 +65,10 @@ export function createDictionaryStore() {
     declare(ids) {
       ids.filter((id) => DICTIONARY_IDS.includes(id)).forEach((id) => declared.add(id));
     },
+    /** The opposite of declare(): this deployment no longer supplies these (e.g. an imported list was removed). */
+    undeclare(ids) {
+      ids.forEach((id) => declared.delete(id));
+    },
     /** Lists that are loaded or declared available, in DICTIONARY_IDS order. */
     available: () => DICTIONARY_IDS.filter((id) => declared.has(id) || lists[id].size > 0),
     /** The loaded lists that suit `language`, best first; used when a chosen list turns out to be unavailable. */

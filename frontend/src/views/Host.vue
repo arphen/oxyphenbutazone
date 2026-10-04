@@ -32,6 +32,7 @@
 
       <button class="primary" :disabled="busy" @click="start(false)">Start hosting</button>
       <p v-if="error" class="error">{{ error }}</p>
+      <button class="link" @click="$router.push('/words')">Word lists: import CSW21 or NWL2023 from a file</button>
     </section>
 
     <!-- Hosting: one card per guest seat -->

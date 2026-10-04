@@ -497,6 +497,17 @@ describe('ENABLE (the open English list) and availability-aware defaults', () =>
     expect(store.available()).toEqual(['csw21', 'enable', 'slovenian']);
   });
 
+  it('undeclare() removes a declared list from available() but not a loaded one', () => {
+    const store = createDictionaryStore();
+    store.declare(['csw21', 'enable', 'slovenian']);
+    store.load('enable', 'aa\n');
+    store.undeclare(['csw21', 'enable', 'bogus']);
+    expect(store.available()).toEqual(['enable', 'slovenian']); // enable is still loaded
+    store.load('enable', ''); // unloading it (what removing an imported list does)
+    expect(store.available()).toEqual(['slovenian']);
+    expect(store.isLoaded('enable')).toBe(false);
+  });
+
   it('loadedFor() lists only loaded lists that suit the language, best first', () => {
     const store = createDictionaryStore();
     store.declare(['csw21']); // declared but not loaded does not count

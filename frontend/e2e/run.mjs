@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const STATIC_SUITES = ['static', 'ui', 'p2p', 'offline', 'csp'];
+const STATIC_SUITES = ['static', 'ui', 'p2p', 'scan', 'offline', 'csp'];
 const wanted = process.argv.slice(2);
 const want = (name) => wanted.length === 0 || wanted.includes(name);
 

@@ -11,6 +11,7 @@ import OddOneOutMode from '../views/OddOneOutMode.vue';
 import OddOneOutMobile from '../views/OddOneOutMobile.vue';
 import Host from '../views/Host.vue';
 import Join from '../views/Join.vue';
+import WordLists from '../views/WordLists.vue';
 
 const routes = [
   {
@@ -57,6 +58,11 @@ const routes = [
     path: '/join',
     name: 'join',
     component: Join
+  },
+  {
+    path: '/words',
+    name: 'words',
+    component: WordLists
   },
   {
     path: '/rack/:playerId',

@@ -1,95 +1,90 @@
 # Oxyphenbutazone
 
-A Vue 3 + Vite word-tile game for 2–4 players, playable offline on a local network.
+A word-tile game for two to four players that works **offline, phone to phone**. It runs entirely in the browser: no
+account, no server, no internet once it is installed.
 
-> Oxyphenbutazone is an independent hobby project and is not affiliated with or endorsed by any game publisher. One laptop hosts the game state via a Vite plugin; phones access `/rack/:playerId` to see their racks and place tiles.
+> Oxyphenbutazone is an independent hobby project and is not affiliated with or endorsed by any game publisher.
+
+## Three ways to play
+
+| | How | Needs |
+| --- | --- | --- |
+| **One device** | Open the app and start a game; pass the phone around. The game is saved and restored. | the app |
+| **Phone to phone** | One phone **hosts**, others **join** by scanning a QR code, opening a link or pasting a code. | the app on each phone; same room (or a shared hotspot) |
+| **Laptop host** | `npm run dev` on a laptop; phones open the QR codes on the laptop's board screen. | same Wi-Fi |
+
+Phone-to-phone details, security model and limits: [docs/P2P.md](docs/P2P.md).
+
+## Install on your phone
+
+Open the published site once, then *Add to Home Screen* (iPhone: Share menu; Android: Install). After that it starts with
+no network. See [docs/DEPLOY.md](docs/DEPLOY.md) for publishing it yourself (GitHub Pages) and
+[docs/PHONE_TEST.md](docs/PHONE_TEST.md) for a checklist to run on real devices.
 
 ## Features
 
-- **15×15 Board** with all premium squares (Triple Word, Double Word, Triple/Double Letter)
-- **2–4 Player Turns** with visual indicators
-- **Dictionary Support**: CSW21, NWL2023, Slovenian; the tile language (English or Slovenian) is chosen per game on the home screen
-- **Scoring**: Letter values, premium multipliers, BINGO bonus (+50 for all 7 tiles)
-- **Mobile Rack View**: Real-time sync, drag-and-drop tile placement and reordering
-- **Word Definitions**: Hover over played words in history to see definitions
-- **Game Persistence**: Save and replay games move-by-move
-- **Flashcard Mode**: Spaced-repetition word practice with 5 categories
-- **Game Replay**: Step through any saved game with board and rack analysis
-- **Language Tiles**: English and Slovenian tile distributions
+- 15×15 board with double/triple letter and word squares, 7-tile racks, 50-point bonus for using all seven tiles
+- Two languages with their own tile sets and points: **English** and **Slovenščina** (fixed per game; a blank tile can
+  only stand for a letter of the game's alphabet)
+- Word lists: **ENABLE** (open) and **Slovenian** are built in; **CSW21** and **NWL2023** can be imported from your own
+  file (*Word lists* screen) and are remembered on the device ([docs/DICTIONARIES.md](docs/DICTIONARIES.md))
+- Placement rules: one line, no gaps, connected to the board, first word on the centre square; invalid words cost the turn
+- Phone view: the whole board with pan and pinch-zoom, tap a tile then a square to place it, tap a placed tile to take it
+  back, large Play / Recall / Shuffle / Swap / Pass buttons
+- Game history and move-by-move replay, word definitions, flashcards, practice scenarios, free play
+  ([docs/FEATURES.md](docs/FEATURES.md))
 
-## Quick Start
+## Develop
 
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev        # laptop-host mode; open http://localhost:5174/ (add ?mode=local to run the standalone app instead)
+npm test           # unit tests (Vitest)
+npm run e2e        # browser end-to-end tests: real Chromium, real WebRTC (see frontend/e2e/README.md)
+npm run build      # static site in frontend/dist
+npm run lint
 ```
 
-Host opens `http://localhost:5174/` (or next available port); players scan QR or navigate to `/rack/1`, `/rack/2`, etc.
+`OXY_EXCLUDE_LISTS=csw21,nwl2023 npm run build` builds the way the public deployment does (without the copyrighted lists).
 
-## Routes
-
-- **`/`** – Home (game setup)
-- **`/game`** – 15×15 board view (host only)
-- **`/rack/:playerId`** – Mobile rack view (players 1–4)
-- **`/freeplay`** – Untimed practice
-- **`/practice`** – Practice mode
-- **`/flashcards`** – Word practice with spaced repetition
-- **`/odd-one-out`** – Puzzle game (host)
-- **`/odd-one-out-mobile`** – Puzzle game (mobile)
-- **`/history`** – List of saved games
-- **`/replay/:gameId`** – Step through a saved game
-
-## API
-
-Vite plugin exposes:
-
-- **`GET /api/game-state`** – Full game state
-- **`POST /api/action`** – Player actions:
-  - `place-tile`, `set-blank-letter`, `recall`, `play-word`, `pass`, `exchange-tiles`, `reorder-rack`, `update-viewport`, `update-dictionary`, `validate-word`, `restart`
-- **`GET /api/words`** – Dictionary words (filters: `?dictionary=`, `?length=`, `?contains=`, `?startsWith=`, etc.)
-- **OddOneOut API** – `POST /api/odd-one-out/create`, `/join`, `/submit`, `GET /api/odd-one-out/state`, `POST /api/odd-one-out/update`
-
-## Project Structure
+## How it is built
 
 ```
 frontend/
 ├── src/
-│   ├── components/       # Board, Rack, Controls, QR, ScoreHistory
-│   ├── views/            # GameBoard-v2, PlayerRackView-v2, FreePlay, etc.
-│   ├── composables/      # useGamePersistence, useFlashcards, useMoveAnalysis
-│   ├── shared/rules.js   # Pure game rules (scoring, placement, tile bags)
-│   ├── router/index.js   # All routes
-│   └── main.js
-├── public/
-│   ├── CSW21.txt         # Collins word list (~279k lines)
-│   ├── NWL2023.txt       # NASPA Word List (~197k lines)
-│   └── SLOVENIAN.txt     # Slovenian (~203k lines)
-├── vite-plugin-game-api-v2.js   # API middleware, game state, dictionaries
-└── vite.config.js
+│   ├── shared/        # pure code, runs everywhere: engine.js (rules/turns), rules.js (scoring, placement, tiles),
+│   │                  # protocol.js (validation of everything untrusted), dictionary.js, wordlist.js
+│   ├── net/           # standalone app plumbing: local backend + fetch interceptor, WebRTC pairing and sessions,
+│   │                  # QR helpers, word-list storage
+│   ├── views/         # screens (Home, Host, Join, WordLists, phone rack view, board, history, practice modes)
+│   ├── components/    # Board, PhoneBoard, QR scanner/display, modals
+│   └── utils/         # URL helpers, logging, wake lock, pan/zoom maths
+├── e2e/               # browser suites (npm run e2e)
+├── public/            # word lists, sounds, manifest, icons
+├── vite-plugin-game-api-v2.js   # laptop-host mode: thin HTTP shell around the shared engine
+└── vite-plugin-offline.js       # build: word-list manifest, service worker, content-security-policy
 ```
 
-## Dictionaries
+The same engine runs in three places: in the laptop dev server, in the browser of a single device, and in the browser of
+the host phone. The screens talk to it through `/api/*` calls; in the standalone app a small interceptor
+(`src/net/api.js`) answers those calls from the in-browser engine instead of a server, so no screen needed rewriting.
 
-Place dictionary files (one word per line, with optional definition) in `public/`:
+### Security
 
-```
-CSW21.txt       Collins word list 2021 (international)
-NWL2023.txt     NASPA Word List 2023 (North America)
-SLOVENIAN.txt   Slovenian word list, cleaned by scripts/clean_slovenian.py (Č, Š, Ž; not an official tournament word list)
-```
+Every device treats every other device as untrusted: actions and game states are rebuilt from a whitelist, sizes and
+ranges are checked, pairing codes are validated, guests are pinned to their seat and rate-limited, and the production
+build ships a strict Content-Security-Policy. This is input hygiene, not anti-cheat: whoever hosts can see everything.
+Details in [docs/P2P.md](docs/P2P.md).
 
-Format: `WORD definition [metadata]` (definition is optional for validation).
+## Known limitations
 
-## Known Limitations
-
-- **Game state is in-memory**: Restarting the server loses all game state
-- **Practice modes use English values**: Free play, practice and flashcards always show English letter points (the live game, phone racks and replays use the game's language)
-- **Persistence records two players only**: saved history/replay captures players 1 and 2, so 3–4 player games are not fully recorded
-
-## Tech Stack
-
-Vue 3, Vite, Vue Router, qrcode-vue3, scoped component CSS.
+- Verified in desktop Chromium only. iPhone Safari, local-network discovery between real phones, the camera in real
+  light, and screen locking have not been tested on devices (see [docs/PHONE_TEST.md](docs/PHONE_TEST.md)).
+- Playing across different networks (e.g. 5G) may need a relay server that this app does not include.
+- The Slovenian list is a general word list, not an official tournament list.
+- Saved history and replays record players 1 and 2 only.
+- The odd-one-out multiplayer mode needs the laptop host.
 
 ## Author
 

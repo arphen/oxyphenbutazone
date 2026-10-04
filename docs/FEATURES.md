@@ -2,7 +2,7 @@
 
 ## Word Definitions
 
-Words played in-game display their definitions on hover in the Game History table. The backend looks up definitions from the active dictionary (CSW21 → NWL2023 → Slovenian fallback). Format: `WORD definition text [metadata]`. Works for valid and invalid words alike.
+Words played in-game display their definitions on hover in the Game History table. Definitions come from the active lists that have them (CSW21 → NWL2023 → Slovenian; the open ENABLE list has none). Format: `WORD definition text [metadata]`. Works for valid and invalid words alike.
 
 **Tooltip behaviour**: Definitions appear below the hovered word with a smooth fade-in animation, styled with a semi-transparent dark background and blue border. Positioning uses `fixed` to break out of overflow-clipped parent containers and ensures tooltips always appear on top.
 
@@ -16,6 +16,20 @@ The tile language is chosen on the home screen when a game starts and is fixed f
 A blank tile can only stand for a letter of the game's alphabet (the picker shows Č Š Ž in Slovenian games, and the server rejects anything else).
 
 Choosing dictionaries (📚 button) changes which words are valid immediately but never the tiles. See [DICTIONARIES.md](DICTIONARIES.md) for how a new game picks its dictionary.
+
+## Phone View
+
+The phone shows the whole board. One finger pans, two fingers pinch-zoom (fit-to-width up to 3.5×), a double tap toggles
+between fit and a close-up, and the Zoom/Fit button does the same. **Tap a rack tile, then tap an empty square** to place
+it (a blank opens the letter picker); **tap a tile you placed this turn** to take it back; dragging a tile from the rack
+still works. Large Play / Recall / Shuffle / Swap / Pass buttons sit above the screen edge. When the laptop board focuses a
+square, the phone view pans there. Code: `PhoneBoard.vue`, `src/utils/panzoom.js`.
+
+## Playing Without a Server
+
+The standalone app runs the same engine in the browser (one device, or phone to phone). The game is saved after every
+move and restored when the app reopens. See [P2P.md](P2P.md), [DEPLOY.md](DEPLOY.md) and
+[DICTIONARIES.md](DICTIONARIES.md) (installing your own word lists).
 
 ## Game Persistence & Replay
 

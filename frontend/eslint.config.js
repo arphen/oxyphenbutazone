@@ -6,26 +6,26 @@ export default [
   {
     ignores: ['dist/', 'node_modules/', 'public/', 'src/data/generatedScenarios.js', 'src/data/corpuses/'],
   },
-  {
-    files: ['src/**/*.{js,vue}'],
-    languageOptions: {
-      globals: globals.browser,
-    },
-    rules: {
-      'no-console': 'off',
-      'no-unused-vars': 'warn',
-    },
-  },
-  {
-    files: ['vite*.js', 'vite.config.js'],
-    languageOptions: {
-      globals: globals.node,
-    },
-  },
+  // Base rule sets first, so the project's own settings below can adjust them
   js.configs.recommended,
   ...pluginVue.configs['flat/recommended'],
   {
+    files: ['src/**/*.{js,vue}'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
+    // build tooling and tests that run under Node (the e2e suites also contain code that runs inside the page)
+    files: ['vite*.js', 'vitest.config.js', 'scripts/**/*.{js,mjs,cjs}', 'e2e/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['sw.template.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     rules: {
+      'no-console': 'off',
+      'no-unused-vars': 'warn',
       'vue/multi-word-component-names': 'off',
     },
   },
