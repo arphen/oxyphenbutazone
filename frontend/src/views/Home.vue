@@ -49,6 +49,14 @@
           </button>
         </div>
         
+        <div v-if="!hasLaptopHost" class="mode-card game-mode-card">
+          <div class="mode-icon">📱</div>
+          <h2>Play with a friend</h2>
+          <p>Two phones, no server, no internet needed once installed. One hosts, the other joins.</p>
+          <button class="mode-button" @click="$router.push('/host')">Host a game</button>
+          <button class="mode-button" @click="$router.push('/join')">Join a game</button>
+        </div>
+
         <div class="mode-card" @click="goToFreePlay">
           <div class="mode-icon">🎨</div>
           <h2>Free Play</h2>

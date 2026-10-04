@@ -1,12 +1,16 @@
 <template>
   <div id="app">
+    <ConnectionBadge />
     <router-view />
   </div>
 </template>
 
 <script>
+import ConnectionBadge from './components/ConnectionBadge.vue';
+
 export default {
-  name: 'App'
+  name: 'App',
+  components: { ConnectionBadge }
 };
 </script>
 

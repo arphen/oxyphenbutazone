@@ -5,6 +5,7 @@ import router from './router'
 import { resolveMode } from './net/mode'
 import { installApi, setBackend } from './net/api'
 import { createLocalBackend } from './net/localBackend'
+import { initNet } from './net/session'
 import { isDebug } from './utils/log'
 
 const mode = resolveMode()
@@ -13,6 +14,7 @@ if (mode === 'local') {
   const backend = createLocalBackend()
   installApi()
   setBackend(backend)
+  initNet(backend)
   if (isDebug()) window.__oxy = { backend } // test hook, only with ?debug
 }
 
