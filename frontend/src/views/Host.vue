@@ -51,7 +51,8 @@
 
           <template v-else>
             <SignalBox :text="ui[seat].token" :link="ui[seat].link" :label="`1. Player ${seat} opens the app and scans this, or you send them the link`" />
-            <label class="field">2. Paste their answer here</label>
+            <label class="field">2. Scan their answer, or paste it here</label>
+            <button class="secondary" @click="scanning = seat">📷 Scan their answer</button>
             <textarea v-model="ui[seat].answer" rows="3" class="paste" placeholder="OXY1…" aria-label="Answer from the other player"></textarea>
             <button class="primary" :disabled="!ui[seat].answer" @click="connect(seat)">Connect</button>
             <button class="link" @click="reset(seat)">Start over</button>
@@ -65,17 +66,19 @@
         <button class="link" @click="stop">Stop hosting</button>
       </div>
     </template>
+    <QrScanner v-if="scanning" title="Scan the other player's answer" @scan="onScan" @cancel="scanning = null" />
   </div>
 </template>
 
 <script>
+import QrScanner from '../components/QrScanner.vue';
 import SignalBox from '../components/SignalBox.vue';
 import { net, startHosting, stopHosting, hostInvite, hostAcceptAnswer } from '../net/session';
 import { appUrl } from '../utils/url';
 
 export default {
   name: 'Host',
-  components: { SignalBox },
+  components: { SignalBox, QrScanner },
   data() {
     return {
       net,
@@ -89,6 +92,7 @@ export default {
       busy: false,
       error: '',
       ui: {},
+      scanning: null, // seat whose answer is being scanned
     };
   },
   computed: {
@@ -150,6 +154,13 @@ export default {
       } catch (error) {
         this.ui[seat].error = error.message;
       }
+    },
+    onScan(code) {
+      const seat = this.scanning;
+      this.scanning = null;
+      if (!seat || !this.ui[seat]?.token) return;
+      this.ui[seat].answer = code;
+      this.connect(seat);
     },
     reset(seat) {
       this.ui[seat] = {};

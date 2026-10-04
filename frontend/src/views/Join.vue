@@ -4,7 +4,8 @@
     <h1>Join a game</h1>
 
     <section v-if="!answer" class="card">
-      <label class="field">Paste the host's invite (or open their link)</label>
+      <button class="secondary" @click="scanning = true">📷 Scan the host's invite</button>
+      <label class="field">Or paste the host's invite (or open their link)</label>
       <textarea v-model="invite" rows="4" class="paste" placeholder="OXY1…" aria-label="Invite from the host"></textarea>
 
       <label class="check">
@@ -24,18 +25,21 @@
       <p class="wait">{{ net.guestStatus === 'open' ? '✓ Connected!' : '⏳ Waiting for the host…' }}</p>
       <button class="link" @click="cancel">Cancel</button>
     </section>
+
+    <QrScanner v-if="scanning" title="Scan the host's invite" @scan="onScan" @cancel="scanning = false" />
   </div>
 </template>
 
 <script>
+import QrScanner from '../components/QrScanner.vue';
 import SignalBox from '../components/SignalBox.vue';
 import { net, joinWithInvite, leaveGame } from '../net/session';
 
 export default {
   name: 'Join',
-  components: { SignalBox },
+  components: { SignalBox, QrScanner },
   data() {
-    return { net, invite: '', online: false, answer: '', busy: false, error: '' };
+    return { net, invite: '', online: false, answer: '', busy: false, error: '', scanning: false };
   },
   watch: {
     'net.guestStatus'(status) {
@@ -57,6 +61,11 @@ export default {
       } finally {
         this.busy = false;
       }
+    },
+    onScan(code) {
+      this.scanning = false;
+      this.invite = code;
+      this.error = '';
     },
     cancel() {
       leaveGame();
