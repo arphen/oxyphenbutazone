@@ -1,166 +1,95 @@
-# Scrabble Trainer - Two-Player Game
+# Scrabble Trainer
 
-A full-featured two-player Scrabble game with mobile rack viewing and real-time synchronization.
+A Vue 3 + Vite game for 2–4 players to play Scrabble offline on a local network. One laptop hosts the game state via a Vite plugin; phones access `/rack/:playerId` to see their racks and place tiles.
 
 ## Features
 
-### Core Gameplay
-- **15x15 Scrabble Board** with all premium squares (Triple Word, Double Word, Triple Letter, Double Letter)
-- **Two-Player Turn System** with visual indicators
-- **SOWPODS Dictionary** validation (267,751 official Scrabble words)
-- **Complete Scoring System**:
-  - Letter point values (1-10 points)
-  - Premium square multipliers
-  - BINGO bonus (+50 points for using all 7 tiles)
-- **Live Score Preview** shows points before playing
-- **Score History** with Excel-style modal showing turn-by-turn breakdown
+- **15×15 Board** with all premium squares (Triple Word, Double Word, Triple/Double Letter)
+- **2–4 Player Turns** with visual indicators
+- **Dictionary Support**: CSW21, NWL2023, Slovenian (with automatic tile distribution)
+- **Scoring**: Letter values, premium multipliers, BINGO bonus (+50 for all 7 tiles)
+- **Mobile Rack View**: Real-time sync, drag-and-drop tile placement and reordering
+- **Word Definitions**: Hover over played words in history to see definitions
+- **Game Persistence**: Save and replay games move-by-move
+- **Flashcard Mode**: Spaced-repetition word practice with 5 categories
+- **Game Replay**: Step through any saved game with board and rack analysis
+- **Language Tiles**: English and Slovenian tile distributions
 
-### Mobile Integration
-- **QR Code System** for easy mobile access
-- **Mobile Rack View** with real-time sync (2-second polling)
-- **5x5 Scrollable Board View** centered on clicked position
-- **Drag & Drop on Mobile**:
-  - Reorder tiles in your rack
-  - Place tiles on the board
-- **Click-to-Center** - Click any square on desktop to focus mobile view
-
-### Technical Features
-- Network-independent sync using Vite dev server API
-- In-memory game state management
-- Vue Router for multiple views
-- Custom Vite middleware plugin
-
-## Tech Stack
-
-- **Frontend**: Vue.js 3, Vite, Vue Router
-- **QR Codes**: qrcode-vue3
-- **Dictionary**: SOWPODS wordlist (public/sowpods.txt)
-- **Backend**: Django 5.2.6 (scaffolded, not currently used)
-- **Styling**: Scoped CSS with gradient backgrounds
-
-## Setup
-
-### Prerequisites
-- Node.js (v16+)
-- npm
-
-### Installation
+## Quick Start
 
 ```bash
 cd frontend
 npm install
-```
-
-### Running the Game
-
-```bash
-cd frontend
 npm run dev
 ```
 
-The game will be available at:
-- **Local**: `http://localhost:5174/` (or 5175 if 5174 is in use)
-- **Network**: `http://YOUR_IP:5174/`
+Host opens `http://localhost:5174/` (or next available port); players scan QR or navigate to `/rack/1`, `/rack/2`, etc.
 
-## How to Play
+## Routes
 
-### Desktop (Main Game)
-1. Open `http://localhost:5174/` in your browser
-2. Click "Show QR Codes" button
-3. Drag letters from racks onto the board
-4. Click "Play" to validate and score the word
-5. Click player scores to view history
+- **`/`** – Home (game setup)
+- **`/game`** – 15×15 board view (host only)
+- **`/rack/:playerId`** – Mobile rack view (players 1–4)
+- **`/freeplay`** – Untimed practice
+- **`/practice`** – Practice mode
+- **`/flashcards`** – Word practice with spaced repetition
+- **`/odd-one-out`** – Puzzle game (host)
+- **`/odd-one-out-mobile`** – Puzzle game (mobile)
+- **`/history`** – List of saved games
+- **`/replay/:gameId`** – Step through a saved game
 
-### Mobile (Rack View)
-1. Scan the QR code with your phone's camera
-2. Tap the notification to open the mobile view
-3. See your tiles, score, and turn status
-4. View a 5x5 section of the board
-5. **Reorder tiles**: Drag tiles within your rack to rearrange them
-6. **Place tiles**: Drag tiles from your rack onto the mini-board
-7. The view auto-updates every 2 seconds
+## API
 
-### Desktop + Mobile Together
-1. Click any square on the desktop board
-2. Mobile view centers on that location within 2 seconds
-3. Place tiles from mobile onto the focused area
-4. Continue playing seamlessly across devices
+Vite plugin exposes:
+
+- **`GET /api/game-state`** – Full game state
+- **`POST /api/action`** – Player actions:
+  - `place-tile`, `set-blank-letter`, `recall`, `play-word`, `pass`, `exchange-tiles`, `reorder-rack`, `update-viewport`, `update-dictionary`, `validate-word`, `restart`
+- **`GET /api/words`** – Dictionary words (filters: `?dictionary=`, `?length=`, `?contains=`, `?startsWith=`, etc.)
+- **OddOneOut API** – `POST /api/odd-one-out/create`, `/join`, `/submit`, `GET /api/odd-one-out/state`, `POST /api/odd-one-out/update`
 
 ## Project Structure
 
 ```
-oxyphenbutazone/
-├── docs/                           # Documentation and guides
-├── scripts/                        # Utility scripts and tests
-├── legacy/                         # Legacy code
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Board.vue           # 15x15 game board
-│   │   │   ├── Rack.vue            # Player rack display
-│   │   │   ├── Controls.vue        # Play/Clear buttons
-│   │   │   ├── QRDisplay.vue       # QR code generator
-│   │   │   ├── ScoreHistoryModal.vue # Score tracking
-│   │   │   └── MobileRackView.vue  # (old, not used)
-│   │   ├── views/
-│   │   │   ├── GameBoard.vue       # Main game view
-│   │   │   └── PlayerRackView.vue  # Mobile rack view
-│   │   ├── router/
-│   │   │   └── index.js            # Route configuration
-│   │   └── main.js                 # App entry point
-│   ├── public/
-│   │   └── sowpods.txt            # Scrabble dictionary
-│   ├── vite-plugin-game-api-v2.js # Custom API middleware
-│   └── vite.config.js             # Vite configuration
-└── backend/                        # Django (not currently used)
+frontend/
+├── src/
+│   ├── components/       # Board, Rack, Controls, QR, ScoreHistory
+│   ├── views/            # GameBoard-v2, PlayerRackView-v2, FreePlay, etc.
+│   ├── composables/      # useGamePersistence, useFlashcards, useMoveAnalysis
+│   ├── router/index.js   # All routes
+│   └── main.js
+├── public/
+│   ├── CSW21.txt         # Collins Scrabble Words (352k+ words)
+│   ├── NWL2023.txt       # NASPA Word List (184k+ words)
+│   └── SLOVENIAN.txt     # Slovenian (254k+ words)
+├── vite-plugin-game-api-v2.js   # API middleware, game state, dictionaries
+└── vite.config.js
 ```
 
-## API Endpoints
+## Dictionaries
 
-The game uses a custom Vite plugin to provide these endpoints:
+Place dictionary files (one word per line, with optional definition) in `public/`:
 
-- `GET /api/rack/1` - Get Player 1's rack, score, board, and viewport
-- `GET /api/rack/2` - Get Player 2's rack, score, board, and viewport  
-- `POST /api/game-state` - Update game state from main view
-- `POST /api/place-tile` - Place a tile on the board from mobile
-
-## Game State
-
-The game maintains state in-memory through the Vite plugin:
-
-```javascript
-{
-  board: Array<Array<{ letter, type, isNew, locked }>>,
-  viewportCenter: { row, col },
-  player1: { playerName, rack, score, isCurrentPlayer },
-  player2: { playerName, rack, score, isCurrentPlayer }
-}
+```
+CSW21.txt       Collins Scrabble Words 2021 (international)
+NWL2023.txt     NASPA Word List 2023 (North America)
+SLOVENIAN.txt   Slovenian Scrabble (254k words, special characters: Č, Š, Ž)
 ```
 
-## Future Enhancements
+Format: `WORD definition [metadata]` (definition is optional for validation).
 
-- [ ] Persistent storage (database)
-- [ ] Multi-game support with unique IDs
-- [ ] Undo/redo functionality
-- [ ] Computer AI opponent
-- [ ] Puzzle/tactics trainer mode
-- [ ] Best move detection
-- [ ] WebSocket for instant sync (instead of polling)
-- [ ] Sound effects and animations
-- [ ] Mobile: Return tiles from board to rack
+## Known Limitations
 
-## Development
+- **Game state is in-memory**: Restarting the server loses all game state
+- **No continuity check**: Placed tiles are not validated to form a single connected line
+- **English letter values only**: Mobile/board display shows English letter point values even in Slovenian mode
 
-### Git
+## Tech Stack
 
-Repository initialized with:
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-```
+Vue 3, Vite, Vue Router, qrcode-vue3, CSS Modules.
 
-### Author
+## Author
+
 Sebastian Wozny <sebastian.wozny@pm.me>
 
 ## License
