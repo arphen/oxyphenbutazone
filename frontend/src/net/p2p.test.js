@@ -356,6 +356,58 @@ describe('pairing and play', () => {
     const invite = await host.invite(2);
     expect(invite.startsWith(SIGNAL_PREFIX)).toBe(true);
   });
+
+  it('a twice-scanned answer fails friendly and still connects (no raw stable-state error)', async () => {
+    const csw = 'CAT\nAT\nTO\nDOG\nCOT\n';
+    const backend = createLocalBackend({ loadList: async (id) => (id === 'csw21' ? csw : null), persist: false });
+    await backend.ready;
+    await backend.dispatch({ type: 'restart', playerCount: 2 });
+    const host = createHostSession(backend, { createPeer: () => new FakeHostPeer() });
+    const invite = await host.invite(2);
+    const { answer } = await acceptInvite(invite, { createPeer: () => new FakeGuestPeer() });
+    await host.acceptAnswer(answer); // the scan applies it
+    const second = await host.acceptAnswer(answer).then(
+      () => null,
+      (error) => error,
+    ); // the follow-up tap must not hit WebRTC again
+    expect(second).toBeInstanceOf(Error);
+    expect(second.message).not.toMatch(/wrong state|stable|InvalidState/);
+    await tick();
+    expect(host.snapshot().seats).toEqual({ 2: 'open' });
+  });
+
+  it('concurrent double answers never surface a raw WebRTC state error', async () => {
+    const csw = 'CAT\nAT\nTO\nDOG\nCOT\n';
+    const backend = createLocalBackend({ loadList: async (id) => (id === 'csw21' ? csw : null), persist: false });
+    await backend.ready;
+    await backend.dispatch({ type: 'restart', playerCount: 2 });
+    const host = createHostSession(backend, { createPeer: () => new FakeHostPeer() });
+    const invite = await host.invite(2);
+    const { answer } = await acceptInvite(invite, { createPeer: () => new FakeGuestPeer() });
+    const results = await Promise.allSettled([host.acceptAnswer(answer), host.acceptAnswer(answer)]);
+    for (const result of results) {
+      if (result.status === 'rejected') expect(result.reason.message).not.toMatch(/wrong state|stable|InvalidState/);
+    }
+    await tick();
+    expect(host.snapshot().seats).toEqual({ 2: 'open' });
+  });
+
+  it('a stale answer after re-inviting leaves the seat waiting, and the fresh answer works', async () => {
+    const csw = 'CAT\nAT\nTO\nDOG\nCOT\n';
+    const backend = createLocalBackend({ loadList: async (id) => (id === 'csw21' ? csw : null), persist: false });
+    await backend.ready;
+    await backend.dispatch({ type: 'restart', playerCount: 2 });
+    const host = createHostSession(backend, { createPeer: () => new FakeHostPeer() });
+    const invite1 = await host.invite(2);
+    const { answer: answer1 } = await acceptInvite(invite1, { createPeer: () => new FakeGuestPeer() });
+    const invite2 = await host.invite(2); // host starts over: new offer, old answer is stale
+    const { answer: answer2 } = await acceptInvite(invite2, { createPeer: () => new FakeGuestPeer() });
+    await expect(host.acceptAnswer(answer1)).rejects.toThrow(/match the current invite/);
+    expect(host.snapshot().seats[2]).toBe('waiting');
+    await host.acceptAnswer(answer2);
+    await tick();
+    expect(host.snapshot().seats).toEqual({ 2: 'open' });
+  });
 });
 
 describe('a hostile guest', () => {

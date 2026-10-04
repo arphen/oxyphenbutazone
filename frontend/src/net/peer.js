@@ -82,7 +82,20 @@ export class HostPeer extends BasePeer {
   }
 
   async acceptAnswer(sdp) {
-    await this.pc.setRemoteDescription({ type: 'answer', sdp });
+    if (!this.pc) throw new Error('No invite is waiting for that seat');
+    // Scanning the same answer twice (camera double-read, or scan + Connect
+    // tap) applies it twice. The second setRemoteDescription would throw a raw
+    // "Called in wrong state: stable", so treat it as a no-op instead.
+    if (this.pc.remoteDescription) return;
+    if (this.pc.signalingState !== 'have-local-offer')
+      throw new Error('No invite is waiting for that seat');
+    try {
+      await this.pc.setRemoteDescription({ type: 'answer', sdp });
+    } catch (error) {
+      if (error?.name === 'InvalidStateError')
+        throw new Error('That answer was already applied, still connecting');
+      throw error;
+    }
   }
 }
 

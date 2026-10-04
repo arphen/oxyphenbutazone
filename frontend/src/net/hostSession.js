@@ -132,7 +132,27 @@ export function createHostSession(backend, { online = false, createPeer = (opts)
       if (answer.room !== room) throw new ProtocolError('That answer belongs to a different game');
       const rec = seats.get(answer.seat);
       if (!rec || rec.status !== 'waiting') throw new ProtocolError('No invite is waiting for that seat');
-      await rec.peer.acceptAnswer(answer.sdp);
+      // The scan flow applies the answer automatically and leaves Connect
+      // enabled, so a second tap (or double scan) can arrive while the first
+      // is still being applied. Fail friendly instead of hitting WebRTC twice.
+      if (rec.accepting) throw new ProtocolError('That answer is already being applied, still connecting');
+      rec.accepting = true;
+      rec.status = 'connecting';
+      emit();
+      try {
+        await rec.peer.acceptAnswer(answer.sdp);
+      } catch (error) {
+        // A bad answer must not wedge the seat: back to waiting so the host
+        // can scan or paste the right one.
+        rec.accepting = false;
+        rec.status = 'waiting';
+        emit();
+        if (error?.message === 'answer does not match this invite') {
+          throw new ProtocolError('That answer does not match the current invite. Invite again or scan the latest answer.');
+        }
+        throw error;
+      }
+      rec.accepting = false;
       return answer.seat;
     },
 

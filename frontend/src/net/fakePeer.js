@@ -67,8 +67,12 @@ export class FakeHostPeer extends FakeBase {
     return sdpFor(this.id, 'actpass');
   }
   async acceptAnswer(sdp) {
+    // Like the real HostPeer (see peer.js): applying the same answer twice
+    // (double scan, double tap) is a no-op instead of a state error.
+    if (this.applied) return;
     const guest = this.guest;
     if (!guest || idOf(sdp) !== this.id) throw new Error('answer does not match this invite');
+    this.applied = true;
     this.other = guest;
     guest.other = this;
     this.open = guest.open = true;
