@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { validateWordListText } from './wordlist.js';
 import { parseDictionaryFile } from './dictionary.js';
 
@@ -220,7 +220,29 @@ describe('validateWordListText: refusing files', () => {
 });
 
 describe('validateWordListText: real lists and performance', () => {
-  it('accepts the shipped CSW21 file: licence header ignored, every entry kept', () => {
+  // The real CSW21 file is copyrighted and is not in the repository (it is git-ignored). This check runs wherever
+  // someone keeps a local copy in public/ (the laptop host does); the synthetic test below always runs.
+  const hasLocalCsw21 = existsSync(new URL('../../public/CSW21.txt', import.meta.url));
+
+  it('accepts a CSW21-style file: licence header ignored, definitions and cross-references kept (synthetic sample)', () => {
+    const raw = [
+      '# Published under license with Collins, an imprint of HarperCollins Publishers Limited.',
+      'AA (Hawaiian) a volcanic rock consisting of angular blocks of lava with a very rough surface [n -S]',
+      'AAH an interjection expressing surprise [interj] / to exclaim in surprise [v -ED, -ING, -S]',
+      'AAHED <aah=v> [v]',
+      'AAHING <aah=v> [v]',
+      'ZZZ to sleep [v]',
+    ].join('\n');
+    const r = ok(raw);
+    expect(r.count).toBe(5); // the '#' header line is neither a word nor counted as skipped
+    expect(r.skipped).toBe(0);
+    const parsed = parseDictionaryFile(r.text);
+    expect(parsed.get('aah')).toMatch(/interjection/);
+    expect(parsed.get('aahed')).toBe('<aah=v> [v]');
+    expect(parsed.has('hawaiian')).toBe(false); // the parenthesised word belongs to the definition of AA
+  });
+
+  it.skipIf(!hasLocalCsw21)('accepts the real CSW21 file when a local copy exists: header ignored, every entry kept', () => {
     const raw = readFileSync(new URL('../../public/CSW21.txt', import.meta.url), 'utf8');
     const r = ok(raw);
     expect(r.count).toBeGreaterThan(250000);
