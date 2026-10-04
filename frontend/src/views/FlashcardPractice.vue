@@ -69,7 +69,11 @@
 
       <!-- Current Flashcard -->
       <div v-if="!isPracticing" class="start-practice">
-        <button class="start-btn" @click="startPracticeSession" :disabled="isLoading">
+        <p v-if="!isLoading && stats.total === 0" class="empty-category" data-testid="empty-category">
+          No words in this category were found in the word list you are using, so there is nothing to practise yet.
+          You can choose another list under <a href="#/words">Word lists</a>.
+        </p>
+        <button class="start-btn" @click="startPracticeSession" :disabled="isLoading || stats.total === 0">
           {{ isLoading ? 'Loading...' : '▶️ Start Practice' }}
         </button>
         <button class="reset-btn" @click="resetProgress">
@@ -1003,6 +1007,18 @@ export default {
   gap: 15px;
   align-items: center;
   padding: 40px;
+}
+
+.empty-category {
+  max-width: 420px;
+  margin: 0;
+  text-align: center;
+  color: #fbbf24;
+  line-height: 1.5;
+}
+
+.empty-category a {
+  color: #93c5fd;
 }
 
 .start-btn, .reset-btn {

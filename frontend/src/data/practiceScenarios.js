@@ -1,10 +1,13 @@
 /**
  * Practice Scenarios Database
- * 
- * Each scenario presents a specific board situation and rack for the player to find the optimal move.
+ *
+ * Each scenario presents a specific board situation and rack for the player to find a strong move.
  * Categories help players practice specific skills like unusual letters, short words, etc.
+ *
+ * Every word used here is in the open ENABLE list, so the scenarios work with whichever list the player has
+ * (the public build ships only ENABLE). src/data/practiceScenarios.test.js re-checks each scenario against the
+ * game rules: the solutions fit the board and the rack, every word they form is a word, and the scores are right.
  */
-
 
 export const practiceCategories = {
     'v-words': {
@@ -41,23 +44,58 @@ export const practiceCategories = {
         name: 'High-Value Letters',
         description: 'Maximize points with J, X, and Z',
         icon: '💎'
-    },
-    'extensions': {
-        name: '3-Letter Extensions',
-        description: 'Extend 2-letter words into 3-letter words',
-        icon: '🌱'
     }
 };
 
+const SIZE = 15;
+
+/** An empty 15x15 board (null = empty square) with the given words laid on it: [word, row, col, 'horizontal'|'vertical']. */
+function boardWith(...words) {
+    const board = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+    for (const [word, row, col, direction] of words) {
+        [...word].forEach((letter, i) => {
+            if (direction === 'horizontal') board[row][col + i] = letter;
+            else board[row + i][col] = letter;
+        });
+    }
+    return board;
+}
+
+/**
+ * A solution that plays `word` from (row, col): the tiles to place are the squares of the word that are still empty
+ * on `board` (the others are already there).
+ */
+function play(board, word, row, col, direction, score, explanation) {
+    const tiles = [];
+    [...word].forEach((letter, i) => {
+        const r = direction === 'horizontal' ? row : row + i;
+        const c = direction === 'horizontal' ? col + i : col;
+        if (!board[r][c]) tiles.push({ letter, row: r, col: c });
+    });
+    return { word, position: { row, col, direction }, tiles, score, explanation };
+}
+
 /**
  * Practice scenarios
- * 
+ *
  * Board representation:
  * - null: empty square
  * - string: letter on that square
- * 
+ *
  * Board is 15x15, coordinates are [row][col]
  */
+const vav = boardWith(['CAT', 7, 7, 'horizontal']);
+const vex = boardWith(['RATE', 6, 6, 'horizontal']);
+const squeeze = boardWith(['BEAT', 7, 5, 'horizontal']);
+const jo = boardWith(['BOAT', 7, 5, 'horizontal']);
+const qat = boardWith(['TOAD', 7, 5, 'horizontal']);
+const sHook = boardWith(['BOOK', 7, 4, 'horizontal']);
+const frontHook = boardWith(['ART', 7, 6, 'horizontal']);
+const parallel = boardWith(['MATE', 7, 5, 'horizontal']);
+const bingo = boardWith();
+const joy = boardWith(['TOP', 6, 8, 'horizontal']);
+const zit = boardWith(['PET', 6, 2, 'horizontal']);
+
 export const practiceScenarios = [
     // V-WORDS CATEGORY
     {
@@ -65,39 +103,17 @@ export const practiceScenarios = [
         category: 'v-words',
         difficulty: 'easy',
         title: 'VAV: The Three-Letter V',
-        description: 'Find the best spot to play VAV (a Hebrew letter)',
-        board: [
-            // Row 0
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, 'C', 'A', 'T', null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        description: 'Find a strong spot to play VAV (a Hebrew letter)',
+        board: vav,
         rack: ['V', 'A', 'V', 'E', 'R', 'S', 'T'],
         solutions: [
-            {
-                word: 'VAV',
-                position: { row: 6, col: 6, direction: 'vertical' }, // Places V-A-V vertically ending at row 8, col 6
-                tiles: [{ letter: 'V', row: 6, col: 6 }, { letter: 'A', row: 7, col: 6 }, { letter: 'V', row: 8, col: 6 }],
-                score: 18, // V(4) + A(1) + V(4) = 9, doubled by DW at [6,6]
-                explanation: 'VAV played vertically to the left of CAT, forming VAC. Uses the DW square.'
-            }
+            play(vav, 'VAV', 6, 8, 'vertical', 17,
+                'VAV runs down through the A of CAT, with both Vs on double letter squares: 8 + 1 + 8 = 17 points.')
         ],
         hints: [
             'VAV is a valid three-letter word (Hebrew letter)',
-            'Look for premium squares near the existing word',
-            'Can you form another word with the C in CAT?'
+            'VAV has an A in the middle, and CAT has one too',
+            'Put the Vs on the double letter squares next to CAT'
         ]
     },
     {
@@ -106,37 +122,16 @@ export const practiceScenarios = [
         difficulty: 'medium',
         title: 'VEX: Triple Letter Score',
         description: 'Maximize your V with a premium square',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, 'R', 'A', 'T', 'E', null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        board: vex,
         rack: ['V', 'E', 'X', 'I', 'N', 'G', 'S'],
         solutions: [
-            {
-                word: 'VEX',
-                position: { row: 5, col: 4, direction: 'vertical' },
-                tiles: [{ letter: 'V', row: 4, col: 4 }, { letter: 'E', row: 5, col: 4 }, { letter: 'X', row: 6, col: 4 }],
-                score: 30, // V(4) + E(1) + X(8) = 13, TL on V at [1,5] makes it 4+8=12 extra, total depends on exact calculation
-                explanation: 'VEX uses the triple letter score and creates VE from RATE'
-            }
+            play(vex, 'VEX', 5, 9, 'vertical', 21,
+                'VEX goes down through the E of RATE with the V on the triple letter square: 12 + 1 + 8 = 21 points.')
         ],
         hints: [
             'VEX means to annoy or frustrate',
-            'Position your V on a premium square',
-            'The X is worth 8 points!'
+            'RATE ends in an E, and VEX has an E in the middle',
+            'The V is worth 4 points: put it on a triple letter square'
         ]
     },
 
@@ -146,77 +141,35 @@ export const practiceScenarios = [
         category: 'two-letter',
         difficulty: 'easy',
         title: 'Tight Spaces',
-        description: 'Use short words to squeeze into small gaps',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, 'F', null, 'B', null, 'M', null, null, null, null, null],
-            [null, null, null, null, null, 'L', null, 'R', null, 'A', null, null, null, null, null],
-            [null, null, null, null, null, 'O', null, 'A', null, 'T', null, null, null, null, null],
-            [null, null, null, null, null, 'W', null, 'T', null, 'S', null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        description: 'Use short words to score in several directions at once',
+        board: squeeze,
         rack: ['A', 'E', 'I', 'O', 'U', 'X', 'Y'],
         solutions: [
-            {
-                word: 'AX',
-                position: { row: 6, col: 6, direction: 'horizontal' },
-                tiles: [{ letter: 'A', row: 6, col: 6 }, { letter: 'X', row: 6, col: 8 }],
-                score: 20, // Forms AX + multiple 2-letter words (OA, AB, EX, etc)
-                explanation: 'Playing AX horizontally between columns creates multiple 2-letter words vertically'
-            }
+            play(squeeze, 'AX', 8, 5, 'horizontal', 38,
+                'AX under BE makes three words at once: AX, BA and EX. The X sits on a double letter square and counts twice, in AX and in EX.')
         ],
         hints: [
-            'Look between the existing words',
-            'Two-letter words: AX, OX, EX are all valid',
-            'Each vertical pair will score points'
+            'Look for two letters you can play right under a word',
+            'Every letter you put under BEAT also makes a two-letter word going down',
+            'Two-letter words ending in X: AX, EX, OX'
         ]
     },
     {
         id: 'two-letter-2',
         category: 'two-letter',
         difficulty: 'medium',
-        title: 'QI is Valid!',
-        description: 'The most important Q without U word',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, 'S', 'O', 'A', 'K', null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
-        rack: ['Q', 'I', 'V', 'I', 'N', 'G', 'S'],
+        title: 'JO: The Short J Word',
+        description: 'JO is one of the few two-letter words with a J',
+        board: jo,
+        rack: ['J', 'I', 'E', 'N', 'R', 'S', 'T'],
         solutions: [
-            {
-                word: 'QI',
-                position: { row: 5, col: 6, direction: 'vertical' },
-                tiles: [{ letter: 'Q', row: 5, col: 6 }, { letter: 'I', row: 6, col: 6 }],
-                score: 22, // Q(10) + I(1) = 11, forming QI and extends to IS
-                explanation: 'QI played vertically before SOAK, also making the S into SI'
-            }
+            play(jo, 'JO', 6, 6, 'vertical', 17,
+                'JO played down onto the O of BOAT, with the J on a double letter square: 16 + 1 = 17 points.')
         ],
         hints: [
-            'QI is a valid word (Chinese concept of life force)',
-            'You don\'t need a U with Q!',
-            'Two-letter Q words: QI, QAT, QOPH (3 letters)'
+            'JO is a valid word (a sweetheart, in Scots)',
+            'You have no O in your rack: use the one on the board',
+            'Put the J on a premium square'
         ]
     },
 
@@ -227,42 +180,16 @@ export const practiceScenarios = [
         difficulty: 'hard',
         title: 'QAT: The Tea Leaf',
         description: 'Learn this essential Q without U word',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, 'T', 'O', 'A', 'D', null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        board: qat,
         rack: ['Q', 'A', 'T', 'S', 'I', 'N', 'G'],
         solutions: [
-            {
-                word: 'QATS',
-                position: { row: 7, col: 4, direction: 'horizontal' },
-                tiles: [
-                    { letter: 'Q', row: 7, col: 4 },
-                    { letter: 'A', row: 7, col: 5 },
-                    { letter: 'T', row: 7, col: 6 },
-                    { letter: 'S', row: 7, col: 7 }
-                ],
-                score: 26, // Q(10) + A(1) + T(1) + S(1) = 13, plus points for making QAT into QATS
-                explanation: 'QATS hooks onto TOAD, forming the word with T shared'
-            }
+            play(qat, 'QAT', 5, 5, 'vertical', 32,
+                'QAT ends on the T of TOAD, with the Q on a triple letter square: 30 + 1 + 1 = 32 points.')
         ],
         hints: [
-            'QAT (or QATS) is a plant whose leaves are chewed as a stimulant',
-            'Can you extend an existing word?',
-            'Remember: Q + A + T = QAT'
+            'QAT is a plant whose leaves are chewed as a stimulant',
+            'You do not need a U: use the T on the board',
+            'Remember: Q + A + T = QAT, and the Q wants a triple letter square'
         ]
     },
 
@@ -272,44 +199,17 @@ export const practiceScenarios = [
         category: 'hooks',
         difficulty: 'easy',
         title: 'S-Hook Master',
-        description: 'Add an S to make a plural',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, 'B', 'O', 'O', 'K', null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, 'H', 'A', 'T', null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        description: 'Add an S to make a plural, and play a long word down from it',
+        board: sHook,
         rack: ['S', 'H', 'I', 'N', 'E', 'D', 'R'],
         solutions: [
-            {
-                word: 'SHINE',
-                position: { row: 6, col: 8, direction: 'vertical' },
-                tiles: [
-                    { letter: 'S', row: 6, col: 8 },
-                    { letter: 'H', row: 7, col: 8 },
-                    { letter: 'I', row: 8, col: 8 },
-                    { letter: 'N', row: 9, col: 8 },
-                    { letter: 'E', row: 10, col: 8 }
-                ],
-                score: 24, // S(1) + H(4) + I(1) + N(1) + E(1) = 8, plus points for BOOKS and HAT -> HATS
-                explanation: 'SHINE hooks the S onto BOOK (making BOOKS) and the I makes HAT into HATI (if valid) or forms new words'
-            }
+            play(sHook, 'SHINE', 7, 8, 'vertical', 23,
+                'The S of SHINE hooks onto BOOK to make BOOKS: SHINE scores 12 and BOOKS 11, 23 points in all.')
         ],
         hints: [
             'Look for places where S can pluralize',
             'BOOK can become BOOKS',
-            'Can you form a vertical word that uses existing letters?'
+            'Play a word that starts with S right after BOOK, going down'
         ]
     },
     {
@@ -318,46 +218,13 @@ export const practiceScenarios = [
         difficulty: 'medium',
         title: 'Front Hook Challenge',
         description: 'Add a letter to the front of a word',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, 'A', 'R', 'T', null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
-        rack: ['C', 'P', 'D', 'W', 'T', 'F', 'E'],
+        board: frontHook,
+        rack: ['C', 'P', 'D', 'T', 'E', 'I', 'O'],
         solutions: [
-            {
-                word: 'CART',
-                position: { row: 7, col: 5, direction: 'horizontal' },
-                tiles: [{ letter: 'C', row: 7, col: 5 }],
-                score: 6, // C(3) + ART already on board
-                explanation: 'Adding C to the front of ART makes CART'
-            },
-            {
-                word: 'PART',
-                position: { row: 7, col: 5, direction: 'horizontal' },
-                tiles: [{ letter: 'P', row: 7, col: 5 }],
-                score: 6, // P(3) + ART
-                explanation: 'Adding P to the front of ART makes PART'
-            },
-            {
-                word: 'DART',
-                position: { row: 7, col: 5, direction: 'horizontal' },
-                tiles: [{ letter: 'D', row: 7, col: 5 }],
-                score: 5, // D(2) + ART
-                explanation: 'Adding D to the front of ART makes DART'
-            }
+            play(frontHook, 'CART', 7, 5, 'horizontal', 6, 'Adding C to the front of ART makes CART.'),
+            play(frontHook, 'PART', 7, 5, 'horizontal', 6, 'Adding P to the front of ART makes PART.'),
+            play(frontHook, 'DART', 7, 5, 'horizontal', 5, 'Adding D to the front of ART makes DART.'),
+            play(frontHook, 'TART', 7, 5, 'horizontal', 4, 'Adding T to the front of ART makes TART.')
         ],
         hints: [
             'ART can have many letters added to the front',
@@ -373,42 +240,16 @@ export const practiceScenarios = [
         difficulty: 'medium',
         title: 'Parallel Power',
         description: 'Score multiple words at once by playing parallel',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, 'C', 'A', 'T', 'S', null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        board: parallel,
         rack: ['D', 'O', 'G', 'S', 'L', 'E', 'D'],
         solutions: [
-            {
-                word: 'DOGS',
-                position: { row: 7, col: 5, direction: 'horizontal' },
-                tiles: [
-                    { letter: 'D', row: 7, col: 5 },
-                    { letter: 'O', row: 7, col: 6 },
-                    { letter: 'G', row: 7, col: 7 },
-                    { letter: 'S', row: 7, col: 8 }
-                ],
-                score: 18, // DOGS (6 points) + CD + AO + TG + SS
-                explanation: 'DOGS played parallel below CATS creates 5 words: CD, AO, TG, SS, plus DOGS itself'
-            }
+            play(parallel, 'EGOS', 8, 5, 'horizontal', 22,
+                'EGOS played right under MATE makes four two-letter words at once: ME, AG, TO and ES, plus EGOS itself.')
         ],
         hints: [
-            'Play a word directly below CATS',
-            'Each letter pair vertically makes a two-letter word',
-            'You\'ll score for DOGS plus all the 2-letter words!'
+            'Play a word directly below MATE',
+            'Each letter pair going down must make a two-letter word',
+            'You will score for the long word plus all the two-letter words!'
         ]
     },
 
@@ -419,45 +260,17 @@ export const practiceScenarios = [
         difficulty: 'hard',
         title: 'Seven-Letter Bonus',
         description: 'Use all 7 tiles for 50 extra points',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, 'S', null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        board: bingo,
         rack: ['R', 'E', 'T', 'I', 'N', 'A', 'S'],
-        solutions: [
-            {
-                word: 'RETINAS',
-                position: { row: 7, col: 7, direction: 'horizontal' },
-                tiles: [
-                    { letter: 'R', row: 7, col: 6 },
-                    { letter: 'E', row: 7, col: 7 },
-                    { letter: 'T', row: 7, col: 8 },
-                    { letter: 'I', row: 7, col: 9 },
-                    { letter: 'N', row: 7, col: 10 },
-                    { letter: 'A', row: 7, col: 11 },
-                    { letter: 'S', row: 7, col: 12 }
-                ],
-                score: 57, // 7 points for letters + 50 bonus
-                explanation: 'RETINAS uses all 7 tiles, earning the 50-point bingo bonus! Forms RETINAS through the S.'
-            }
-        ],
+        // All seven-letter anagrams of the rack. Starting in column 3 puts the first tile on a double letter square.
+        solutions: ['ANESTRI', 'ANTSIER', 'NASTIER', 'RATINES', 'RETAINS', 'RETINAS', 'RETSINA', 'STAINER', 'STEARIN'].map(word =>
+            play(bingo, word, 7, 3, 'horizontal', 66,
+                `${word} uses all 7 tiles, earning the 50-point bingo bonus! The first word doubles on the centre star.`)
+        ),
         hints: [
-            'You have the letters for RETINAS',
+            'These seven letters make several seven-letter words',
             'Use all 7 tiles to get a 50-point bonus!',
-            'Play through the existing S on the board'
+            'The first word must cover the centre star'
         ]
     },
 
@@ -468,36 +281,11 @@ export const practiceScenarios = [
         difficulty: 'medium',
         title: 'J on Triple Letter',
         description: 'Maximize your J tile value',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, 'O', 'P', 'T', null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
-        rack: ['J', 'O', 'Y', 'S', 'E', 'R', 'I'],
+        board: joy,
+        rack: ['J', 'Y', 'S', 'E', 'R', 'I', 'T'],
         solutions: [
-            {
-                word: 'JOY',
-                position: { row: 5, col: 8, direction: 'vertical' },
-                tiles: [
-                    { letter: 'J', row: 5, col: 8 },
-                    { letter: 'O', row: 6, col: 8 },
-                    { letter: 'Y', row: 7, col: 8 }
-                ],
-                score: 35, // J(8)*3 on TL = 24, + O(1) + Y(4) = 29, plus JO forms with existing O
-                explanation: 'JOY with J on the triple letter score at [5,9] maximizes the J value'
-            }
+            play(joy, 'JOY', 5, 9, 'vertical', 29,
+                'JOY goes down through the O of TOP, with the J on the triple letter square: 24 + 1 + 4 = 29 points.')
         ],
         hints: [
             'J is worth 8 points',
@@ -509,47 +297,21 @@ export const practiceScenarios = [
         id: 'jxz-2',
         category: 'j-x-z',
         difficulty: 'hard',
-        title: 'ZA on Double Word',
-        description: 'ZA is a valid 2-letter word!',
-        board: [
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, 'P', 'E', 'T', null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-        ],
+        title: 'ZIT on a Double Word',
+        description: 'Put your Z on a double word square',
+        board: zit,
         rack: ['Z', 'A', 'X', 'I', 'N', 'G', 'E'],
         solutions: [
-            {
-                word: 'ZA',
-                position: { row: 5, col: 7, direction: 'vertical' },
-                tiles: [
-                    { letter: 'Z', row: 5, col: 7 },
-                    { letter: 'A', row: 6, col: 7 }
-                ],
-                score: 22, // Z(10) + A(1) = 11, doubled on DW = 22, plus forms ZE vertically with E
-                explanation: 'ZA (slang for pizza) played vertically hits the double word score'
-            }
+            play(zit, 'ZIT', 4, 4, 'vertical', 24,
+                'ZIT ends on the T of PET, with the Z on a double word square: (10 + 1 + 1) x 2 = 24 points.')
         ],
         hints: [
-            'ZA is a valid word (slang for pizza)',
-            'It\'s one of the most useful 2-letter words',
-            'Position it on a premium square!'
+            'ZIT is a valid word',
+            'Your rack has no T: use the one on the board',
+            'Position your Z on a premium square!'
         ]
     }
 ];
-
-// Add generated scenarios
 
 /**
  * Get scenarios by category

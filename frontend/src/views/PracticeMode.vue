@@ -19,7 +19,7 @@
           <h2>{{ category.name }}</h2>
           <p>{{ category.description }}</p>
           <div class="scenario-count">
-            {{ getCategoryScenarioCount(key) }} scenarios
+            {{ getCategoryScenarioCount(key) }} {{ getCategoryScenarioCount(key) === 1 ? 'scenario' : 'scenarios' }}
           </div>
         </div>
       </div>
@@ -165,10 +165,10 @@
 import Board from '../components/Board.vue';
 import { 
   practiceCategories, 
-  practiceScenarios, 
   getScenariosByCategory,
   getRandomScenario 
 } from '../data/practiceScenarios.js';
+import { scenarioCells, evaluatePlay, findInvalidWords, findSolution, sameTiles } from '../data/practiceCheck.js';
 
 export default {
   name: 'PracticeMode',
@@ -214,15 +214,8 @@ export default {
     },
 
     initializeScenario() {
-      // Deep clone the board to avoid modifying the original
-      this.currentBoard = this.selectedScenario.board.map(row => 
-        row.map(cell => ({
-          letter: cell || '',
-          type: this.getCellType(this.selectedScenario.board.indexOf(row), row.indexOf(cell)),
-          isNew: false,
-          isPracticeOriginal: !!cell // Mark original scenario tiles
-        }))
-      );
+      // A fresh copy of the board: the scenario's tiles are fixed, premium squares come from the real board layout
+      this.currentBoard = scenarioCells(this.selectedScenario);
 
       // Clone the rack
       this.rack = [...this.selectedScenario.rack];
@@ -231,24 +224,6 @@ export default {
       this.feedback = null;
       this.showSolution = false;
       this.visibleHints = [];
-    },
-
-    getCellType(row, col) {
-      const specialSquares = {
-        tw: [[0,0], [0,7], [0,14], [7,0], [7,14], [14,0], [14,7], [14,14]],
-        dw: [[1,1], [2,2], [3,3], [4,4], [1,13], [2,12], [3,11], [4,10], [13,1], [12,2], [11,3], [10,4], [13,13], [12,12], [11,11], [10,10]],
-        tl: [[1,5], [1,9], [5,1], [5,5], [5,9], [5,13], [9,1], [9,5], [9,9], [9,13], [13,5], [13,9]],
-        dl: [[0,3], [0,11], [2,6], [2,8], [3,0], [3,7], [3,14], [6,2], [6,6], [6,8], [6,12], [7,3], [7,11], [8,2], [8,6], [8,8], [8,12], [11,0], [11,7], [11,14], [12,6], [12,8], [14,3], [14,11]]
-      };
-
-      for (const type in specialSquares) {
-        if (specialSquares[type].some(([r, c]) => r === row && c === col)) {
-          return type;
-        }
-      }
-
-      if (row === 7 && col === 7) return 'center';
-      return '';
     },
 
     handleDragStart(event, letter, index) {
@@ -348,7 +323,7 @@ export default {
       return values[letter] || 0;
     },
 
-    checkSolution() {
+    async checkSolution() {
       if (this.placedTiles.length === 0) {
         this.feedback = {
           type: 'error',
@@ -358,142 +333,69 @@ export default {
         return;
       }
 
-      // Extract the word(s) formed
-      const formedWords = this.getFormedWords();
-      
-      if (formedWords.length === 0) {
+      // Is it a legal play, and which words does it make (the main word and every cross word)?
+      const play = evaluatePlay(this.currentBoard);
+      if (!play.ok) {
+        this.feedback = { type: 'error', title: 'Not a legal play', message: play.message };
+        return;
+      }
+
+      // Every word has to be in the word list this player is using
+      let invalid;
+      try {
+        invalid = await findInvalidWords(play.words, async (word) => {
+          const response = await fetch('/api/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'validate-word', word })
+          });
+          return (await response.json()).valid === true;
+        });
+      } catch {
+        this.feedback = { type: 'error', title: 'Could not check', message: 'The words could not be checked. Please try again.' };
+        return;
+      }
+      if (invalid.length > 0) {
         this.feedback = {
           type: 'error',
-          title: 'No valid words',
-          message: 'Your tiles don\'t form a word. Make sure tiles are connected.'
+          title: 'Not a word',
+          message: `${invalid.join(', ')} ${invalid.length === 1 ? 'is' : 'are'} not in your word list, so this play is not allowed.`
         };
         return;
       }
 
-      // Check against solutions
-      const matchingSolution = this.selectedScenario.solutions.find(solution => {
-        // Check if the main word matches
-        const mainWord = formedWords.find(w => w.word === solution.word);
-        return !!mainWord;
-      });
-
+      const matchingSolution = findSolution(this.selectedScenario, play.words);
       if (matchingSolution) {
+        const exact = sameTiles(this.currentBoard, matchingSolution);
         this.feedback = {
           type: 'success',
           title: 'Correct! 🎉',
-          message: matchingSolution.explanation,
-          score: matchingSolution.score
+          message: exact
+            ? matchingSolution.explanation
+            : `You found ${matchingSolution.word}. ${matchingSolution.explanation}`,
+          score: play.score
+        };
+        return;
+      }
+
+      // A valid play of your own: compare it with the best listed play
+      const bestSolutionScore = Math.max(...this.selectedScenario.solutions.map(s => s.score));
+      if (play.score >= bestSolutionScore * 0.9) {
+        const longest = [...play.words].sort((a, b) => b.word.length - a.word.length)[0].word;
+        this.feedback = {
+          type: 'success',
+          title: 'Good play!',
+          message: `${longest} is a real word and your play scored ${play.score} points. That's a strong move!`,
+          score: play.score
         };
       } else {
-        // Check if it's a valid alternative
-        const playerScore = this.calculatePlayerScore();
-        const bestSolutionScore = Math.max(...this.selectedScenario.solutions.map(s => s.score));
-        
-        if (playerScore >= bestSolutionScore * 0.9) {
-          this.feedback = {
-            type: 'success',
-            title: 'Good play!',
-            message: `Your play scored ${playerScore} points. That's a strong move!`,
-            score: playerScore
-          };
-        } else {
-          this.feedback = {
-            type: 'info',
-            title: 'Not the optimal solution',
-            message: `You scored ${playerScore} points, but there's a better move worth ${bestSolutionScore} points. Try again or check the solution!`,
-            score: playerScore
-          };
-        }
+        this.feedback = {
+          type: 'info',
+          title: 'Not the optimal solution',
+          message: `You scored ${play.score} points, but there's a better move worth ${bestSolutionScore} points. Try again or check the solution!`,
+          score: play.score
+        };
       }
-    },
-
-    getFormedWords() {
-      // This is a simplified version - you may want to use more sophisticated logic
-      const words = [];
-      
-      // Check if placed tiles form a single horizontal or vertical word
-      if (this.placedTiles.length > 0) {
-        const rows = [...new Set(this.placedTiles.map(t => t.row))];
-        const cols = [...new Set(this.placedTiles.map(t => t.col))];
-        
-        if (rows.length === 1) {
-          // Horizontal word
-          const row = rows[0];
-          const minCol = Math.min(...this.placedTiles.map(t => t.col));
-          const maxCol = Math.max(...this.placedTiles.map(t => t.col));
-          
-          let word = '';
-          for (let col = minCol; col <= maxCol; col++) {
-            word += this.currentBoard[row][col].letter;
-          }
-          
-          // Extend to include adjacent letters
-          let startCol = minCol;
-          while (startCol > 0 && this.currentBoard[row][startCol - 1].letter) {
-            startCol--;
-          }
-          let endCol = maxCol;
-          while (endCol < 14 && this.currentBoard[row][endCol + 1].letter) {
-            endCol++;
-          }
-          
-          word = '';
-          for (let col = startCol; col <= endCol; col++) {
-            word += this.currentBoard[row][col].letter;
-          }
-          
-          if (word.length > 1) {
-            words.push({ word, direction: 'horizontal' });
-          }
-        } else if (cols.length === 1) {
-          // Vertical word
-          const col = cols[0];
-          const minRow = Math.min(...this.placedTiles.map(t => t.row));
-          const maxRow = Math.max(...this.placedTiles.map(t => t.row));
-          
-          let word = '';
-          for (let row = minRow; row <= maxRow; row++) {
-            word += this.currentBoard[row][col].letter;
-          }
-          
-          // Extend to include adjacent letters
-          let startRow = minRow;
-          while (startRow > 0 && this.currentBoard[startRow - 1][col].letter) {
-            startRow--;
-          }
-          let endRow = maxRow;
-          while (endRow < 14 && this.currentBoard[endRow + 1][col].letter) {
-            endRow++;
-          }
-          
-          word = '';
-          for (let row = startRow; row <= endRow; row++) {
-            word += this.currentBoard[row][col].letter;
-          }
-          
-          if (word.length > 1) {
-            words.push({ word, direction: 'vertical' });
-          }
-        }
-      }
-      
-      return words;
-    },
-
-    calculatePlayerScore() {
-      // Simplified scoring - in a real implementation, you'd calculate with premium squares
-      const words = this.getFormedWords();
-      let totalScore = 0;
-      
-      words.forEach(wordObj => {
-        let wordScore = 0;
-        for (const letter of wordObj.word) {
-          wordScore += this.getLetterValue(letter);
-        }
-        totalScore += wordScore;
-      });
-      
-      return totalScore;
     },
 
     resetBoard() {

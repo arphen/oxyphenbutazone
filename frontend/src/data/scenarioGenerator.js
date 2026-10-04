@@ -102,9 +102,9 @@ function buildRack(requiredLetters, fillerCount = 7, avoidWords = []) {
 }
 
 /**
- * CURATED ANCHOR WORDS - Common valid words for building scenarios
+ * CURATED ANCHOR WORDS - Common words for building scenarios; all of them are in the open ENABLE list (checked by a test)
  */
-const COMMON_ANCHOR_WORDS = [
+export const COMMON_ANCHOR_WORDS = [
     // 3-letter words
     'CAT', 'DOG', 'BAT', 'RAT', 'HAT', 'SAT', 'MAT', 'FAT', 'PAT', 'VAT',
     'ACE', 'AGE', 'ATE', 'ARE', 'AXE', 'APE',
@@ -129,7 +129,7 @@ const COMMON_ANCHOR_WORDS = [
     'VAN', 'VET', 'VIA',
     'WAR', 'WAX', 'WET', 'WIG', 'WIN', 'WIT',
     'YET', 'YES',
-    'ZEN', 'ZOO',
+    'ZOO',
 
     // 4-letter words
     'GAME', 'GAIN', 'GATE', 'GAVE', 'GEAR',
