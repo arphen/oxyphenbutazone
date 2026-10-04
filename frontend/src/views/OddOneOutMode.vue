@@ -10,15 +10,15 @@
 
       <div class="setup-card">
         <div class="section">
-          <h3>1. Select Dictionaries</h3>
-          <div class="checkbox-group">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="selectedDictionaries" value="CSW21">
-              CSW21 (International)
-            </label>
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="selectedDictionaries" value="NWL2023">
-              NWL2023 (USA/Canada)
+          <h3>1. Select Word Lists</h3>
+          <div v-if="listsLoaded && installedLists.length === 0" class="notice" data-testid="no-lists">
+            No word list is installed on this device yet.
+            <a href="#/words" @click.prevent="$router.push('/words')">Add one on the Word lists page.</a>
+          </div>
+          <div v-else class="checkbox-group">
+            <label v-for="list in installedLists" :key="list.id" class="checkbox-label">
+              <input type="checkbox" v-model="selectedLists" :value="list.id" :data-list="list.id">
+              {{ list.label }}
             </label>
           </div>
         </div>
@@ -26,8 +26,8 @@
         <div class="section">
           <h3>2. Select Category</h3>
           <div class="categories-grid">
-            <button 
-              v-for="cat in categories" 
+            <button
+              v-for="cat in categories"
               :key="cat.id"
               class="category-btn"
               :class="{ active: selectedCategory === cat.id }"
@@ -42,15 +42,16 @@
         <div class="section">
           <h3>3. Game Mode</h3>
           <div class="mode-toggle">
-            <button 
-              class="toggle-btn" 
+            <button
+              class="toggle-btn"
               :class="{ active: !isMultiplayer }"
               @click="isMultiplayer = false"
             >
               Single Player
             </button>
-            <button 
-              class="toggle-btn" 
+            <button
+              v-if="canMultiplayer"
+              class="toggle-btn"
               :class="{ active: isMultiplayer }"
               @click="isMultiplayer = true"
             >
@@ -62,8 +63,8 @@
         <div class="section" v-if="isMultiplayer">
           <h3>4. Round Duration</h3>
           <div class="duration-selector">
-            <button 
-              v-for="sec in [5, 10, 15, 20, 30]" 
+            <button
+              v-for="sec in [5, 10, 15, 20, 30]"
               :key="sec"
               class="duration-btn"
               :class="{ active: roundDuration === sec }"
@@ -74,9 +75,11 @@
           </div>
         </div>
 
-        <button 
-          class="start-button" 
-          :disabled="selectedDictionaries.length === 0 || !selectedCategory"
+        <p v-if="setupMessage" class="notice" data-testid="setup-message">{{ setupMessage }}</p>
+
+        <button
+          class="start-button"
+          :disabled="!canStart"
           @click="startGame"
         >
           {{ isMultiplayer ? 'Create Room' : 'Start Game' }}
@@ -90,7 +93,7 @@
         <button @click="gameState = 'setup'" class="back-button">← Back</button>
         <h1>Waiting for Players...</h1>
       </div>
-      
+
       <div class="qr-container">
         <div class="player-qr">
           <h3>Player 1</h3>
@@ -136,20 +139,20 @@
               {{ timeLeft.toFixed(1) }}s
             </div>
           </div>
-          
+
           <div v-if="session?.status === 'review'" class="result-area">
             <h2 class="correct-word-title">Correct Word: <span class="highlight">{{ currentPuzzle.words[currentPuzzle.correctIndex] }}</span></h2>
             <div class="feedback">
               {{ currentPuzzle.explanation }}
             </div>
-            
+
             <!-- Show the grid with player choices -->
             <div class="words-grid review-grid">
-              <div 
-                v-for="(word, index) in currentPuzzle.words" 
+              <div
+                v-for="(word, index) in currentPuzzle.words"
                 :key="index"
                 class="word-card review-card"
-                :class="{ 
+                :class="{
                   'correct': index === currentPuzzle.correctIndex,
                   'wrong': (session.players['1']?.answer === index || session.players['2']?.answer === index) && index !== currentPuzzle.correctIndex
                 }"
@@ -175,13 +178,13 @@
 
       <div class="puzzle-container">
         <h2>Which word is invalid?</h2>
-        
+
         <div class="words-grid">
-          <button 
-            v-for="(word, index) in currentPuzzle.words" 
+          <button
+            v-for="(word, index) in currentPuzzle.words"
             :key="index"
             class="word-card"
-            :class="{ 
+            :class="{
               'correct': showResult && index === currentPuzzle.correctIndex,
               'wrong': showResult && selectedIndex === index && index !== currentPuzzle.correctIndex,
               'selected': selectedIndex === index
@@ -202,7 +205,7 @@
         </div>
       </div>
     </div>
-    
+
     <div v-else class="loading-screen">
       Loading...
     </div>
@@ -212,8 +215,41 @@
 <script>
 import { assetUrl, appUrl } from '../utils/url';
 import { OddOneOutGenerator } from '../game/oddOneOut/generator';
+import { loadCorpus, MIN_CORPUS_WORDS } from '../game/oddOneOut/corpus';
+import { getBackend } from '../net/api';
+import { resolveMode } from '../net/mode';
 import QRDisplay from '../components/QRDisplay.vue';
 import { debug } from '../utils/log';
+
+// The word lists the app knows, best first; labels as shown to the player
+const LIST_LABELS = {
+  csw21: 'CSW21',
+  nwl2023: 'NWL2023',
+  enable: 'ENABLE (open list)',
+  slovenian: 'Slovenian'
+};
+const LIST_IDS = Object.keys(LIST_LABELS);
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json();
+}
+
+/** Ids of the installed lists, in LIST_IDS order: from the in-browser backend (standalone) or the laptop's file list. */
+async function findInstalledLists() {
+  let ids = null;
+  if (resolveMode() === 'local') {
+    const status = await getBackend()?.listStatus?.();
+    if (status) ids = LIST_IDS.filter((id) => status[id] && (status[id].shipped || status[id].imported || status[id].loaded));
+  }
+  if (!ids) {
+    const response = await fetch(assetUrl('wordlists.json'));
+    const { lists } = await response.json();
+    ids = LIST_IDS.filter((id) => lists && lists[id]);
+  }
+  return ids;
+}
 
 export default {
   name: 'OddOneOutMode',
@@ -221,7 +257,14 @@ export default {
   data() {
     return {
       gameState: 'setup', // setup, loading, playing, lobby, multiplayer_playing
-      selectedDictionaries: ['CSW21', 'NWL2023'],
+      installedLists: [],
+      listsLoaded: false,
+      selectedLists: [],
+      canMultiplayer: resolveMode() === 'http', // the two-phone game needs the laptop server
+      corpus: null,
+      corpusStatus: 'idle', // idle, loading, ready, error
+      corpusToken: 0,
+      setupMessage: '',
       selectedCategory: null,
       isMultiplayer: false,
       roundDuration: 5,
@@ -252,25 +295,83 @@ export default {
   computed: {
     isCorrect() {
       return this.selectedIndex === this.currentPuzzle.correctIndex;
+    },
+    canStart() {
+      return this.selectedLists.length > 0 && !!this.selectedCategory && this.corpusStatus === 'ready';
     }
+  },
+  watch: {
+    selectedLists() {
+      this.prepareCorpus();
+    },
+    selectedCategory() {
+      this.prepareCorpus();
+    }
+  },
+  async mounted() {
+    try {
+      const ids = await findInstalledLists();
+      this.installedLists = ids.map((id) => ({ id, label: LIST_LABELS[id] }));
+      this.selectedLists = await this.defaultSelection(ids);
+    } catch (error) {
+      console.error('Could not find the word lists:', error);
+      this.setupMessage = 'Could not find out which word lists are installed.';
+    }
+    this.listsLoaded = true;
   },
   beforeUnmount() {
     if (this.pollInterval) clearInterval(this.pollInterval);
     if (this.gameLoopInterval) clearInterval(this.gameLoopInterval);
   },
   methods: {
+    /** The lists of the game in progress (when installed), else the best installed one. */
+    async defaultSelection(installed) {
+      try {
+        const state = await fetchJson('/api/game-state');
+        const inGame = installed.filter((id) => state?.dictionaries?.[id]);
+        if (inGame.length) return inGame;
+      } catch (error) {
+        debug('No game state to take the word lists from', error);
+      }
+      return installed.length ? [installed[0]] : [];
+    },
+    /** Load the words of the chosen category and say whether there are enough for a puzzle. */
+    async prepareCorpus() {
+      const token = ++this.corpusToken;
+      this.corpus = null;
+      this.setupMessage = '';
+      if (this.selectedLists.length === 0 || !this.selectedCategory) {
+        this.corpusStatus = 'idle';
+        if (this.listsLoaded && this.selectedLists.length === 0) this.setupMessage = 'Pick at least one word list to play with.';
+        return;
+      }
+      this.corpusStatus = 'loading';
+      try {
+        const corpus = await loadCorpus(this.selectedCategory, [...this.selectedLists], fetchJson);
+        if (token !== this.corpusToken) return; // the player has changed the choice meanwhile
+        this.corpus = corpus;
+        if (corpus.words.length < MIN_CORPUS_WORDS) {
+          this.corpusStatus = 'error';
+          this.setupMessage = `This category has only ${corpus.words.length} word${corpus.words.length === 1 ? '' : 's'} in the chosen word list${this.selectedLists.length === 1 ? '' : 's'}; a puzzle needs at least ${MIN_CORPUS_WORDS}. Try another category or word list.`;
+        } else {
+          this.corpusStatus = 'ready';
+        }
+      } catch (error) {
+        if (token !== this.corpusToken) return;
+        console.error('Failed to load the words:', error);
+        this.corpusStatus = 'error';
+        this.setupMessage = 'Could not load the words of this category. Please try another.';
+      }
+    },
     async startGame() {
+      if (!this.canStart) return;
       this.gameState = 'loading';
       try {
-        // Dynamic import of the corpus
-        const module = await import(`../data/corpuses/${this.selectedCategory}.json`);
-        const corpus = module.default;
-        
-        this.generator = new OddOneOutGenerator(corpus, this.selectedDictionaries);
-        
+        this.generator = new OddOneOutGenerator({ words: this.corpus.words, isValid: this.corpus.isValid });
+
         if (this.isMultiplayer) {
           // Create multiplayer session
-          const res = await fetch('/api/odd-one-out/create', { 
+          const res = await fetch('/api/odd-one-out/create', {
             method: 'POST',
             body: JSON.stringify({ roundDuration: this.roundDuration })
           });
@@ -286,8 +387,8 @@ export default {
           this.gameState = 'playing';
         }
       } catch (error) {
-        console.error("Failed to load corpus:", error);
-        alert("Error loading category data. Please try another.");
+        console.error("Failed to start the game:", error);
+        this.setupMessage = "Could not start the game: " + error.message;
         this.gameState = 'setup';
       }
     },
@@ -298,7 +399,7 @@ export default {
       this.pollInterval = setInterval(async () => {
         const res = await fetch(`/api/odd-one-out/state?sessionId=${this.sessionId}`);
         this.session = await res.json();
-        
+
         // Check if both players connected
         if (this.session.players['1']?.connected && this.session.players['2']?.connected) {
           clearInterval(this.pollInterval);
@@ -313,7 +414,7 @@ export default {
     async nextMultiplayerPuzzle() {
       try {
         this.currentPuzzle = this.generator.generatePuzzle();
-        
+
         // Update server state
         await fetch('/api/odd-one-out/update', {
           method: 'POST',
@@ -323,7 +424,7 @@ export default {
             puzzle: this.currentPuzzle
           })
         });
-        
+
         this.startRoundTimer();
       } catch (e) {
         console.error(e);
@@ -333,7 +434,7 @@ export default {
       this.timeLeft = this.roundDuration;
       const startTime = Date.now();
       this.roundActive = true;
-      
+
       if (this.gameLoopInterval) clearInterval(this.gameLoopInterval);
 
       this.gameLoopInterval = setInterval(async () => {
@@ -345,15 +446,15 @@ export default {
         // Update timer
         const elapsed = (Date.now() - startTime) / 1000;
         this.timeLeft = Math.max(0, this.roundDuration - elapsed);
-        
+
         // Poll for answers
         try {
           const res = await fetch(`/api/odd-one-out/state?sessionId=${this.sessionId}`);
           this.session = await res.json();
-          
+
           const p1Ans = this.session.players['1']?.answer;
           const p2Ans = this.session.players['2']?.answer;
-          
+
           // Check if round over
           if (this.roundActive && (this.timeLeft === 0 || (p1Ans !== null && p2Ans !== null))) {
             this.roundActive = false;
@@ -372,7 +473,7 @@ export default {
 
       if (p1Correct) this.scores['1'] += 10;
       if (p2Correct) this.scores['2'] += 10;
-      
+
       // Play sounds
       try {
         if (p1Correct || p2Correct) {
@@ -392,7 +493,7 @@ export default {
           status: 'review'
         })
       });
-      
+
       // Wait 5 seconds then next puzzle
       setTimeout(() => {
         if (this.gameState === 'multiplayer_playing') {
@@ -446,6 +547,18 @@ export default {
 
 .section {
   margin-bottom: 30px;
+}
+
+.notice {
+  background: #0f3460;
+  border-left: 4px solid #e94560;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin: 10px 0 20px;
+}
+
+.notice a {
+  color: #8ecbff;
 }
 
 .checkbox-group {

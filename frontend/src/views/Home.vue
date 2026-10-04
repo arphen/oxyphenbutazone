@@ -78,7 +78,7 @@
           <button class="mode-button">Solve Puzzles</button>
         </div>
         
-        <div v-if="hasLaptopHost" class="mode-card" @click="goToOddOneOut">
+        <div class="mode-card" @click="goToOddOneOut">
           <div class="mode-icon">🕵️</div>
           <h2>Odd One Out</h2>
           <p>Find the invalid word among valid ones</p>

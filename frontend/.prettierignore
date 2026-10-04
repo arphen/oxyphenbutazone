@@ -1,5 +1,4 @@
 dist
 public
-src/data/corpuses
 src/data/generatedScenarios.js
 package-lock.json

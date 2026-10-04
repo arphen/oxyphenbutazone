@@ -12,7 +12,7 @@ run(async () => {
   console.log('1. Static site, no API server: Home -> Slovenščina, 2 players -> Start');
   await page.goto(BASE + '/?debug#/'); await page.waitForFunction(() => window.__oxy);
   await page.evaluate(() => window.__oxy.backend.ready);
-  assert.equal(await page.locator('text=Odd One Out').count(), 0); ok('odd-one-out card hidden (needs laptop host)');
+  assert.equal(await page.getByRole('heading', { name: 'Odd One Out' }).count(), 1); ok('odd-one-out card shown (single player needs no laptop host)');
   await page.getByText('Slovenščina').click();
   await page.locator('.player-count-btn', { hasText: '2' }).first().click();
   await page.getByText(/Start 2-Player Game/).click();

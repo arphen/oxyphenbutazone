@@ -4,7 +4,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/', 'node_modules/', 'public/', 'src/data/generatedScenarios.js', 'src/data/corpuses/'],
+    ignores: ['dist/', 'node_modules/', 'public/', 'src/data/generatedScenarios.js'],
   },
   // Base rule sets first, so the project's own settings below can adjust them
   js.configs.recommended,

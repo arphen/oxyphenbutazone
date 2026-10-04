@@ -12,6 +12,7 @@ Real Chromium (via `playwright-core`, no browser download), real WebRTC, the bui
 | `scan` | the in-app QR scanner with a fake camera: scans an invite link, ignores a junk QR, handles a denied camera, stops the camera, and pairs two browsers by scanning both ways |
 | `offline` | install, cut the network, reload and play; public build ships no CSW21/NWL2023; fallback when a list is missing |
 | `csp` | the Content-Security-Policy blocks injected scripts, handlers and foreign requests |
+| `oddoneout` | Odd One Out on the public build: only the installed lists (ENABLE, Slovenian) are offered, no multiplayer, every category gives a 5-word puzzle with exactly one non-word, scoring and feedback for a right and a wrong answer, too-small categories are refused, no corpus file is requested |
 | `laptop` | dev-server mode: Slovenian game, rules hardening (size caps, bad JSON, `__proto__`, rack tampering), language/dictionary rules |
 
 Page errors and CSP violations fail every suite. Not covered (needs real phones): iOS Safari, local-network discovery,
