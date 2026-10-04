@@ -25,6 +25,24 @@ export function offlinePlugin() {
   return {
     name: 'oxy-offline',
     apply: 'build',
+    // Defence in depth for the production build: even if hostile text ever reached the page, the browser refuses to run
+    // inline scripts or talk to / load from any other origin. (Not applied in dev: Vite's hot reload needs more.)
+    transformIndexHtml(html) {
+      const csp = [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'", // Vue scoped styles and :style bindings
+        "img-src 'self' data: blob:",
+        "media-src 'self' blob:",
+        "connect-src 'self'",
+        "worker-src 'self'",
+        "manifest-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+      ].join('; ');
+      return html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n  <meta http-equiv="Content-Security-Policy" content="${csp}" />`);
+    },
     configResolved(config) {
       root = config.root;
       outDir = path.resolve(config.root, config.build.outDir);
