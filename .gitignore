@@ -30,3 +30,8 @@ npm-debug.log*
 
 # Backup files
 *.backup
+
+# Copyrighted word lists. Keep a copy on your own machine (laptop-host mode reads them from here, and the standalone
+# app imports them from a file) but never commit them.
+frontend/public/CSW21.txt
+frontend/public/NWL2023.txt

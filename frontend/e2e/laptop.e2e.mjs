@@ -91,8 +91,12 @@ run(async () => {
 
   console.log('6. English game still works');
   await act({ type: 'restart', playerCount: 2, language: 'english' });
-  g = await state(); assert.equal(g.language, 'english'); assert.deepEqual(g.dictionaries, { csw21: true, nwl2023: false, enable: false, slovenian: false });
-  ok('english restart -> csw21 + english tiles');
+  // the default English list is the best one this server has (CSW21 is not in the repo: it is a local, git-ignored file)
+  const shipped = (await (await fetch(BASE + '/wordlists.json')).json()).lists;
+  const defaultEnglish = ['csw21', 'nwl2023', 'enable'].find((id) => shipped[id]);
+  g = await state(); assert.equal(g.language, 'english');
+  assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, slovenian: false, [defaultEnglish]: true });
+  ok(`english restart -> ${defaultEnglish} + english tiles`);
   await phone.reload(); await phone.waitForTimeout(1200);
   const en = await phone.evaluate(async () => {
     let c = document.querySelector('.tile[data-index]').__vueParentComponent; while (c && !c.proxy?.alphabet) c = c.parent;
