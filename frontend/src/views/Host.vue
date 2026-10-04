@@ -51,11 +51,14 @@
           </button>
 
           <template v-else>
+            <p v-if="status(seat) === 'connecting'" class="hint">Connecting… waiting for the guest's phone.</p>
             <SignalBox :text="ui[seat].token" :link="ui[seat].link" :label="`1. Player ${seat} opens the app and scans this, or you send them the link`" />
             <label class="field">2. Scan their answer, or paste it here</label>
             <button class="secondary" @click="scanning = seat">📷 Scan their answer</button>
             <textarea v-model="ui[seat].answer" rows="3" class="paste" placeholder="OXY1…" aria-label="Answer from the other player"></textarea>
-            <button class="primary" :disabled="!ui[seat].answer" @click="connect(seat)">Connect</button>
+            <button class="primary" :disabled="!ui[seat].answer || ui[seat].connecting" @click="connect(seat)">
+              {{ ui[seat].connecting ? 'Connecting…' : 'Connect' }}
+            </button>
             <button class="link" @click="reset(seat)">Start over</button>
           </template>
           <p v-if="ui[seat]?.error" class="error">{{ ui[seat].error }}</p>
@@ -149,12 +152,26 @@ export default {
       }
     },
     async connect(seat) {
-      this.ui[seat].error = '';
+      const entry = this.ui[seat];
+      if (!entry?.answer || entry.connecting) return;
+      entry.connecting = true;
+      entry.error = '';
       try {
-        await hostAcceptAnswer(this.ui[seat].answer);
+        await hostAcceptAnswer(entry.answer);
       } catch (error) {
-        this.ui[seat].error = error.message;
+        entry.error = this.friendlyConnectError(error);
+      } finally {
+        entry.connecting = false;
       }
+    },
+    friendlyConnectError(error) {
+      const message = error?.message || 'Could not connect';
+      // Raw WebRTC state errors (e.g. a twice-applied answer) mean nothing to
+      // a host; the pairing is still on its way.
+      if (/wrong state|stable|InvalidState/i.test(message)) {
+        return 'That answer was already applied, still connecting. Wait a moment for “✓ Connected”.';
+      }
+      return message;
     },
     onScan(code) {
       const seat = this.scanning;

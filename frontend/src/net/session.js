@@ -10,7 +10,7 @@ import { keepAwake } from '../utils/wakeLock.js';
 export const net = reactive({
   role: 'none', // 'none' | 'host' | 'guest'
   room: null,
-  seats: {}, // host: seat -> 'inviting' | 'waiting' | 'open' | 'closed'
+  seats: {}, // host: seat -> 'inviting' | 'waiting' | 'connecting' | 'open' | 'closed'
   seat: null, // guest: my seat
   guestStatus: 'idle', // guest: 'connecting' | 'open' | 'closed'
 });
