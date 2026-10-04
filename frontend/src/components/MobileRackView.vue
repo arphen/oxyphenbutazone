@@ -56,7 +56,7 @@ export default {
   },
   mounted() {
     // Get game ID and player ID from URL
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(this.$route.query);
     this.gameId = urlParams.get('game') || 'default';
     this.playerId = urlParams.get('player') || '1';
     

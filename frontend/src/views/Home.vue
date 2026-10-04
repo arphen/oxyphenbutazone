@@ -70,7 +70,7 @@
           <button class="mode-button">Solve Puzzles</button>
         </div>
         
-        <div class="mode-card" @click="goToOddOneOut">
+        <div v-if="hasLaptopHost" class="mode-card" @click="goToOddOneOut">
           <div class="mode-icon">🕵️</div>
           <h2>Odd One Out</h2>
           <p>Find the invalid word among valid ones</p>
@@ -89,11 +89,14 @@
 </template>
 
 <script>
+import { resolveMode } from '../net/mode';
+
 export default {
   name: 'Home',
   data() {
     return {
       selectedPlayerCount: 4, // Default to 4 players
+      hasLaptopHost: resolveMode() === 'http', // odd-one-out multiplayer needs the dev server
       selectedLanguage: 'english',
       languages: [
         { id: 'english', flag: '🇬🇧', label: 'English' },

@@ -1,3 +1,4 @@
+import { assetUrl } from '../utils/url';
 /**
  * Composable for playing sound effects
  * Create audio objects outside the function to persist across calls
@@ -12,11 +13,11 @@ let isInitialized = false;
 function initializeAudioPool() {
     if (!audioPool) {
         audioPool = [
-            new Audio('/sounds/click1.mp3'),
-            new Audio('/sounds/click2.mp3'),
-            new Audio('/sounds/click3.mp3'),
-            new Audio('/sounds/click4.mp3'),
-            new Audio('/sounds/click5.mp3')
+            new Audio(assetUrl('sounds/click1.mp3')),
+            new Audio(assetUrl('sounds/click2.mp3')),
+            new Audio(assetUrl('sounds/click3.mp3')),
+            new Audio(assetUrl('sounds/click4.mp3')),
+            new Audio(assetUrl('sounds/click5.mp3'))
         ];
 
         // Preload all sounds

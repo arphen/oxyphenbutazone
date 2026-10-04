@@ -96,6 +96,7 @@
 </template>
 
 <script>
+import { assetUrl } from '../utils/url';
 import Board from '../components/Board.vue';
 import DictionaryChooser from '../components/DictionaryChooser.vue';
 import { debug } from '../utils/log';
@@ -179,7 +180,7 @@ export default {
         
         // Load CSW21 dictionary
         try {
-          const csw21Response = await fetch('/CSW21.txt');
+          const csw21Response = await fetch(assetUrl('CSW21.txt'));
           const csw21Text = await csw21Response.text();
           this.csw21Dictionary = parseDictionary(csw21Text);
           debug(`CSW21 loaded: ${this.csw21Dictionary.size} words`);
@@ -189,7 +190,7 @@ export default {
         
         // Load NWL2023 dictionary
         try {
-          const nwl2023Response = await fetch('/NWL2023.txt');
+          const nwl2023Response = await fetch(assetUrl('NWL2023.txt'));
           const nwl2023Text = await nwl2023Response.text();
           this.nwl2023Dictionary = parseDictionary(nwl2023Text);
           debug(`NWL2023 loaded: ${this.nwl2023Dictionary.size} words`);

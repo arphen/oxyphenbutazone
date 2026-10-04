@@ -210,6 +210,7 @@
 </template>
 
 <script>
+import { assetUrl, appUrl } from '../utils/url';
 import { OddOneOutGenerator } from '../game/oddOneOut/generator';
 import QRDisplay from '../components/QRDisplay.vue';
 import { debug } from '../utils/log';
@@ -291,8 +292,7 @@ export default {
       }
     },
     getPlayerUrl(id) {
-      const baseUrl = window.location.origin;
-      return `${baseUrl}/odd-one-out-mobile?sessionId=${this.sessionId}&playerId=${id}`;
+      return appUrl(`/odd-one-out-mobile?sessionId=${this.sessionId}&playerId=${id}`);
     },
     startLobbyPolling() {
       this.pollInterval = setInterval(async () => {
@@ -376,9 +376,9 @@ export default {
       // Play sounds
       try {
         if (p1Correct || p2Correct) {
-          new Audio('/sounds/success.mp3').play().catch(e => debug('Audio play failed', e));
+          new Audio(assetUrl('sounds/success.mp3')).play().catch(e => debug('Audio play failed', e));
         } else {
-          new Audio('/sounds/failure.mp3').play().catch(e => debug('Audio play failed', e));
+          new Audio(assetUrl('sounds/failure.mp3')).play().catch(e => debug('Audio play failed', e));
         }
       } catch (e) {
         debug("Sound error", e);

@@ -80,7 +80,7 @@ export default {
     }
   },
   async created() {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(this.$route.query);
     this.sessionId = params.get('sessionId');
     this.playerId = params.get('playerId');
 

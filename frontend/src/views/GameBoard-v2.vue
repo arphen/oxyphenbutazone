@@ -276,7 +276,7 @@ export default {
   },
   async mounted() {
     // Check if this is a mobile view
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(this.$route.query);
     this.isMobileView = urlParams.get('view') === 'mobile';
     
     // Get player count from route params or query

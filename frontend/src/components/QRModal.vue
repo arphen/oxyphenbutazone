@@ -237,6 +237,7 @@
 </template>
 
 <script>
+import { appUrl } from '../utils/url';
 import QRCodeVue3 from 'qrcode-vue3';
 
 export default {
@@ -292,7 +293,7 @@ export default {
       }
     },
     getQRDataUrl(playerId) {
-      const url = `${window.location.protocol}//${window.location.host}/rack/${playerId}`;
+      const url = appUrl(`/rack/${playerId}`);
       return url;
     },
     openPreview(playerId) {

@@ -36,6 +36,7 @@
 </template>
 
 <script>
+import { appUrl } from '../utils/url';
 import QRCodeVue3 from 'qrcode-vue3';
 import { debug } from '../utils/log';
 
@@ -78,7 +79,7 @@ export default {
     qrDataUrl() {
       if (this.customUrl) return this.customUrl;
       // Generate a URL that can be scanned and opened on a phone
-      const url = `${window.location.protocol}//${window.location.host}/rack/${this.playerId}`;
+      const url = appUrl(`/rack/${this.playerId}`);
       debug(`QR URL for ${this.playerName}:`, url);
       return url;
     },

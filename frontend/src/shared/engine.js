@@ -18,7 +18,7 @@ import {
 } from './rules.js';
 import { sanitizeAction } from './protocol.js';
 import { selectionForNewGame, defaultSelectionFor } from './dictionary.js';
-import { debug, logError, logWarn } from '../utils/log.js';
+import { debug, logError } from '../utils/log.js';
 
 /**
  * @param dict    a dictionary store (see dictionary.js)
@@ -608,6 +608,10 @@ export function createEngine(dict, { random = Math.random } = {}) {
     return {
         dispatch,
         getState: () => gameState,
+        /** Replace the whole state, e.g. one loaded from storage. The caller must have sanitized it (see protocol.js). */
+        restoreState(state) {
+            gameState = state;
+        },
         dictionary: dict,
         /** Test/debug hook: set a player's rack directly. Not reachable through dispatch(). */
         debugSetRack(playerId, rack) {
