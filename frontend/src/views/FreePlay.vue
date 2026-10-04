@@ -3,13 +3,13 @@
     <div class="freeplay-layout">
       <!-- Board Section -->
       <div class="board-section">
-        <Board 
-          :board="board" 
-          @place-letter="handlePlaceLetter" 
-          @cell-click="handleCellClick" 
+        <Board
+          :board="board"
+          @place-letter="handlePlaceLetter"
+          @cell-click="handleCellClick"
         />
       </div>
-      
+
       <!-- Sidebar -->
       <div class="sidebar">
         <!-- Header Controls -->
@@ -17,21 +17,22 @@
           <button @click="goHome" class="icon-button" title="Back to Menu">
             🏠
           </button>
-          <DictionaryChooser 
+          <DictionaryChooser
             :selectedDictionaries="selectedDictionaries"
+            :installed="installedLists"
             @update="handleDictionaryUpdate"
           />
           <button @click="clearBoard" class="icon-button" title="Clear Board">
             🗑️
           </button>
         </div>
-        
+
         <!-- Tile Picker -->
         <div class="tile-picker-section">
           <h3>Pick Any Tile</h3>
           <div class="alphabet-grid">
-            <div 
-              v-for="letter in alphabet" 
+            <div
+              v-for="letter in alphabet"
               :key="letter"
               class="letter-tile"
               draggable="true"
@@ -40,7 +41,7 @@
             >
               {{ letter }}
             </div>
-            <div 
+            <div
               class="letter-tile blank-tile"
               draggable="true"
               @dragstart="handleDragFromAlphabet($event, '')"
@@ -51,21 +52,25 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Word Validation Results -->
         <div class="validation-section">
           <h3>Words on Board</h3>
+          <div v-if="listProblem" class="list-problem" data-testid="list-problem">
+            {{ listProblem }}
+            <a href="#/words">Word lists…</a>
+          </div>
           <div v-if="boardWords.length === 0" class="no-words">
             No words formed yet
           </div>
           <div v-else class="words-list">
-            <div 
-              v-for="(wordObj, index) in boardWords" 
+            <div
+              v-for="(wordObj, index) in boardWords"
               :key="index"
               class="word-item"
-              :class="{ 
-                'valid': isWordValid(wordObj.word), 
-                'invalid': !isWordValid(wordObj.word) 
+              :class="{
+                'valid': isWordValid(wordObj.word),
+                'invalid': !isWordValid(wordObj.word)
               }"
             >
               <span class="word-text">{{ wordObj.word }}</span>
@@ -76,7 +81,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Instructions -->
         <div class="instructions-section">
           <h3>How to Play</h3>
@@ -96,9 +101,11 @@
 </template>
 
 <script>
-import { assetUrl } from '../utils/url';
+import { markRaw } from 'vue';
 import Board from '../components/Board.vue';
 import DictionaryChooser from '../components/DictionaryChooser.vue';
+import { getBackend } from '../net/api';
+import { buildWordSet, initialSelection, selectedIds } from '../utils/freePlayWords';
 import { debug } from '../utils/log';
 
 export default {
@@ -111,10 +118,10 @@ export default {
     return {
       board: this.createInitialBoard(),
       alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
-      dictionary: new Set(),
-      csw21Dictionary: new Map(),
-      nwl2023Dictionary: new Map(),
-      selectedDictionaries: { csw21: true, nwl2023: false },
+      dictionary: markRaw(new Set()), // upper-case words accepted by the lists picked in the chooser
+      selectedDictionaries: { csw21: false, nwl2023: false, enable: false, slovenian: false },
+      installedLists: null, // ids of the word lists this device has (standalone build); null = do not restrict the chooser
+      listProblem: '', // shown when no list is available, so no word can be checked
       draggedLetter: null,
       dragSource: null, // 'alphabet' or 'board'
       dragSourcePosition: null, // {row, col} if from board
@@ -125,16 +132,19 @@ export default {
       return this.getWordsFromBoard();
     }
   },
+  created() {
+    this.listCache = new Map(); // id -> Set of words; not reactive on purpose (lists have 100k+ words)
+  },
   async mounted() {
     await this.loadDictionary();
   },
   methods: {
     createInitialBoard() {
-      const board = Array(15).fill(null).map(() => 
-        Array(15).fill(null).map(() => ({ 
-          letter: '', 
-          type: '', 
-          isNew: false 
+      const board = Array(15).fill(null).map(() =>
+        Array(15).fill(null).map(() => ({
+          letter: '',
+          type: '',
+          isNew: false
         }))
       );
 
@@ -154,110 +164,69 @@ export default {
       board[7][7].type = 'center';
       return board;
     },
-    
+
+    // The lists come from the game's own word endpoint, so Free Play works with whichever lists this device has
+    // (ENABLE in the public build; CSW21/NWL2023 once the player has imported them).
     async loadDictionary() {
       try {
-        // Parse dictionary file with definitions
-        const parseDictionary = (content) => {
-          const dictionary = new Map();
-          const lines = content.split('\n');
-          
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            
-            // Match format: WORD rest of line
-            const match = trimmed.match(/^(\S+)\s+(.+)$/);
-            if (match) {
-              const word = match[1].toUpperCase();
-              const definition = match[2];
-              dictionary.set(word, definition);
-            }
-          }
-          
-          return dictionary;
-        };
-        
-        // Load CSW21 dictionary
-        try {
-          const csw21Response = await fetch(assetUrl('CSW21.txt'));
-          const csw21Text = await csw21Response.text();
-          this.csw21Dictionary = parseDictionary(csw21Text);
-          debug(`CSW21 loaded: ${this.csw21Dictionary.size} words`);
-        } catch (error) {
-          console.warn('CSW21.txt not found:', error);
-        }
-        
-        // Load NWL2023 dictionary
-        try {
-          const nwl2023Response = await fetch(assetUrl('NWL2023.txt'));
-          const nwl2023Text = await nwl2023Response.text();
-          this.nwl2023Dictionary = parseDictionary(nwl2023Text);
-          debug(`NWL2023 loaded: ${this.nwl2023Dictionary.size} words`);
-        } catch (error) {
-          console.warn('NWL2023.txt not found:', error);
-        }
-        
-        // Set initial dictionary
-        this.updateActiveDictionary();
-      } catch (error) {
-        console.error('Failed to load dictionary:', error);
+        const status = await getBackend()?.listStatus?.();
+        if (status) this.installedLists = Object.keys(status).filter((id) => status[id].shipped || status[id].imported);
+      } catch {
+        this.installedLists = null;
       }
+      let gameDictionaries = null;
+      try {
+        const response = await fetch('/api/game-state');
+        if (response.ok) gameDictionaries = (await response.json()).dictionaries || null;
+      } catch {
+        /* no game running: start from the best available list */
+      }
+      this.selectedDictionaries = initialSelection(gameDictionaries, this.installedLists);
+      await this.updateActiveDictionary();
     },
-    
-    updateActiveDictionary() {
-      const { csw21, nwl2023 } = this.selectedDictionaries;
-      
-      this.dictionary = new Set();
-      
-      if (csw21) {
-        for (const word of this.csw21Dictionary.keys()) {
-          this.dictionary.add(word);
-        }
-      }
-      
-      if (nwl2023) {
-        for (const word of this.nwl2023Dictionary.keys()) {
-          this.dictionary.add(word);
-        }
-      }
-      
-      // Ensure at least one dictionary is active
-      if (this.dictionary.size === 0 && this.csw21Dictionary.size > 0) {
-        this.selectedDictionaries.csw21 = true;
-        for (const word of this.csw21Dictionary.keys()) {
-          this.dictionary.add(word);
-        }
-      }
 
-      debug(`Active dictionary: ${this.dictionary.size} words`);
+    async updateActiveDictionary() {
+      const ids = selectedIds(this.selectedDictionaries);
+      const { words, loaded } = await buildWordSet(ids, this.listCache);
+      // Ignore a result that a newer choice has already replaced
+      if (ids.join() !== selectedIds(this.selectedDictionaries).join()) return;
+      this.dictionary = markRaw(words);
+      this.listProblem = loaded.length > 0
+        ? ''
+        : ids.length === 0
+          ? 'No word list is installed on this device, so words cannot be checked.'
+          : 'The chosen word list could not be loaded, so words cannot be checked.';
+      debug(`Active dictionary: ${words.size} words (${loaded.join(', ') || 'none'})`);
     },
-    
+
     handleDictionaryUpdate(selection) {
-      if (!selection.csw21 && !selection.nwl2023) {
+      if (selectedIds(selection).length === 0) {
+        // Keep at least one list; a fresh object makes the chooser tick the box again
+        this.selectedDictionaries = { ...this.selectedDictionaries };
         return;
       }
       this.selectedDictionaries = selection;
       this.updateActiveDictionary();
     },
-    
+
     handleDragFromAlphabet(event, letter) {
       this.draggedLetter = letter;
       this.dragSource = 'alphabet';
-      event.dataTransfer.effectAllowed = 'copy';
+      // The board's drop target says dropEffect 'move', which a plain 'copy' would forbid (the browser then never fires drop)
+      event.dataTransfer.effectAllowed = 'copyMove';
       // Set the drag data in the format the Board component expects
-      event.dataTransfer.setData('text/plain', JSON.stringify({ 
-        letter, 
+      event.dataTransfer.setData('text/plain', JSON.stringify({
+        letter,
         from: 'alphabet',
-        index: -1 
+        index: -1
       }));
     },
-    
+
     handleDragEnd(event) {
       this.draggedLetter = null;
       this.dragSource = null;
     },
-    
+
     handlePlaceLetter(data) {
       const { letter, from, index, toRowIndex, toColIndex, fromRowIndex, fromColIndex } = data;
 
@@ -279,14 +248,14 @@ export default {
           this.board[toRowIndex][toColIndex].letter = letter;
         }
       }
-      
+
       // Mark all tiles as "new" for scoring preview purposes
       this.board[toRowIndex][toColIndex].isNew = true;
-      
+
       // Force reactivity update
       this.board = [...this.board];
     },
-    
+
     handleCellClick({ row, col }) {
       // Click on a tile to remove it
       if (this.board[row][col].letter) {
@@ -296,10 +265,10 @@ export default {
         this.board = [...this.board];
       }
     },
-    
+
     getWordsFromBoard() {
       const words = [];
-      
+
       // Check horizontal words
       for (let row = 0; row < 15; row++) {
         let word = '';
@@ -320,7 +289,7 @@ export default {
           words.push({ word: word.toUpperCase(), tiles: wordTiles });
         }
       }
-      
+
       // Check vertical words
       for (let col = 0; col < 15; col++) {
         let word = '';
@@ -341,14 +310,14 @@ export default {
           words.push({ word: word.toUpperCase(), tiles: wordTiles });
         }
       }
-      
+
       return words;
     },
-    
+
     isWordValid(word) {
       return this.dictionary.has(word.toUpperCase());
     },
-    
+
     getLetterValue(letter) {
       const values = {
         'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
@@ -362,17 +331,17 @@ export default {
       };
       return values[letter.toLowerCase()] || 0;
     },
-    
+
     calculateWordScore(wordObj) {
       let score = 0;
       let wordMultiplier = 1;
-      
+
       wordObj.tiles.forEach(tile => {
         const { row, col, isNew } = tile;
         const letter = this.board[row][col].letter;
         const squareType = this.board[row][col].type;
         let letterValue = this.getLetterValue(letter);
-        
+
         // In freeplay, we can apply premium squares to all tiles
         if (squareType === 'dl') {
           letterValue *= 2;
@@ -383,20 +352,20 @@ export default {
         } else if (squareType === 'tw') {
           wordMultiplier *= 3;
         }
-        
+
         score += letterValue;
       });
-      
+
       score *= wordMultiplier;
       return score;
     },
-    
+
     clearBoard() {
       if (confirm('Clear the entire board?')) {
         this.board = this.createInitialBoard();
       }
     },
-    
+
     goHome() {
       this.$router.push('/');
     }
@@ -533,6 +502,21 @@ export default {
   color: #a1a1aa;
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.list-problem {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 4px;
+  color: #fbbf24;
+  font-size: 0.9rem;
+}
+
+.list-problem a {
+  color: #93c5fd;
+  margin-left: 6px;
 }
 
 .no-words {

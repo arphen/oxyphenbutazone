@@ -13,6 +13,7 @@ Real Chromium (via `playwright-core`, no browser download), real WebRTC, the bui
 | `offline` | install, cut the network, reload and play; public build ships no CSW21/NWL2023; fallback when a list is missing |
 | `csp` | the Content-Security-Policy blocks injected scripts, handlers and foreign requests |
 | `oddoneout` | Odd One Out on the public build: only the installed lists (ENABLE, Slovenian) are offered, no multiplayer, every category gives a 5-word puzzle with exactly one non-word, scoring and feedback for a right and a wrong answer, too-small categories are refused, no corpus file is requested |
+| `practice` | Free Play, Flashcards and Practice scenarios on the public build (ENABLE only): Free Play recognises a real word and rejects others, the chooser offers only installed lists and no CSW21/NWL2023 file is requested; every flashcard category loads cards and an answer is accepted; all 11 practice scenarios load and are solved by their real answer, wrong plays are told apart; a CSW21-style file imported on the word lists screen is then what Free Play (and Flashcards) use; with no list at all Free Play says so |
 | `laptop` | dev-server mode: Slovenian game, rules hardening (size caps, bad JSON, `__proto__`, rack tampering), language/dictionary rules |
 
 Page errors and CSP violations fail every suite. Not covered (needs real phones): iOS Safari, local-network discovery,
