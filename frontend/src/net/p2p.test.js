@@ -513,3 +513,38 @@ describe('host options', () => {
     }
   });
 });
+
+describe('word lists that are really an HTML fallback page', () => {
+  it('looksLikeHtml recognises a host answering a missing file with its index page', async () => {
+    const { looksLikeHtml } = await import('./localBackend.js');
+    expect(looksLikeHtml('<!doctype html>\n<html lang="en"><head>')).toBe(true);
+    expect(looksLikeHtml('  \n<!DOCTYPE HTML><html>')).toBe(true);
+    expect(looksLikeHtml('<html><body>Not found</body></html>')).toBe(true);
+    expect(looksLikeHtml('aa\naah\naahed\n')).toBe(false);
+    expect(looksLikeHtml('cat a small animal\ndog another\n')).toBe(false);
+  });
+
+  it('the backend treats such a response as "not installed" and falls back to a list that really exists', async () => {
+    const html = '<!doctype html><html><head><title>app</title></head><body></body></html>';
+    const backend = createLocalBackend({
+      loadList: async (id) => (id === 'csw21' ? html : id === 'enable' ? 'cat\nat\n' : null),
+      listIds: async () => ['csw21', 'enable'], // both are "shipped"; csw21's file is really the host's fallback page
+      persist: false,
+    });
+    await backend.ready;
+    expect(backend.missingLists()).toEqual(['csw21']);
+    const state = await backend.getState();
+    expect(state.dictionaries).toEqual({ csw21: false, nwl2023: false, enable: true, slovenian: false });
+    expect(state.message).toBe('The chosen word list is not installed; using ENABLE instead.');
+    expect((await backend.dispatch({ type: 'validate-word', word: 'cat' })).valid).toBe(true);
+    expect((await backend.dispatch({ type: 'validate-word', word: 'html' })).valid).toBe(false); // the page's text did not become words
+  });
+
+  it('with no usable list at all it says so instead of silently accepting nothing', async () => {
+    const backend = createLocalBackend({ loadList: async () => '<html></html>', listIds: async () => ['csw21'], persist: false });
+    await backend.ready;
+    const state = await backend.getState();
+    expect(state.messageType).toBe('error');
+    expect(state.message).toMatch(/No word list is installed/);
+  });
+});

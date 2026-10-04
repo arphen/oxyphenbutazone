@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write src",
-    "format:check": "prettier --check src"
+    "format:check": "prettier --check src",
+    "e2e": "node e2e/run.mjs"
   },
   "dependencies": {
     "jsqr": "^1.4.0",
@@ -26,6 +27,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-vue": "^9.31.0",
     "globals": "^15.12.0",
+    "playwright-core": "^1.63.0",
     "prettier": "^3.3.3",
     "qrcode": "^1.5.4",
     "vite": "^7.1.7",

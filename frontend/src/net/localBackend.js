@@ -2,7 +2,7 @@
 // Used for the static build (no server) and by the phone that hosts a peer-to-peer game.
 
 import { createEngine } from '../shared/engine.js';
-import { createDictionaryStore, defaultSelectionFor, DICTIONARY_IDS } from '../shared/dictionary.js';
+import { createDictionaryStore, defaultSelectionFor, DICTIONARY_IDS, ENGLISH_IDS } from '../shared/dictionary.js';
 import { trySanitizeGameState } from '../shared/protocol.js';
 import { assetUrl } from '../utils/url.js';
 import { debug, logWarn } from '../utils/log.js';
@@ -27,6 +27,11 @@ function writeSaved(state) {
   } catch (error) {
     logWarn('[Local] Could not save game:', error?.message);
   }
+}
+
+/** Static hosts with single-page-app rules answer a missing file with index.html and a 200: that is not a word list. */
+export function looksLikeHtml(text) {
+  return /^\s*<(?:!doctype|html|head|body|script|meta)\b/i.test(text.slice(0, 300));
 }
 
 export function clearSavedGame() {
@@ -56,8 +61,8 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
         id,
         (async () => {
           const text = await loadList(id);
-          if (text) debug(`[Local] ${id} loaded: ${store.load(id, text)} words`);
-          else missing.add(id);
+          if (text && !looksLikeHtml(text)) debug(`[Local] ${id} loaded: ${store.load(id, text)} words`);
+          else missing.add(id); // absent, or a host answered a missing file with its HTML fallback page
         })().finally(() => loading.delete(id))
       );
     }
@@ -72,20 +77,25 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
     store.setSelection(saved.dictionaries);
   }
 
-  /** If the chosen lists turned out not to be installed, switch to a loaded one so words can be played at all. */
-  function repairSelection() {
+  /**
+   * If the chosen lists turned out not to be installed, switch to one that is (loading the other lists this
+   * deployment ships, best first) so that words can be played at all.
+   */
+  async function repairSelection() {
     if (store.activeSize > 0) return;
     const state = engine.getState();
-    const [fallback] = store.loadedFor(state.language);
-    if (!fallback) {
-      state.message = 'No word list is installed yet, so no word can be checked.';
-      state.messageType = 'error';
+    const candidates = (state.language === 'slovenian' ? ['slovenian'] : ENGLISH_IDS).filter((id) => store.available().includes(id));
+    for (const id of candidates) {
+      await ensureList(id);
+      if (!store.isLoaded(id)) continue;
+      store.setSelection({ [id]: true });
+      state.message = `The chosen word list is not installed; using ${id.toUpperCase()} instead.`;
+      state.messageType = 'info';
+      state.dictionaries = store.getSelection();
       return;
     }
-    store.setSelection({ [fallback]: true });
-    state.message = `The chosen word list is not installed; using ${fallback.toUpperCase()} instead.`;
-    state.messageType = 'info';
-    state.dictionaries = store.getSelection();
+    state.message = 'No word list is installed yet, so no word can be checked.';
+    state.messageType = 'error';
   }
 
   const ready = (async () => {
@@ -96,7 +106,7 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
       engine.getState().dictionaries = store.getSelection();
     }
     await ensureSelection(store.getSelection());
-    repairSelection();
+    await repairSelection();
   })();
   let queue = Promise.resolve();
 
@@ -131,7 +141,7 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
         const result = engine.dispatch(action, ctx);
         // The action may have selected a list that is not loaded yet (e.g. switching to Slovenian)
         await ensureSelection(store.getSelection());
-        repairSelection();
+        await repairSelection();
         if (action?.type !== 'validate-word') {
           if (persist) writeSaved(engine.getState());
           notify();
