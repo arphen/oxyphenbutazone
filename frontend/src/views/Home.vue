@@ -92,6 +92,10 @@
           <button class="mode-button">View History</button>
         </div>
       </div>
+
+      <p v-if="!hasLaptopHost" class="footer-link">
+        <a href="#/words" @click.prevent="$router.push('/words')">Word lists</a>
+      </p>
     </div>
   </div>
 </template>
@@ -363,6 +367,15 @@ export default {
   50% {
     transform: translateY(-5px);
   }
+}
+
+.footer-link {
+  margin: 30px 0 0;
+  font-size: 0.95rem;
+}
+
+.footer-link a {
+  color: #93c5fd;
 }
 
 @media (max-width: 768px) {

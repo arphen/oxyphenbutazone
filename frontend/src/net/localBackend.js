@@ -2,8 +2,10 @@
 // Used for the static build (no server) and by the phone that hosts a peer-to-peer game.
 
 import { createEngine } from '../shared/engine.js';
-import { createDictionaryStore, defaultSelectionFor, DICTIONARY_IDS } from '../shared/dictionary.js';
-import { trySanitizeGameState } from '../shared/protocol.js';
+import { createDictionaryStore, defaultSelectionFor, DICTIONARY_IDS, DICTIONARY_LABELS } from '../shared/dictionary.js';
+import { trySanitizeGameState, cleanString } from '../shared/protocol.js';
+import { validateWordListText } from '../shared/wordlist.js';
+import { wordStore as defaultWordStore } from './wordStore.js';
 import { assetUrl } from '../utils/url.js';
 import { debug, logWarn } from '../utils/log.js';
 
@@ -38,11 +40,16 @@ export function clearSavedGame() {
 }
 
 /**
- * @param options.loadList   async (id) => text | null  - supplies a word list (defaults to fetching public/ files)
- * @param options.listIds    async () => string[]  - which lists this deployment ships (defaults to wordlists.json)
+ * @param options.loadList   async (id) => text | null  - supplies a word list (defaults to the lists the player imported
+ *                           on this device, then the files this deployment ships in public/)
+ * @param options.listIds    async () => string[]  - which lists this deployment ships (defaults to wordlists.json plus
+ *                           the lists imported on this device)
  * @param options.persist    save the game to localStorage after every action (default true)
+ * @param options.wordStore  where imported lists are remembered (defaults to IndexedDB; injectable for tests)
  */
-export function createLocalBackend({ loadList = defaultLoadList, listIds = defaultListIds, persist = true } = {}) {
+export function createLocalBackend({ loadList, listIds, persist = true, wordStore = defaultWordStore } = {}) {
+  loadList ??= (id) => defaultLoadList(id, wordStore);
+  let shipped = new Set(); // ids this deployment ships (not the imported ones)
   const store = createDictionaryStore();
   const engine = createEngine(store);
   const listeners = new Set();
@@ -89,7 +96,10 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
   }
 
   const ready = (async () => {
-    store.declare(await listIds());
+    const shippedIds = await (listIds ?? defaultListIds)();
+    shipped = new Set(shippedIds);
+    // Injected lists (tests) are taken as given; otherwise the lists imported on this device count as available too
+    store.declare(listIds ? shippedIds : [...shippedIds, ...(await wordStore.listIds())]);
     // Fresh start: the best English list this deployment ships (CSW21 when present, otherwise the open list)
     if (!saved) {
       store.setSelection(defaultSelectionFor('english', {}, store.available()));
@@ -101,6 +111,19 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
   let queue = Promise.resolve();
 
   const notify = () => listeners.forEach((fn) => fn(engine.getState()));
+
+  // Like dispatch, list changes run one at a time so they never interleave with an action that loads lists
+  const serialize = (run) => {
+    const result = queue.then(run, run);
+    queue = result.catch(() => {});
+    return result;
+  };
+
+  function afterListChange() {
+    engine.getState().dictionaries = store.getSelection();
+    if (persist) writeSaved(engine.getState());
+    notify();
+  }
 
   return {
     kind: 'local',
@@ -114,6 +137,72 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
       const count = store.load(id, text);
       missing.delete(id);
       return count;
+    },
+    /** Which lists are shipped / imported / loaded, and whether imported lists survive closing the app. */
+    async listStatus() {
+      await ready;
+      const persistent = await wordStore.init();
+      const imported = new Set(await wordStore.listIds());
+      return Object.fromEntries(
+        DICTIONARY_IDS.map((id) => [
+          id,
+          { shipped: shipped.has(id), imported: imported.has(id), loaded: store.isLoaded(id), count: store.size(id), persistent },
+        ])
+      );
+    },
+    /**
+     * Install a list from a file the player chose: validate, load it so it works at once, and remember it on this device.
+     * @returns {{ok: true, count, skipped} | {ok: false, error}}
+     */
+    importList(id, rawText, fileName = '') {
+      if (!DICTIONARY_IDS.includes(id)) return Promise.resolve({ ok: false, error: 'That word list is not known to this app.' });
+      const checked = validateWordListText(rawText);
+      if (!checked.ok) return Promise.resolve(checked);
+      return serialize(async () => {
+        await ready;
+        const count = store.load(id, checked.text); // rebuilds the active words when this list is selected
+        missing.delete(id);
+        store.declare([id]);
+        await wordStore.putList({ id, text: checked.text, count, importedAt: Date.now(), fileName: cleanString(String(fileName), 200) });
+        afterListChange();
+        return { ok: true, count, skipped: checked.skipped };
+      });
+    },
+    /** Forget an imported list. A list this deployment ships is reloaded from its file; any other is unloaded. */
+    removeList(id) {
+      if (!DICTIONARY_IDS.includes(id)) return Promise.resolve({ ok: false, error: 'That word list is not known to this app.' });
+      return serialize(async () => {
+        await ready;
+        await wordStore.deleteList(id);
+        if (shipped.has(id)) {
+          const text = await loadList(id);
+          if (text) store.load(id, text);
+        } else {
+          store.load(id, '');
+          store.undeclare([id]);
+          missing.add(id);
+          const selection = store.getSelection();
+          if (selection[id]) {
+            const rest = { ...selection, [id]: false };
+            const state = engine.getState();
+            if (DICTIONARY_IDS.some((other) => rest[other])) {
+              store.setSelection(rest);
+            } else {
+              // It was the only list in use: switch to the best one still available (it may not be loaded yet)
+              const next = defaultSelectionFor(state.language, {}, store.available());
+              store.setSelection(next);
+              await ensureSelection(next);
+              repairSelection(); // nothing left to load? then it says no list is installed
+              if (store.activeSize > 0) {
+                state.message = `${DICTIONARY_LABELS[id]} was removed; using ${DICTIONARY_IDS.filter((other) => next[other]).map((other) => DICTIONARY_LABELS[other]).join(' + ')} instead.`;
+                state.messageType = 'info';
+              }
+            }
+          }
+        }
+        afterListChange();
+        return { ok: true };
+      });
     },
     onChange(fn) {
       listeners.add(fn);
@@ -148,7 +237,13 @@ export function createLocalBackend({ loadList = defaultLoadList, listIds = defau
   };
 }
 
-async function defaultLoadList(id) {
+async function defaultLoadList(id, wordStore) {
+  try {
+    const imported = await wordStore.getList(id);
+    if (imported?.text) return imported.text;
+  } catch {
+    /* unreadable storage: fall back to the shipped file */
+  }
   try {
     const response = await fetch(assetUrl(WORD_LIST_FILES[id]));
     if (!response.ok) return null;

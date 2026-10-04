@@ -27,6 +27,7 @@
             </button>
             <DictionaryChooser 
               :selectedDictionaries="selectedDictionaries"
+              :installed="installedLists"
               :language="gameState?.language"
               @update="handleDictionaryUpdate"
             />
@@ -166,6 +167,7 @@ import DictionaryChooser from '../components/DictionaryChooser.vue';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
 import { debug } from '../utils/log';
+import { getBackend } from '../net/api';
 
 export default {
   name: 'GameBoard',
@@ -193,6 +195,7 @@ export default {
       pollInterval: null,
       selectedDictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: false },
       lastServerDictionaries: null,
+      installedLists: null, // ids of the word lists this device has (local mode only); null = do not restrict the chooser
       playerCount: 4, // Default to 4 players, can be changed from route params
     };
   },
@@ -275,6 +278,8 @@ export default {
     }
   },
   async mounted() {
+    this.loadInstalledLists();
+
     // Check if this is a mobile view
     const urlParams = new URLSearchParams(this.$route.query);
     this.isMobileView = urlParams.get('view') === 'mobile';
@@ -540,6 +545,15 @@ export default {
       }
       // Navigate to game history to see the completed game
       this.$router.push('/history');
+    },
+    // Local mode only: the backend knows which lists are built in or imported. With a laptop host nothing changes.
+    async loadInstalledLists() {
+      try {
+        const status = await getBackend()?.listStatus?.();
+        if (status) this.installedLists = Object.keys(status).filter((id) => status[id].shipped || status[id].imported);
+      } catch {
+        this.installedLists = null;
+      }
     },
     async handleDictionaryUpdate(selection) {
       // Ensure at least one is selected
