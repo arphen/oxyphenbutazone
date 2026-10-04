@@ -163,6 +163,7 @@ import GameOverModal from '../components/GameOverModal.vue';
 import DictionaryChooser from '../components/DictionaryChooser.vue';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
+import { debug } from '../utils/log';
 
 export default {
   name: 'GameBoard',
@@ -287,7 +288,7 @@ export default {
       
       if (shouldRestart) {
         // Initialize game with correct player count first
-        console.log('[GameBoard] Initializing new game with', this.playerCount, 'players');
+        debug('[GameBoard] Initializing new game with', this.playerCount, 'players');
         await fetch('/api/action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -302,7 +303,7 @@ export default {
         delete query.newGame;
         this.$router.replace({ query });
       } else {
-        console.log('[GameBoard] Joining existing game');
+        debug('[GameBoard] Joining existing game');
       }
       
       // Fetch initial game state
@@ -339,7 +340,7 @@ export default {
             if (hasNoMoves && !newGameState.gameOver) {
               // Fresh game, initialize it
               this.gamePersistence.startNewGame(newGameState);
-              console.log('[GamePersistence] Initialized new game:', this.gamePersistence.currentGameId.value);
+              debug('[GamePersistence] Initialized new game:', this.gamePersistence.currentGameId.value);
             } else if (!hasNoMoves || newGameState.gameOver) {
               // Game in progress or completed but we don't have it tracked
               // This can happen if page was refreshed mid-game
@@ -358,14 +359,14 @@ export default {
             // Check if player 1 made a new move
             if (newP1Moves > oldP1Moves) {
               const lastMove = newGameState.player1.history[newP1Moves - 1];
-              console.log('[GameBoard] Player 1 made a move, recording it');
+              debug('[GameBoard] Player 1 made a move, recording it');
               this.recordMoveFromHistory(newGameState, '1', lastMove);
             }
             
             // Check if player 2 made a new move
             if (newP2Moves > oldP2Moves) {
               const lastMove = newGameState.player2.history[newP2Moves - 1];
-              console.log('[GameBoard] Player 2 made a move, recording it');
+              debug('[GameBoard] Player 2 made a move, recording it');
               this.recordMoveFromHistory(newGameState, '2', lastMove);
             }
           }
@@ -389,7 +390,7 @@ export default {
             }
             
             if (hasNewTiles) {
-              console.log('[GameBoard] New tiles detected, playing sound');
+              debug('[GameBoard] New tiles detected, playing sound');
               this.playClickSound();
             }
           }
@@ -405,7 +406,7 @@ export default {
           if (newGameState.gameOver && this.gamePersistence.currentGameId.value) {
             const currentGame = this.gamePersistence.getCurrentGame();
             if (currentGame && currentGame.status !== 'completed') {
-              console.log('[GameBoard] Game ended, completing it');
+              debug('[GameBoard] Game ended, completing it');
               this.gamePersistence.completeGame(newGameState);
             }
           }
@@ -505,7 +506,7 @@ export default {
         metadata.tilesExchanged = historyEntry.tiles?.length || 0;
       }
       
-      console.log('[GameBoard] Recording move from history:', {
+      debug('[GameBoard] Recording move from history:', {
         action,
         playerNum,
         historyEntry,
@@ -522,7 +523,7 @@ export default {
     handleGameOverClose() {
       // When the game over modal is closed, complete the game if not already done
       if (this.gameState?.gameOver && this.gamePersistence.currentGameId.value) {
-        console.log('[GameBoard] Completing game on modal close');
+        debug('[GameBoard] Completing game on modal close');
         this.gamePersistence.completeGame(this.gameState);
       }
       // Navigate to game history to see the completed game

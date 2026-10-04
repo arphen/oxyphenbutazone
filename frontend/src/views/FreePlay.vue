@@ -98,6 +98,7 @@
 <script>
 import Board from '../components/Board.vue';
 import DictionaryChooser from '../components/DictionaryChooser.vue';
+import { debug } from '../utils/log';
 
 export default {
   name: 'FreePlay',
@@ -181,7 +182,7 @@ export default {
           const csw21Response = await fetch('/CSW21.txt');
           const csw21Text = await csw21Response.text();
           this.csw21Dictionary = parseDictionary(csw21Text);
-          console.log(`CSW21 loaded: ${this.csw21Dictionary.size} words`);
+          debug(`CSW21 loaded: ${this.csw21Dictionary.size} words`);
         } catch (error) {
           console.warn('CSW21.txt not found:', error);
         }
@@ -191,7 +192,7 @@ export default {
           const nwl2023Response = await fetch('/NWL2023.txt');
           const nwl2023Text = await nwl2023Response.text();
           this.nwl2023Dictionary = parseDictionary(nwl2023Text);
-          console.log(`NWL2023 loaded: ${this.nwl2023Dictionary.size} words`);
+          debug(`NWL2023 loaded: ${this.nwl2023Dictionary.size} words`);
         } catch (error) {
           console.warn('NWL2023.txt not found:', error);
         }
@@ -227,8 +228,8 @@ export default {
           this.dictionary.add(word);
         }
       }
-      
-      console.log(`Active dictionary: ${this.dictionary.size} words`);
+
+      debug(`Active dictionary: ${this.dictionary.size} words`);
     },
     
     handleDictionaryUpdate(selection) {

@@ -267,6 +267,7 @@
 import Board from '../components/Board.vue';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
 import { useMoveAnalysis } from '../composables/useMoveAnalysis.js';
+import { debug, logWarn, logError } from '../utils/log';
 
 export default {
   name: 'GameReplay',
@@ -289,17 +290,17 @@ export default {
       if (!this.game) return null;
       
       if (this.currentMoveIndex === 0) {
-        console.log('[GameReplay] Showing initial state');
+        debug('[GameReplay] Showing initial state');
         return this.game.initialState;
       }
       
       const move = this.game.moves[this.currentMoveIndex - 1];
       if (!move) {
-        console.warn('[GameReplay] Move not found at index', this.currentMoveIndex - 1);
+        logWarn('[GameReplay] Move not found at index', this.currentMoveIndex - 1);
         return this.game.initialState;
       }
       
-      console.log('[GameReplay] Current move:', {
+      debug('[GameReplay] Current move:', {
         index: this.currentMoveIndex,
         move,
         hasSnapshot: !!move.gameStateSnapshot
@@ -307,12 +308,12 @@ export default {
       
       // Check if gameStateSnapshot exists
       if (!move.gameStateSnapshot) {
-        console.warn('[GameReplay] Move has no gameStateSnapshot, reconstructing:', move);
+        logWarn('[GameReplay] Move has no gameStateSnapshot, reconstructing:', move);
         // Fallback: try to reconstruct state from move data
         return this.reconstructStateFromMove(move);
       }
       
-      console.log('[GameReplay] Using gameStateSnapshot');
+      debug('[GameReplay] Using gameStateSnapshot');
       return move.gameStateSnapshot;
     },
     currentBoardState() {
@@ -323,7 +324,7 @@ export default {
       
       const board = this.currentState?.board;
       if (!board || board.length === 0) {
-        console.warn('[GameReplay] No board state available');
+        logWarn('[GameReplay] No board state available');
         return this.game?.initialState?.board || [];
       }
       return board;
@@ -338,9 +339,9 @@ export default {
   },
   watch: {
     currentMoveIndex(newIndex, oldIndex) {
-      console.log('[GameReplay] Move index changed:', { from: oldIndex, to: newIndex });
-      console.log('[GameReplay] Current move:', this.currentMove);
-      console.log('[GameReplay] Current state:', this.currentState);
+      debug('[GameReplay] Move index changed:', { from: oldIndex, to: newIndex });
+      debug('[GameReplay] Current move:', this.currentMove);
+      debug('[GameReplay] Current state:', this.currentState);
     }
   },
   mounted() {
@@ -374,7 +375,7 @@ export default {
         return;
       }
 
-      console.log('[GameReplay] Analyzing move:', {
+      debug('[GameReplay] Analyzing move:', {
         moveIndex: this.currentMoveIndex,
         playerId,
         rack,
@@ -423,7 +424,7 @@ export default {
         };
       }
       
-      console.error('[GameReplay] Cannot reconstruct state from move:', move);
+      logError('[GameReplay] Cannot reconstruct state from move:', move);
       return this.game.initialState;
     },
     
@@ -437,7 +438,7 @@ export default {
         return;
       }
       
-      console.log('[GameReplay] Loaded game:', {
+      debug('[GameReplay] Loaded game:', {
         id: this.game.id,
         moves: this.game.moves.length,
         hasInitialState: !!this.game.initialState,
@@ -449,7 +450,7 @@ export default {
       // Start at the last move
       this.currentMoveIndex = this.game.moves.length;
       
-      console.log('[GameReplay] Set currentMoveIndex to:', this.currentMoveIndex);
+      debug('[GameReplay] Set currentMoveIndex to:', this.currentMoveIndex);
     },
     goBack() {
       this.$router.push('/history');

@@ -212,6 +212,7 @@
 <script>
 import { OddOneOutGenerator } from '../game/oddOneOut/generator';
 import QRDisplay from '../components/QRDisplay.vue';
+import { debug } from '../utils/log';
 
 export default {
   name: 'OddOneOutMode',
@@ -375,12 +376,12 @@ export default {
       // Play sounds
       try {
         if (p1Correct || p2Correct) {
-          new Audio('/sounds/success.mp3').play().catch(e => console.log('Audio play failed', e));
+          new Audio('/sounds/success.mp3').play().catch(e => debug('Audio play failed', e));
         } else {
-          new Audio('/sounds/failure.mp3').play().catch(e => console.log('Audio play failed', e));
+          new Audio('/sounds/failure.mp3').play().catch(e => debug('Audio play failed', e));
         }
       } catch (e) {
-        console.log("Sound error", e);
+        debug("Sound error", e);
       }
 
       // Update server to review state

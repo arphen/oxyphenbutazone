@@ -4,7 +4,7 @@
     <div v-if="showTurnFlash" class="flash-overlay"></div>
     
     <!-- Debug Console Overlay -->
-    <div v-if="showDebugConsole" class="debug-console">
+    <div v-if="debugEnabled && showDebugConsole" class="debug-console">
       <div class="debug-header">
         <span>🐛 Debug Console</span>
         <button @click="showDebugConsole = false" class="close-debug">✕</button>
@@ -17,7 +17,7 @@
         </div>
       </div>
     </div>
-    <button v-else @click="showDebugConsole = true" class="debug-toggle">🐛</button>
+    <button v-else-if="debugEnabled" @click="showDebugConsole = true" class="debug-toggle">🐛</button>
     
     <div class="rack-container">
       <div class="rack-header">
@@ -166,6 +166,7 @@ import BlankLetterPicker from '../components/BlankLetterPicker.vue';
 import SwapTilesModal from '../components/SwapTilesModal.vue';
 import { useSoundEffects } from '../composables/useSoundEffects.js';
 import { useGamePersistence } from '../composables/useGamePersistence.js';
+import { isDebug, debug, logWarn, logError } from '../utils/log';
 
 export default {
   name: 'PlayerRackView',
@@ -218,7 +219,12 @@ export default {
       debugLogs: [],
       // Turn change animation
       previousTurnPlayer: null,
-      showTurnFlash: false
+      showTurnFlash: false,
+      debugEnabled: isDebug(),
+      // Original console methods for restoration
+      originalLog: null,
+      originalError: null,
+      originalWarn: null
     };
   },
   computed: {
@@ -241,7 +247,7 @@ export default {
       if (!this.gameState) return false;
       const player = this.gameState[`player${this.playerId}`];
       const result = player?.isCurrentPlayer || false;
-      // console.log('[isCurrentPlayer computed] Player', this.playerId, ':', result);
+      // debug('[isCurrentPlayer computed] Player', this.playerId, ':', result);
       return result;
     },
     board() {
@@ -276,32 +282,41 @@ export default {
     }
   },
   mounted() {
-    // Override console for debug logs
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-    
-    console.log = (...args) => {
-      this.addDebugLog('log', args.join(' '));
-      originalLog.apply(console, args);
-    };
-    
-    console.error = (...args) => {
-      this.addDebugLog('error', args.join(' '));
-      originalError.apply(console, args);
-    };
-    
-    console.warn = (...args) => {
-      this.addDebugLog('warn', args.join(' '));
-      originalWarn.apply(console, args);
-    };
-    
+    // Override console for debug logs only when debug mode is enabled
+    if (this.debugEnabled) {
+      this.originalLog = console.log;
+      this.originalError = console.error;
+      this.originalWarn = console.warn;
+
+      console.log = (...args) => {
+        this.addDebugLog('log', args.join(' '));
+        this.originalLog.apply(console, args);
+      };
+
+      console.error = (...args) => {
+        this.addDebugLog('error', args.join(' '));
+        this.originalError.apply(console, args);
+      };
+
+      console.warn = (...args) => {
+        this.addDebugLog('warn', args.join(' '));
+        this.originalWarn.apply(console, args);
+      };
+    }
+
     this.fetchGameState();
     this.pollInterval = setInterval(() => {
       this.fetchGameState();
     }, 500);
   },
   beforeUnmount() {
+    // Restore original console methods if they were overridden
+    if (this.originalLog) {
+      console.log = this.originalLog;
+      console.error = this.originalError;
+      console.warn = this.originalWarn;
+    }
+
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
     }
@@ -356,7 +371,7 @@ export default {
         
         this.playClickSound();
       } catch (error) {
-        console.error('Failed to shuffle rack:', error);
+        logError('Failed to shuffle rack:', error);
       }
     },
     async fetchGameState() {
@@ -375,11 +390,11 @@ export default {
             if (hasNoMoves && !newGameState.gameOver) {
               // Fresh game, initialize it
               this.gamePersistence.startNewGame(newGameState);
-              console.log('[GamePersistence] Initialized new game:', this.gamePersistence.currentGameId.value);
+              debug('[GamePersistence] Initialized new game:', this.gamePersistence.currentGameId.value);
             } else if (!hasNoMoves || newGameState.gameOver) {
               // Game in progress or completed but we don't have it tracked
               // This can happen if page was refreshed mid-game
-              console.warn('[GamePersistence] Game in progress detected but not tracked. Starting tracking now.');
+              logWarn('[GamePersistence] Game in progress detected but not tracked. Starting tracking now.');
               this.gamePersistence.startNewGame(newGameState);
             }
           }
@@ -404,7 +419,7 @@ export default {
           this.isConnected = false;
         }
       } catch (error) {
-        console.error('Error fetching game state:', error);
+        logError('Error fetching game state:', error);
         this.isConnected = false;
       }
     },
@@ -445,7 +460,7 @@ export default {
       this.dragIntent = null; // Reset intent
       this.draggedElement = event.target.closest('.tile');
       
-      console.log(`[Drag Start] Index: ${index}, Letter: ${letter || 'BLANK'}`);
+      debug(`[Drag Start] Index: ${index}, Letter: ${letter || 'BLANK'}`);
     },
     onTouchMove(event) {
       if (!this.isDragging) return;
@@ -470,18 +485,18 @@ export default {
           // If we moved significantly upward (toward board), it's likely a place
           if (rackTile && rackTile !== this.draggedElement) {
             this.dragIntent = 'reorder';
-            console.log('[Drag Intent] REORDER detected');
+            debug('[Drag Intent] REORDER detected');
           } else if (deltaY > this.dragThreshold && deltaY > deltaX) {
             // Moving upward more than horizontally - likely placing on board
             this.dragIntent = 'place';
-            console.log('[Drag Intent] PLACE detected (upward movement)');
+            debug('[Drag Intent] PLACE detected (upward movement)');
           } else if (boardSquare) {
             this.dragIntent = 'place';
-            console.log('[Drag Intent] PLACE detected (over board)');
+            debug('[Drag Intent] PLACE detected (over board)');
           } else {
             // Default to reorder if moving horizontally within rack area
             this.dragIntent = 'reorder';
-            console.log('[Drag Intent] REORDER detected (horizontal movement)');
+            debug('[Drag Intent] REORDER detected (horizontal movement)');
           }
         }
       }
@@ -536,7 +551,7 @@ export default {
       }
       
       const dragDuration = Date.now() - this.dragStartTime;
-      console.log(`[Drag End] Duration: ${dragDuration}ms, Intent: ${this.dragIntent || 'undetermined'}`);
+      debug(`[Drag End] Duration: ${dragDuration}ms, Intent: ${this.dragIntent || 'undetermined'}`);
       
       if (elementUnderTouch) {
         // Handle reordering within rack
@@ -544,14 +559,14 @@ export default {
         if (rackTile && rackTile !== this.draggedElement && this.dragIntent === 'reorder') {
           const targetIndex = parseInt(rackTile.dataset.index);
           if (!isNaN(targetIndex) && this.draggedIndex !== targetIndex) {
-            console.log(`[Reorder] Moving tile from index ${this.draggedIndex} to ${targetIndex}`);
+            debug(`[Reorder] Moving tile from index ${this.draggedIndex} to ${targetIndex}`);
             
             // Reorder tiles in rack
             const newRack = [...this.rack];
             const [draggedItem] = newRack.splice(this.draggedIndex, 1);
             newRack.splice(targetIndex, 0, draggedItem);
             
-            console.log(`[Reorder] New rack order:`, newRack);
+            debug(`[Reorder] New rack order:`, newRack);
             
             // Persist to server
             try {
@@ -568,10 +583,10 @@ export default {
               if (response.ok) {
                 const result = await response.json();
                 this.gameState = result.gameState;
-                console.log('[Reorder] Rack reordering persisted to server');
+                debug('[Reorder] Rack reordering persisted to server');
               }
             } catch (error) {
-              console.error('Failed to reorder rack:', error);
+              logError('Failed to reorder rack:', error);
             }
           }
         }
@@ -593,7 +608,7 @@ export default {
                   const isNotOutOfBounds = square.type !== 'out-of-bounds';
                   
                   if (isEmpty && isNotLocked && isNotOutOfBounds) {
-                    console.log(`[Place] Placing tile at (${row}, ${col})`);
+                    debug(`[Place] Placing tile at (${row}, ${col})`);
                     
                     // Check if it's a blank tile
                     if (this.draggedLetter === '') {
@@ -619,13 +634,13 @@ export default {
                         if (response.ok) {
                           const result = await response.json();
                           this.gameState = result.gameState;
-                          console.log('[Place] Tile placed successfully');
+                          debug('[Place] Tile placed successfully');
                           // Play sound effect when tile is placed
-                          console.log('[Sound] Attempting to play click sound after tile placement');
+                          debug('[Sound] Attempting to play click sound after tile placement');
                           this.playClickSound();
                         }
                       } catch (error) {
-                        console.error('Failed to place tile:', error);
+                        logError('Failed to place tile:', error);
                       }
                     }
                   }
@@ -661,7 +676,7 @@ export default {
       if (!this.isCurrentPlayer || !this.hasNewTiles) return;
       
       // Play sound effect
-      console.log('[Sound] Attempting to play click sound for Play Word button');
+      debug('[Sound] Attempting to play click sound for Play Word button');
       this.playClickSound();
       
       // Capture state before move
@@ -710,7 +725,7 @@ export default {
           const lastMove = playerHistory?.[playerHistory.length - 1];
           
           // Log the state before saving
-          console.log('[PlayerRackView] About to save move with newGameState:', {
+          debug('[PlayerRackView] About to save move with newGameState:', {
             hasBoardData: !!newGameState.board && newGameState.board.length > 0,
             boardLength: newGameState.board?.length,
             player1Rack: newGameState.player1?.rack,
@@ -736,7 +751,7 @@ export default {
           }
         }
       } catch (error) {
-        console.error('Failed to play word:', error);
+        logError('Failed to play word:', error);
       }
     },
     async recallTiles() {
@@ -757,7 +772,7 @@ export default {
           this.gameState = result.gameState;
         }
       } catch (error) {
-        console.error('Failed to recall tiles:', error);
+        logError('Failed to recall tiles:', error);
       }
     },
     async passTurn() {
@@ -782,10 +797,10 @@ export default {
         
         if (response.ok) {
           const result = await response.json();
-          console.log('[Pass] Before update - isCurrentPlayer:', this.isCurrentPlayer);
-          console.log('[Pass] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
-          console.log('[Pass] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
-          console.log('[Pass] This player ID:', this.playerId);
+          debug('[Pass] Before update - isCurrentPlayer:', this.isCurrentPlayer);
+          debug('[Pass] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
+          debug('[Pass] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
+          debug('[Pass] This player ID:', this.playerId);
           
           // Save pass action
           this.gamePersistence.saveMove(result.gameState, 'pass', {
@@ -798,11 +813,11 @@ export default {
           
           // Force immediate re-render to ensure UI updates
           this.$nextTick(() => {
-            console.log('[Pass] After nextTick - isCurrentPlayer:', this.isCurrentPlayer);
+            debug('[Pass] After nextTick - isCurrentPlayer:', this.isCurrentPlayer);
           });
         }
       } catch (error) {
-        console.error('Failed to pass turn:', error);
+        logError('Failed to pass turn:', error);
       }
     },
     async exchangeTiles() {
@@ -832,9 +847,9 @@ export default {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('[Exchange] Before update - isCurrentPlayer:', this.isCurrentPlayer);
-          console.log('[Exchange] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
-          console.log('[Exchange] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
+          debug('[Exchange] Before update - isCurrentPlayer:', this.isCurrentPlayer);
+          debug('[Exchange] New gameState player1.isCurrentPlayer:', result.gameState.player1?.isCurrentPlayer);
+          debug('[Exchange] New gameState player2.isCurrentPlayer:', result.gameState.player2?.isCurrentPlayer);
           
           // Save exchange action
           this.gamePersistence.saveMove(result.gameState, 'exchange', {
@@ -847,11 +862,11 @@ export default {
           
           // Force immediate re-render
           this.$nextTick(() => {
-            console.log('[Exchange] After nextTick - isCurrentPlayer:', this.isCurrentPlayer);
+            debug('[Exchange] After nextTick - isCurrentPlayer:', this.isCurrentPlayer);
           });
         }
       } catch (error) {
-        console.error('Failed to exchange tiles:', error);
+        logError('Failed to exchange tiles:', error);
       }
     },
     async handleBlankLetterSelect(chosenLetter) {
@@ -879,11 +894,11 @@ export default {
           const result = await response.json();
           this.gameState = result.gameState;
           // Play sound effect when blank tile is placed
-          console.log('[Sound] Attempting to play click sound after blank tile placement');
+          debug('[Sound] Attempting to play click sound after blank tile placement');
           this.playClickSound();
         }
       } catch (error) {
-        console.error('Failed to place blank tile:', error);
+        logError('Failed to place blank tile:', error);
       } finally {
         this.showBlankPicker = false;
         this.pendingBlankPosition = null;
@@ -903,13 +918,13 @@ export default {
           this.gamePersistence.startNewGame(this.gameState);
         }
       } catch (error) {
-        console.error('Failed to restart game:', error);
+        logError('Failed to restart game:', error);
       }
     },
     handleGameOverClose() {
       // When the game over modal is closed, complete the game if not already done
       if (this.gameState?.gameOver && this.gamePersistence.currentGameId.value) {
-        console.log('[GameOver] Completing game on modal close');
+        debug('[GameOver] Completing game on modal close');
         this.gamePersistence.completeGame(this.gameState);
       }
       // Navigate to game history to see the completed game

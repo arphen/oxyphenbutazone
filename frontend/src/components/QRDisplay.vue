@@ -37,6 +37,7 @@
 
 <script>
 import QRCodeVue3 from 'qrcode-vue3';
+import { debug } from '../utils/log';
 
 export default {
   name: 'QRDisplay',
@@ -78,12 +79,12 @@ export default {
       if (this.customUrl) return this.customUrl;
       // Generate a URL that can be scanned and opened on a phone
       const url = `${window.location.protocol}//${window.location.host}/rack/${this.playerId}`;
-      console.log(`QR URL for ${this.playerName}:`, url);
+      debug(`QR URL for ${this.playerName}:`, url);
       return url;
     },
   },
   mounted() {
-    console.log('QRDisplay mounted', {
+    debug('QRDisplay mounted', {
       playerName: this.playerName,
       rack: this.rack,
       score: this.score,

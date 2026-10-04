@@ -3,6 +3,8 @@
  * Create audio objects outside the function to persist across calls
  */
 
+import { debug, logWarn, logError } from '../utils/log';
+
 // Create audio pool outside to persist
 let audioPool = null;
 let isInitialized = false;
@@ -24,13 +26,13 @@ function initializeAudioPool() {
 
             // Add error handling with detailed logging
             sound.addEventListener('error', (e) => {
-                console.error(`Error loading sound ${index + 1}:`);
-                console.error('  - Error event:', e);
-                console.error('  - Audio src:', sound.src);
-                console.error('  - Audio error:', sound.error);
+                logError(`Error loading sound ${index + 1}:`);
+                logError('  - Error event:', e);
+                logError('  - Audio src:', sound.src);
+                logError('  - Audio error:', sound.error);
                 if (sound.error) {
-                    console.error('  - Error code:', sound.error.code);
-                    console.error('  - Error message:', sound.error.message);
+                    logError('  - Error code:', sound.error.code);
+                    logError('  - Error message:', sound.error.message);
                     // Error codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
                     const errorMessages = {
                         1: 'MEDIA_ERR_ABORTED - The user canceled the audio',
@@ -38,18 +40,18 @@ function initializeAudioPool() {
                         3: 'MEDIA_ERR_DECODE - Error decoding audio file (corrupted/invalid format)',
                         4: 'MEDIA_ERR_SRC_NOT_SUPPORTED - Audio format not supported'
                     };
-                    console.error('  - Error type:', errorMessages[sound.error.code] || 'Unknown error');
+                    logError('  - Error type:', errorMessages[sound.error.code] || 'Unknown error');
                 }
             });
 
             // Log when sounds are loaded
             sound.addEventListener('canplaythrough', () => {
-                console.log(`Sound ${index + 1} loaded successfully`);
+                debug(`Sound ${index + 1} loaded successfully`);
             });
         });
 
         isInitialized = true;
-        console.log('Audio pool initialized with', audioPool.length, 'sounds');
+        debug('Audio pool initialized with', audioPool.length, 'sounds');
     }
     return audioPool;
 }
@@ -66,7 +68,7 @@ export function useSoundEffects() {
             const randomIndex = Math.floor(Math.random() * clickSounds.length);
             const sound = clickSounds[randomIndex];
 
-            console.log(`Playing sound ${randomIndex + 1}, volume: ${sound.volume}`);
+            debug(`Playing sound ${randomIndex + 1}, volume: ${sound.volume}`);
 
             // Clone the audio to allow overlapping plays
             const soundClone = sound.cloneNode();
@@ -78,18 +80,18 @@ export function useSoundEffects() {
             if (playPromise !== undefined) {
                 playPromise
                     .then(() => {
-                        console.log(`Sound ${randomIndex + 1} played successfully`);
+                        debug(`Sound ${randomIndex + 1} played successfully`);
                     })
                     .catch(error => {
-                        console.error('Failed to play sound:', error.name, error.message);
+                        logError('Failed to play sound:', error.name, error.message);
                         // If autoplay is blocked, log helpful message
                         if (error.name === 'NotAllowedError') {
-                            console.warn('Audio autoplay was blocked. User interaction may be required first.');
+                            logWarn('Audio autoplay was blocked. User interaction may be required first.');
                         }
                     });
             }
         } catch (error) {
-            console.error('Error playing click sound:', error);
+            logError('Error playing click sound:', error);
         }
     };
 
@@ -101,14 +103,14 @@ export function useSoundEffects() {
         clickSounds.forEach(sound => {
             sound.volume = newVolume;
         });
-        console.log('Volume set to:', newVolume);
+        debug('Volume set to:', newVolume);
     };
 
     /**
      * Test play a sound (useful for debugging)
      */
     const testSound = () => {
-        console.log('Testing sound playback...');
+        debug('Testing sound playback...');
         playClickSound();
     };
 

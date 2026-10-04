@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { debug, logWarn, logError } from '../utils/log';
 
 /**
  * Game Persistence Composable
@@ -50,13 +51,13 @@ export function useGamePersistence() {
      */
     const recordMove = (moveData) => {
         if (!currentGameId.value) {
-            console.warn('[GamePersistence] No active game to record move');
+            logWarn('[GamePersistence] No active game to record move');
             return;
         }
 
         const currentGame = getCurrentGame();
         if (!currentGame) {
-            console.error('[GamePersistence] Current game not found');
+            logError('[GamePersistence] Current game not found');
             return;
         }
 
@@ -75,14 +76,14 @@ export function useGamePersistence() {
             data: currentGame
         }));
 
-        console.log(`[GamePersistence] Recorded move ${move.moveNumber}`, move);
+        debug(`[GamePersistence] Recorded move ${move.moveNumber}`, move);
     };
 
     /**
      * Save a complete move with all context
      */
     const saveMove = (gameState, action, metadata = {}) => {
-        console.log('[GamePersistence] saveMove called with:', {
+        debug('[GamePersistence] saveMove called with:', {
             action,
             hasBoardInGameState: !!gameState?.board,
             boardLength: gameState?.board?.length,
@@ -93,11 +94,11 @@ export function useGamePersistence() {
 
         // Ensure we have a current game
         if (!currentGameId.value) {
-            console.error('[GamePersistence] saveMove called but no currentGameId! Attempting to recover...');
+            logError('[GamePersistence] saveMove called but no currentGameId! Attempting to recover...');
             // Try to get from localStorage
             const stored = getCurrentGame();
             if (!stored) {
-                console.error('[GamePersistence] Cannot save move - no game session found. Creating new game...');
+                logError('[GamePersistence] Cannot save move - no game session found. Creating new game...');
                 startNewGame(gameState);
             }
         }
@@ -143,7 +144,7 @@ export function useGamePersistence() {
             gameStateSnapshot: captureGameSnapshot(gameState)
         };
 
-        console.log('[GamePersistence] saveMove:', {
+        debug('[GamePersistence] saveMove:', {
             action,
             playerId: moveData.playerId,
             scoreDelta: moveData.scoreDelta,
@@ -158,19 +159,19 @@ export function useGamePersistence() {
      */
     const completeGame = (finalGameState) => {
         if (!currentGameId.value) {
-            console.warn('[GamePersistence] No current game ID to complete');
+            logWarn('[GamePersistence] No current game ID to complete');
             return;
         }
 
         const currentGame = getCurrentGame();
         if (!currentGame) {
-            console.warn('[GamePersistence] Current game not found');
+            logWarn('[GamePersistence] Current game not found');
             return;
         }
 
         // Check if already completed to avoid duplicate processing
         if (currentGame.status === 'completed') {
-            console.log('[GamePersistence] Game already completed, skipping');
+            debug('[GamePersistence] Game already completed, skipping');
             return;
         }
 
@@ -181,7 +182,7 @@ export function useGamePersistence() {
         currentGame.metadata.finalScore2 = finalGameState.player2?.score || 0;
         currentGame.metadata.winner = finalGameState.winner || null;
 
-        console.log(`[GamePersistence] Completing game ${currentGame.id}:`, {
+        debug(`[GamePersistence] Completing game ${currentGame.id}:`, {
             moves: currentGame.moves.length,
             status: currentGame.status,
             finalScore1: currentGame.metadata.finalScore1,
@@ -196,7 +197,7 @@ export function useGamePersistence() {
         localStorage.removeItem(CURRENT_GAME_KEY);
         currentGameId.value = null;
 
-        console.log(`[GamePersistence] Game saved to history. Total games:`, getAllGames().length);
+        debug(`[GamePersistence] Game saved to history. Total games:`, getAllGames().length);
     };
 
     /**
@@ -208,10 +209,10 @@ export function useGamePersistence() {
         // Check if game already exists (update it)
         const existingIndex = games.findIndex(g => g.id === gameData.id);
         if (existingIndex >= 0) {
-            console.log(`[GamePersistence] Updating existing game in history at index ${existingIndex}`);
+            debug(`[GamePersistence] Updating existing game in history at index ${existingIndex}`);
             games[existingIndex] = gameData;
         } else {
-            console.log(`[GamePersistence] Adding new game to history`);
+            debug(`[GamePersistence] Adding new game to history`);
             games.push(gameData);
         }
 
@@ -221,9 +222,9 @@ export function useGamePersistence() {
         // Store in localStorage
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-            console.log(`[GamePersistence] Successfully saved ${games.length} games to localStorage`);
+            debug(`[GamePersistence] Successfully saved ${games.length} games to localStorage`);
         } catch (error) {
-            console.error('[GamePersistence] Error saving to localStorage:', error);
+            logError('[GamePersistence] Error saving to localStorage:', error);
         }
     };
 
@@ -235,7 +236,7 @@ export function useGamePersistence() {
             const data = localStorage.getItem(STORAGE_KEY);
             return data ? JSON.parse(data) : [];
         } catch (e) {
-            console.error('[GamePersistence] Error loading games:', e);
+            logError('[GamePersistence] Error loading games:', e);
             return [];
         }
     };
@@ -260,7 +261,7 @@ export function useGamePersistence() {
             currentGameId.value = id;
             return gameData;
         } catch (e) {
-            console.error('[GamePersistence] Error loading current game:', e);
+            logError('[GamePersistence] Error loading current game:', e);
             return null;
         }
     };
@@ -325,7 +326,7 @@ export function useGamePersistence() {
      */
     const captureGameSnapshot = (gameState) => {
         const capturedBoard = captureBoard(gameState.board);
-        console.log('[GamePersistence] captureGameSnapshot:', {
+        debug('[GamePersistence] captureGameSnapshot:', {
             inputBoardExists: !!gameState?.board,
             inputBoardLength: gameState?.board?.length,
             capturedBoardLength: capturedBoard?.length,
@@ -356,12 +357,12 @@ export function useGamePersistence() {
      */
     const captureBoard = (board) => {
         if (!board) {
-            console.warn('[GamePersistence] captureBoard: board is null/undefined');
+            logWarn('[GamePersistence] captureBoard: board is null/undefined');
             return [];
         }
 
         if (!Array.isArray(board) || board.length === 0) {
-            console.warn('[GamePersistence] captureBoard: board is empty or not an array', board);
+            logWarn('[GamePersistence] captureBoard: board is empty or not an array', board);
             return [];
         }
 
@@ -376,7 +377,7 @@ export function useGamePersistence() {
             }))
         );
 
-        console.log('[GamePersistence] captureBoard: captured', captured.length, 'rows');
+        debug('[GamePersistence] captureBoard: captured', captured.length, 'rows');
         return captured;
     };
 
@@ -390,7 +391,7 @@ export function useGamePersistence() {
     // Try to load current game on init
     const currentGame = getCurrentGame();
     if (currentGame) {
-        console.log(`[GamePersistence] Resumed game ${currentGameId.value}`);
+        debug(`[GamePersistence] Resumed game ${currentGameId.value}`);
     }
 
     return {
