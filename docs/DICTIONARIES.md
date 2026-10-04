@@ -23,7 +23,7 @@ The definition and metadata are optional but recommended for the word definition
 | List | File (in `public/`) | Words | Ships with the public site? | Notes |
 |------|------|-------|---|-------|
 | **ENABLE** | `ENABLE.txt` | 168,551 | yes | Open English list (widely described as public domain; verify before relying on that). Entries over 15 letters are removed: they cannot fit the board. No definitions. |
-| **Slovenian** | `SLOVENIAN.txt` | 187,169 | yes | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž |
+| **Slovenian** | `SLOVENIAN.txt` | 187,169 | yes | Cleaned general-language word list (see [Slovenian dictionary](#slovenian-dictionary)); includes Č, Š, Ž. Licence checked by the maintainer: fine to redistribute |
 | **CSW21** | `CSW21.txt` | 279,078 | **no** | Collins word list 2021, with definitions. Copyrighted. |
 | **NWL2023** | `NWL2023.txt` | 196,601 | **no** | NASPA Word List 2023, with definitions. Copyrighted. |
 
@@ -37,6 +37,10 @@ for it with its HTML fallback page) the app switches to one that is and says so 
   NWL2023 or any other list. It is validated (2–15 letters per entry, junk and HTML refused, 40 MB limit), stored in the
   browser's IndexedDB, and remembered; it never leaves the device. Remove it again from the same screen.
 - **Laptop host:** put the file in `frontend/public/` with the exact name from the table and restart the dev server.
+- **Who needs a list:** in a phone-to-phone game only the **host** needs one, because every word is checked on the host's
+  phone (a guest's word checks are answered by the host). Importing CSW21 or NWL2023 on the host is enough.
+- **Using it:** importing CSW21 or NWL2023 switches an English game that is on the open list to the imported one (and says
+  so); new games keep using it. Slovenian games are not affected.
 - **Publishing:** `OXY_EXCLUDE_LISTS=csw21,nwl2023` leaves those two out of a build (the GitHub Pages workflow does this
   unless the repository variable `PUBLISH_WORD_LISTS` is `true`). See [DEPLOY.md](DEPLOY.md).
 

@@ -55,7 +55,7 @@ import { getBackend } from '../net/api';
 import { MAX_LIST_BYTES } from '../shared/wordlist';
 
 const LISTS = [
-  { id: 'csw21', label: 'CSW21', detail: 'Collins Scrabble Words 2021 (UK and international tournament play).' },
+  { id: 'csw21', label: 'CSW21', detail: 'Collins word list 2021 (UK and international tournament play).' },
   { id: 'nwl2023', label: 'NWL2023', detail: 'NASPA Word List 2023 (North American tournament play).' },
   { id: 'enable', label: 'ENABLE (open list)', detail: 'A free word list, built in.' },
   { id: 'slovenian', label: 'Slovenian', detail: 'For games with Slovenian tiles, built in.' },

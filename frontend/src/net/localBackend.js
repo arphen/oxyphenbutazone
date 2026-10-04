@@ -9,6 +9,8 @@ import { wordStore as defaultWordStore } from './wordStore.js';
 import { assetUrl } from '../utils/url.js';
 import { debug, logWarn } from '../utils/log.js';
 
+const OFFICIAL_IDS = ['csw21', 'nwl2023']; // the lists a public deployment cannot ship; players import them
+
 export const WORD_LIST_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
 const SAVE_KEY = 'oxyphenbutazone_local_game_v1';
 
@@ -174,6 +176,15 @@ export function createLocalBackend({ loadList, listIds, persist = true, wordStor
         missing.delete(id);
         store.declare([id]);
         await wordStore.putList({ id, text: checked.text, count, importedAt: Date.now(), fileName: cleanString(String(fileName), 200) });
+        // Someone who imports an official list wants to play with it: if an English game is only using the open list
+        // (or nothing official), switch to the new one instead of leaving them on ENABLE without noticing.
+        const state = engine.getState();
+        const selection = store.getSelection();
+        if (OFFICIAL_IDS.includes(id) && state.language === 'english' && !OFFICIAL_IDS.some((other) => selection[other])) {
+          store.setSelection({ [id]: true });
+          state.message = `${DICTIONARY_LABELS[id]} imported; now using it.`;
+          state.messageType = 'info';
+        }
         afterListChange();
         return { ok: true, count, skipped: checked.skipped };
       });

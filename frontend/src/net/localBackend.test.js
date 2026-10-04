@@ -330,3 +330,61 @@ describe('removeList', () => {
     expect((await backend.getState()).dictionaries).toEqual(only('csw21'));
   });
 });
+
+describe('importing an official list while on the open list', () => {
+  const SHIPPED = { enable: ENABLE, slovenian: 'miza\nstol' };
+
+  it('switches an English game that is only on ENABLE to the imported list, and says so', async () => {
+    shipping(SHIPPED);
+    const backend = await backendFor(freshStore());
+    expect((await backend.getState()).dictionaries).toEqual(only('enable'));
+    await backend.importList('csw21', IMPORTED, 'my-csw.txt');
+    const state = await backend.getState();
+    expect(state.dictionaries).toEqual(only('csw21'));
+    expect(state.message).toBe('CSW21 imported; now using it.');
+    expect(await valid(backend, 'zzyzx')).toBe(true); // ready to play, no extra tick in the chooser
+    expect(await valid(backend, 'bird')).toBe(false); // ENABLE words are no longer the rule
+  });
+
+  it('does the same for NWL2023', async () => {
+    shipping(SHIPPED);
+    const backend = await backendFor(freshStore());
+    await backend.importList('nwl2023', IMPORTED, 'nwl.txt');
+    expect((await backend.getState()).dictionaries).toEqual(only('nwl2023'));
+    expect((await backend.getState()).message).toBe('NWL2023 imported; now using it.');
+  });
+
+  it('leaves the choice alone when an official list is already selected', async () => {
+    shipping(SHIPPED);
+    const backend = await backendFor(freshStore());
+    await backend.importList('nwl2023', IMPORTED, 'nwl.txt'); // now using nwl2023
+    await backend.importList('csw21', 'cat\nzzyzx', 'csw.txt');
+    expect((await backend.getState()).dictionaries).toEqual(only('nwl2023'));
+  });
+
+  it('does not touch a Slovenian game', async () => {
+    shipping(SHIPPED);
+    const backend = await backendFor(freshStore());
+    await backend.dispatch({ type: 'restart', playerCount: 2, language: 'slovenian' });
+    await backend.importList('csw21', IMPORTED, 'csw.txt');
+    const state = await backend.getState();
+    expect(state.language).toBe('slovenian');
+    expect(state.dictionaries).toEqual(only('slovenian'));
+  });
+
+  it('does not switch for lists that are not the official ones', async () => {
+    shipping(SHIPPED);
+    const backend = await backendFor(freshStore());
+    await backend.importList('slovenian', 'dom\nmiza', 'sl.txt');
+    expect((await backend.getState()).dictionaries).toEqual(only('enable'));
+  });
+
+  it('the next game you host uses the imported list without further steps', async () => {
+    shipping(SHIPPED);
+    const backend = await backendFor(freshStore());
+    await backend.importList('csw21', IMPORTED, 'csw.txt');
+    await backend.dispatch({ type: 'restart', playerCount: 2, language: 'english' });
+    expect((await backend.getState()).dictionaries).toEqual(only('csw21'));
+    expect(await valid(backend, 'zzyzx')).toBe(true);
+  });
+});

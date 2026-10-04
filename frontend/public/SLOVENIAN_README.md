@@ -1,7 +1,7 @@
 # Slovenian Dictionary
 
 ## Source
-The word list (`SLOVENIAN.txt`) derives from [unjica/slovenske-besede](https://github.com/unjica/slovenske-besede) (listed upstream as MIT-licensed; verify before redistributing).
+The word list (`SLOVENIAN.txt`) derives from [unjica/slovenske-besede](https://github.com/unjica/slovenske-besede) (listed upstream as MIT-licensed; the project maintainer checked the licence and confirmed the list can be redistributed). MIT asks that the upstream copyright notice travels with the data: keep the upstream LICENSE text alongside this file.
 
 ## Cleaning
 The original copy committed here had the wrong text encoding (ISO-8859-2 read as Latin-1), which corrupted every word containing č, š or ž. `scripts/clean_slovenian.py` repairs it and keeps only playable words:

@@ -11,8 +11,8 @@ The build uses a relative base and hash routes, so it works from any sub-path.
 ### Word lists
 
 CSW21 and NWL2023 are copyrighted and are **not** published by default: the workflow sets `OXY_EXCLUDE_LISTS=csw21,nwl2023`.
-The site ships the open ENABLE list and the Slovenian list; players import CSW21/NWL2023 from their own file
-(*Word lists* screen) and the app remembers them on that device. To publish them too (only if you are entitled to),
+The site ships the open ENABLE list and the Slovenian list; the host imports CSW21/NWL2023 from their own file
+(*Word lists* screen) and the app remembers them on that device. Guests never need a list: the host checks every word. To publish them too (only if you are entitled to),
 set the repository variable `PUBLISH_WORD_LISTS` to `true`. Remember a Pages site is public even for a private repo.
 
 Locally: `cd frontend && npm run build` includes everything in `public/`; `OXY_EXCLUDE_LISTS=csw21,nwl2023 npm run build`
