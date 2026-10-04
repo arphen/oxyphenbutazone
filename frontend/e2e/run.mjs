@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SUITE_TIMEOUT_MS = 4 * 60 * 1000; // a stuck suite fails instead of hanging the whole run
 const STATIC_SUITES = ['static', 'ui', 'p2p', 'scan', 'offline', 'csp'];
 const wanted = process.argv.slice(2);
 const want = (name) => wanted.length === 0 || wanted.includes(name);
@@ -30,7 +31,8 @@ async function serve(args, env, port) {
 
 function suite(name, base) {
   console.log(`\n━━━ ${name} ━━━`);
-  const result = spawnSync('node', [path.join('e2e', `${name}.e2e.mjs`)], { cwd: root, env: { ...process.env, E2E_BASE: base }, stdio: 'inherit' });
+  const result = spawnSync('node', [path.join('e2e', `${name}.e2e.mjs`)], { cwd: root, env: { ...process.env, E2E_BASE: base }, stdio: 'inherit', timeout: SUITE_TIMEOUT_MS, killSignal: 'SIGKILL' });
+  if (result.error?.code === 'ETIMEDOUT') console.error(`${name}: timed out after ${SUITE_TIMEOUT_MS / 1000}s`);
   return result.status === 0;
 }
 

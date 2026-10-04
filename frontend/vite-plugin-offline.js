@@ -69,7 +69,12 @@ export function offlinePlugin() {
         .slice(0, 10);
       const urls = ['./', ...files.map((f) => `./${f}`)];
       const template = fs.readFileSync(path.resolve(root, 'sw.template.js'), 'utf8');
-      fs.writeFileSync(path.join(outDir, 'sw.js'), template.replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(urls)));
+      for (const token of ['__VERSION__', '__PRECACHE__']) {
+        // exactly one occurrence, or the first replacement could land in a comment and leave the real one undefined
+        if (template.split(token).length !== 2) throw new Error(`sw.template.js must contain ${token} exactly once`);
+      }
+      const worker = template.replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(urls));
+      fs.writeFileSync(path.join(outDir, 'sw.js'), worker);
       console.log(`[offline] ${urls.length} files precached (version ${version}); word lists shipped: ${Object.keys(lists).join(', ') || 'none'}`);
     },
   };

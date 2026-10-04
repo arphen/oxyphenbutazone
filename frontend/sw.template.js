@@ -1,4 +1,4 @@
-/* global __PRECACHE__ */
+/* eslint-disable no-undef -- build-time placeholders, filled in by vite-plugin-offline.js */
 // Service worker for the installed app. Generated into dist/sw.js by vite-plugin-offline.js, which fills in the
 // version and the list of files to precache. Strategy: everything the app needs is cached when the app is installed,
 // then served cache-first, so it works with no network at all. Other same-origin files (e.g. a word list that was not
