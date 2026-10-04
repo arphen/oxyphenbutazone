@@ -1,891 +1,166 @@
 import fs from 'fs';
 import path from 'path';
-import {
-    createBoard,
-    createTileBag,
-    getWordsFromBoard,
-    scoreWord,
-    getAlphabet,
-    TILE_DISTRIBUTIONS,
-    validatePlacement,
-    calculateFinalScores as computeFinalScores,
-    RACK_SIZE,
-    BINGO_BONUS,
-} from './src/shared/rules.js';
+import { createEngine } from './src/shared/engine.js';
+import { createDictionaryStore, DICTIONARY_IDS } from './src/shared/dictionary.js';
+import { safeJsonParse, cleanString, MAX_ACTION_BYTES } from './src/shared/protocol.js';
 
-// Single source of truth - all game state lives here
-let gameState = null;
-let oddOneOutSessions = new Map(); // sessionId -> sessionState
+// Laptop-host mode: a thin HTTP shell around the shared engine. All rules live in src/shared/engine.js, which the
+// phones also run in their browsers for peer-to-peer play. Bodies are size-capped and parsed with safeJsonParse.
 
-// Dictionaries loaded once at startup
-let csw21Dictionary = new Map(); // word -> definition
-let nwl2023Dictionary = new Map(); // word -> definition
-let slovenianDictionary = new Map(); // word -> definition
-let activeDictionary = new Set(); // combined active words
-let activeSelection = { csw21: true, nwl2023: false, slovenian: false }; // which dictionaries are in activeDictionary
+const DICTIONARY_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', slovenian: 'SLOVENIAN.txt' };
+const MAX_BODY_BYTES = 16 * 1024;
 
-// Dictionaries for a game whose language was chosen explicitly: Slovenian has a single list; English keeps the
-// player's CSW21/NWL2023 preference (dropping Slovenian), defaulting to CSW21.
-function selectionForNewGame(language, current) {
-    if (language === 'slovenian') return { csw21: false, nwl2023: false, slovenian: true };
-    if (current.csw21 || current.nwl2023) return { csw21: current.csw21, nwl2023: current.nwl2023, slovenian: false };
-    return { csw21: true, nwl2023: false, slovenian: false };
+const oddOneOutSessions = new Map(); // sessionId -> sessionState
+
+function loadDictionaries(store) {
+    for (const id of DICTIONARY_IDS) {
+        const file = path.join(process.cwd(), 'public', DICTIONARY_FILES[id]);
+        if (fs.existsSync(file)) {
+            console.log(`[Game API] ${DICTIONARY_FILES[id]} loaded: ${store.load(id, fs.readFileSync(file, 'utf-8'))} words`);
+        } else {
+            console.warn(`[Game API] ${DICTIONARY_FILES[id]} not found`);
+        }
+    }
+    store.setSelection({ csw21: true, nwl2023: false, slovenian: false });
 }
 
-// Dictionaries for a plain restart: keep the selection unless it cannot suit the language.
-function defaultSelectionFor(language, current) {
-    if (language === 'slovenian') {
-        return current.slovenian ? current : { csw21: false, nwl2023: false, slovenian: true };
-    }
-    return current.csw21 || current.nwl2023 ? current : { csw21: true, nwl2023: false, slovenian: false };
-}
-
-// Initialize game state
-function createInitialGameState(playerCount = 4, language = 'english') {
-    const state = {
-        board: createBoard(),
-        tileBag: createTileBag(language),
-        viewportCenter: { row: 7, col: 7 },
-        currentPlayer: 1,
-        playerCount: playerCount,
-        language: language,
-        dictionaries: { ...activeSelection },
-        consecutivePasses: 0,
-        gameOver: false,
-        winner: null,
-        finalScores: null,
-        message: '',
-        messageType: '',
-        gameId: generateGameId()
-    };
-
-    // Create players dynamically based on playerCount
-    for (let i = 1; i <= playerCount; i++) {
-        state[`player${i}`] = {
-            playerName: `Player ${i}`,
-            rack: [],
-            score: 0,
-            history: [],
-            isCurrentPlayer: i === 1
-        };
-    }
-
-    return state;
-}
-
-function generateGameId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
-
-
-
-function fillRack(player) {
-    while (player.rack.length < RACK_SIZE && gameState.tileBag.length > 0) {
-        player.rack.push(gameState.tileBag.pop());
-    }
-}
-
-
-
-function handlePlaceTile(playerId, letter, rackIndex, row, col, chosenLetter = null) {
-    const player = gameState[`player${playerId}`];
-
-    // Validate player exists
-    if (!player) {
-        console.error(`Player ${playerId} not found. Available players:`, Object.keys(gameState).filter(k => k.startsWith('player')));
-        return { success: false, error: `Player ${playerId} not found` };
-    }
-
-    // Validate
-    if (!player.isCurrentPlayer) {
-        return { success: false, error: 'Not your turn' };
-    }
-
-    if (rackIndex < 0 || rackIndex >= player.rack.length) {
-        return { success: false, error: 'Invalid rack index' };
-    }
-
-    if (gameState.board[row][col].letter || gameState.board[row][col].isBlank) {
-        return { success: false, error: 'Square occupied' };
-    }
-
-    // Check if it's a blank tile
-    const isBlank = letter === '';
-
-    if (isBlank && chosenLetter && !getAlphabet(gameState.language).includes(chosenLetter.toLowerCase())) {
-        return { success: false, error: `'${chosenLetter}' is not a letter in this game's alphabet` };
-    }
-
-    // Place tile
-    if (isBlank) {
-        gameState.board[row][col].isBlank = true;
-        gameState.board[row][col].chosenLetter = chosenLetter || '';
-        gameState.board[row][col].letter = '';
-    } else {
-        gameState.board[row][col].letter = letter;
-        gameState.board[row][col].isBlank = false;
-        gameState.board[row][col].chosenLetter = '';
-    }
-    gameState.board[row][col].isNew = true;
-    player.rack.splice(rackIndex, 1);
-
-    return { success: true };
-}
-
-function handleRecallTiles(playerId) {
-    const player = gameState[`player${playerId}`];
-
-    if (!player) {
-        console.error(`Player ${playerId} not found in handleRecallTiles`);
-        return { success: false, error: `Player ${playerId} not found` };
-    }
-
-    // Find all new tiles and return to rack
-    for (let row = 0; row < 15; row++) {
-        for (let col = 0; col < 15; col++) {
-            const square = gameState.board[row][col];
-            if (square.isNew) {
-                if (square.isBlank) {
-                    player.rack.push('');
-                    square.isBlank = false;
-                    square.chosenLetter = '';
-                } else if (square.letter) {
-                    player.rack.push(square.letter);
-                }
-                square.letter = '';
-                square.isNew = false;
+/** Read and safely parse a JSON body; responds with 4xx and resolves null when it is too large or invalid. */
+function readJson(req, res, maxBytes = MAX_BODY_BYTES) {
+    return new Promise((resolve) => {
+        let body = '';
+        let tooLarge = false;
+        req.on('data', (chunk) => {
+            if (tooLarge) return;
+            body += chunk;
+            if (body.length > maxBytes) {
+                tooLarge = true;
+                res.statusCode = 413;
+                res.end(JSON.stringify({ success: false, error: 'Request too large' }));
+                req.destroy();
+                resolve(null);
             }
-        }
-    }
-
-    gameState.message = 'Tiles recalled';
-    gameState.messageType = 'info';
-
-    return { success: true };
-}
-
-function handleSetBlankLetter(row, col, chosenLetter) {
-    const square = gameState.board[row][col];
-
-    if (!square.isBlank) {
-        return { success: false, error: 'Not a blank tile' };
-    }
-
-    if (!square.isNew) {
-        return { success: false, error: 'Cannot change locked blank' };
-    }
-
-    if (!chosenLetter || chosenLetter.length !== 1 || !getAlphabet(gameState.language).includes(chosenLetter.toLowerCase())) {
-        return { success: false, error: 'Invalid letter' };
-    }
-
-    square.chosenLetter = chosenLetter.toLowerCase();
-
-    return { success: true };
-}
-
-function handlePass(playerId) {
-    const player = gameState[`player${playerId}`];
-
-    if (!player) {
-        console.error(`Player ${playerId} not found in handlePass`);
-        return { success: false, error: `Player ${playerId} not found` };
-    }
-
-    if (!player.isCurrentPlayer) {
-        return { success: false, error: 'Not your turn' };
-    }
-
-    // Check if there are tiles on the board
-    const hasNewTiles = gameState.board.some(row => row.some(cell => cell.isNew));
-    if (hasNewTiles) {
-        gameState.message = 'Cannot pass with tiles placed on board. Clear them first.';
-        gameState.messageType = 'error';
-        return { success: false, error: 'Tiles on board' };
-    }
-
-    // Increment consecutive passes
-    gameState.consecutivePasses++;
-
-    console.log(`[Pass] Player ${playerId} passed. Consecutive passes: ${gameState.consecutivePasses}/${gameState.playerCount}`);
-
-    // Add pass to history
-    player.history.push({
-        turnNumber: player.history.length + 1,
-        action: 'pass',
-        totalScore: 0
-    });
-
-    gameState.message = `${player.playerName} passed their turn`;
-    gameState.messageType = 'info';
-
-    // Check if game should end (all players passed consecutively)
-    if (gameState.consecutivePasses >= gameState.playerCount) {
-        console.log(`[Pass] Game ending - all ${gameState.playerCount} players passed consecutively`);
-        endGame();
-        return { success: true, gameOver: true };
-    }
-
-    // Switch to next player
-    switchToNextPlayer();
-
-    return { success: true };
-}
-
-function switchToNextPlayer() {
-    const previousPlayer = gameState.currentPlayer;
-
-    console.log(`[Turn Switch DEBUG] Before: currentPlayer=${gameState.currentPlayer}, playerCount=${gameState.playerCount}, type=${typeof gameState.playerCount}`);
-
-    // Set all players to not current
-    for (let i = 1; i <= gameState.playerCount; i++) {
-        gameState[`player${i}`].isCurrentPlayer = false;
-    }
-
-    // Move to next player (circular rotation)
-    // If current is 3 and count is 3: (3 % 3) = 0, wrap to 1
-    // If current is 1 and count is 3: (1 % 3) = 1, next is 2
-    // If current is 2 and count is 3: (2 % 3) = 2, next is 3
-    let nextPlayer = (gameState.currentPlayer % gameState.playerCount) + 1;
-
-    console.log(`[Turn Switch DEBUG] Calculation: (${previousPlayer} % ${gameState.playerCount}) + 1 = ${nextPlayer}`);
-
-    // Double-check the player exists, otherwise fall back to player 1
-    if (!gameState[`player${nextPlayer}`]) {
-        console.error(`[Turn Switch ERROR] Player ${nextPlayer} does not exist! Falling back to Player 1. Available:`, Object.keys(gameState).filter(k => k.startsWith('player')));
-        nextPlayer = 1;
-    }
-
-    gameState.currentPlayer = nextPlayer;
-    gameState[`player${gameState.currentPlayer}`].isCurrentPlayer = true;
-
-    console.log(`[Turn Switch] Player ${previousPlayer} → Player ${gameState.currentPlayer} (${gameState.playerCount} players total)`);
-}
-
-function calculateFinalScores() {
-    const players = Array.from({ length: gameState.playerCount }, (_, i) => gameState[`player${i + 1}`]);
-    const { finalScores, remaining } = computeFinalScores(players, gameState.language);
-    const result = {};
-    finalScores.forEach((score, i) => { result[`player${i + 1}`] = score; });
-    remaining.forEach((value, i) => { result[`player${i + 1}Remaining`] = value; });
-    return result;
-}
-
-function endGame() {
-    gameState.gameOver = true;
-    const finalScores = calculateFinalScores();
-    gameState.finalScores = finalScores;
-
-    // Find the winner(s)
-    let highestScore = -Infinity;
-    let winners = [];
-
-    for (let i = 1; i <= gameState.playerCount; i++) {
-        const score = finalScores[`player${i}`];
-        if (score > highestScore) {
-            highestScore = score;
-            winners = [i];
-        } else if (score === highestScore) {
-            winners.push(i);
-        }
-    }
-
-    if (winners.length === 1) {
-        gameState.winner = winners[0];
-        const winnerName = gameState[`player${winners[0]}`].playerName;
-        const scoresText = Array.from({ length: gameState.playerCount }, (_, i) =>
-            finalScores[`player${i + 1}`]
-        ).join(' - ');
-        gameState.message = `Game Over! ${winnerName} wins with ${highestScore} points! (${scoresText})`;
-    } else {
-        gameState.winner = 0; // Tie
-        const winnerNames = winners.map(w => gameState[`player${w}`].playerName).join(' and ');
-        gameState.message = `Game Over! It's a tie between ${winnerNames} at ${highestScore} points!`;
-    }
-    gameState.messageType = 'success';
-}
-
-function handlePlayWord(playerId) {
-    const player = gameState[`player${playerId}`];
-
-    if (!player) {
-        console.error(`Player ${playerId} not found in handlePlayWord`);
-        return { success: false, error: `Player ${playerId} not found` };
-    }
-
-    if (!player.isCurrentPlayer) {
-        return { success: false, error: 'Not your turn' };
-    }
-
-    // Find new tiles
-    const newTiles = [];
-    const unassignedBlanks = [];
-    for (let row = 0; row < 15; row++) {
-        for (let col = 0; col < 15; col++) {
-            const square = gameState.board[row][col];
-            if (square.isNew) {
-                newTiles.push({ row, col, letter: square.letter, isBlank: square.isBlank });
-                // Check if blank needs letter assignment
-                if (square.isBlank && !square.chosenLetter) {
-                    unassignedBlanks.push({ row, col });
-                }
-            }
-        }
-    }
-
-    if (newTiles.length === 0) {
-        gameState.message = 'No tiles placed!';
-        gameState.messageType = 'error';
-        return { success: false, error: 'No tiles placed' };
-    }
-
-    // Validate all blanks have chosen letters
-    if (unassignedBlanks.length > 0) {
-        gameState.message = 'Please assign letters to all blank tiles!';
-        gameState.messageType = 'error';
-        return { success: false, error: 'Unassigned blanks', unassignedBlanks };
-    }
-
-    // Placement legality: one line, no gaps, centre on first move, connected afterwards
-    const placement = validatePlacement(gameState.board);
-    if (!placement.ok) {
-        gameState.message = placement.message;
-        gameState.messageType = 'error';
-        return { success: false, error: placement.message, code: placement.code };
-    }
-
-    // Get words and validate
-    const allWords = getWordsFromBoard(gameState.board);
-    const newWords = allWords.filter(wordObj => wordObj.tiles.some(tile => tile.isNew));
-
-    if (newWords.length === 0) {
-        gameState.message = 'No valid words formed!';
-        gameState.messageType = 'error';
-        return { success: false, error: 'No valid words' };
-    }
-
-    // Check dictionary
-    const invalidWords = newWords.filter(wordObj => !activeDictionary.has(wordObj.word.toLowerCase()));
-
-    if (invalidWords.length > 0) {
-        gameState.message = `Invalid word(s): ${invalidWords.map(w => w.word).join(', ')}`;
-        gameState.messageType = 'error';
-
-        // Add to history
-        player.history.push({
-            turnNumber: player.history.length + 1,
-            action: 'invalid',
-            words: invalidWords.map(w => ({
-                word: w.word,
-                score: 0,
-                definition: 'Not in dictionary'
-            })),
-            totalScore: 0,
-            timestamp: new Date().toLocaleTimeString()
         });
-
-        // Return tiles to rack
-        newTiles.forEach(tile => {
-            const square = gameState.board[tile.row][tile.col];
-            // Return blank tile (empty string) or regular letter
-            if (square.isBlank) {
-                player.rack.push('');
-                square.isBlank = false;
-                square.chosenLetter = '';
-            } else {
-                player.rack.push(tile.letter);
+        req.on('end', () => {
+            if (tooLarge) return;
+            try {
+                resolve(body ? safeJsonParse(body, maxBytes) : {});
+            } catch (error) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ success: false, error: error.message }));
+                resolve(null);
             }
-            square.letter = '';
-            square.isNew = false;
         });
-
-        // Switch player (end turn)
-        switchToNextPlayer();
-
-        return { success: false, error: 'Invalid words' };
-    }
-
-    // Calculate score
-    let totalScore = 0;
-    const wordScores = newWords.map(wordObj => {
-        const score = scoreWord(gameState.board, wordObj, gameState.language);
-        totalScore += score;
-        const definition = getDefinition(wordObj.word);
-        return {
-            word: wordObj.word,
-            score,
-            definition: definition || 'Definition not available'
-        };
+        req.on('error', () => resolve(null));
     });
-
-    // Bingo bonus
-    const bingoBonus = newTiles.length === RACK_SIZE ? BINGO_BONUS : 0;
-    totalScore += bingoBonus;
-
-    // Update history
-    player.history.push({
-        turnNumber: player.history.length + 1,
-        words: wordScores,
-        bingoBonus: bingoBonus,
-        totalScore: totalScore,
-        timestamp: new Date().toLocaleTimeString()
-    });
-
-    player.score += totalScore;
-
-    // Lock tiles
-    newTiles.forEach(tile => {
-        gameState.board[tile.row][tile.col].isNew = false;
-        gameState.board[tile.row][tile.col].locked = true;
-    });
-
-    // Reset consecutive passes on successful play
-    console.log(`[Play Word] Player ${playerId} played a word. Resetting consecutive passes from ${gameState.consecutivePasses} to 0`);
-    gameState.consecutivePasses = 0;
-
-    // Refill rack
-    fillRack(player);
-
-    // Check if game should end (bag empty AND player used all tiles)
-    if (gameState.tileBag.length === 0 && player.rack.length === 0) {
-        endGame();
-        return { success: true, score: totalScore, gameOver: true };
-    }
-
-    // Switch player
-    switchToNextPlayer();
-
-    // Message
-    const wordDetails = wordScores.map(ws => `${ws.word} (${ws.score})`).join(', ');
-    const bonusText = bingoBonus ? ' +50 BINGO!' : '';
-    gameState.message = `Valid! ${wordDetails}${bonusText} = ${totalScore} points`;
-    gameState.messageType = 'success';
-
-    return { success: true, score: totalScore };
 }
 
-function handleExchangeTiles(playerId, indices) {
-    const player = gameState[`player${playerId}`];
+const SESSION_ID = /^[A-Z0-9]{6}$/;
+const sessionFrom = (id) => (typeof id === 'string' && SESSION_ID.test(id) ? oddOneOutSessions.get(id) : undefined);
+const intIn = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
 
-    if (!player) {
-        console.error(`Player ${playerId} not found in handleExchangeTiles`);
-        return { success: false, error: `Player ${playerId} not found` };
-    }
-
-    if (!player.isCurrentPlayer) {
-        return { success: false, error: 'Not your turn' };
-    }
-
-    if (indices.length === 0) {
-        return { success: false, error: 'No tiles selected for exchange' };
-    }
-
-    if (gameState.tileBag.length < indices.length) {
-        gameState.message = 'Not enough tiles in the bag to exchange.';
-        gameState.messageType = 'error';
-        return { success: false, error: 'Not enough tiles in bag' };
-    }
-
-    // Sort indices in descending order to avoid issues when removing from rack
-    indices.sort((a, b) => b - a);
-
-    const tilesToReturn = [];
-    for (const index of indices) {
-        if (index >= 0 && index < player.rack.length) {
-            tilesToReturn.push(player.rack.splice(index, 1)[0]);
-        }
-    }
-
-    // Add returned tiles back to the bag and shuffle
-    gameState.tileBag.push(...tilesToReturn);
-    for (let i = gameState.tileBag.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [gameState.tileBag[i], gameState.tileBag[j]] = [gameState.tileBag[j], gameState.tileBag[i]];
-    }
-
-    // Refill player's rack
-    fillRack(player);
-
-    // Add to history
-    player.history.push({
-        turnNumber: player.history.length + 1,
-        action: 'exchange',
-        count: tilesToReturn.length,
-        totalScore: 0,
-        timestamp: new Date().toLocaleTimeString()
-    });
-
-    // End turn
-    switchToNextPlayer();
-    gameState.consecutivePasses = 0; // Reset pass counter
-
-    gameState.message = `${player.playerName} exchanged ${indices.length} tiles.`;
-    gameState.messageType = 'info';
-
-    return { success: true };
-}
-
-
-// Parse dictionary file with definitions
-// Format: WORD definition [metadata]
-function parseDictionaryFile(content) {
-    const dictionary = new Map();
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        // Match format: WORD rest of line (with definition)
-        const match = trimmed.match(/^(\S+)\s+(.+)$/);
-        if (match) {
-            const word = match[1].toLowerCase();
-            const definition = match[2];
-            dictionary.set(word, definition);
-        } else {
-            // Format: just WORD (no definition)
-            const word = trimmed.toLowerCase();
-            dictionary.set(word, null);
-        }
-    }
-
-    return dictionary;
-}
-
-// Load dictionaries
-function loadDictionaries() {
-    try {
-        // Load CSW21
-        const csw21Path = path.join(process.cwd(), 'public', 'CSW21.txt');
-        if (fs.existsSync(csw21Path)) {
-            const content = fs.readFileSync(csw21Path, 'utf-8');
-            csw21Dictionary = parseDictionaryFile(content);
-            console.log(`[Game API] CSW21 Dictionary loaded: ${csw21Dictionary.size} words`);
-        } else {
-            console.warn('[Game API] CSW21.txt not found');
-        }
-
-        // Load NWL2023
-        const nwl2023Path = path.join(process.cwd(), 'public', 'NWL2023.txt');
-        if (fs.existsSync(nwl2023Path)) {
-            const content = fs.readFileSync(nwl2023Path, 'utf-8');
-            nwl2023Dictionary = parseDictionaryFile(content);
-            console.log(`[Game API] NWL2023 Dictionary loaded: ${nwl2023Dictionary.size} words`);
-        } else {
-            console.warn('[Game API] NWL2023.txt not found');
-        }
-
-        // Load Slovenian dictionary
-        const slovenianPath = path.join(process.cwd(), 'public', 'SLOVENIAN.txt');
-        if (fs.existsSync(slovenianPath)) {
-            const content = fs.readFileSync(slovenianPath, 'utf-8');
-            slovenianDictionary = parseDictionaryFile(content);
-            console.log(`[Game API] Slovenian Dictionary loaded: ${slovenianDictionary.size} words 🇸🇮`);
-        } else {
-            console.warn('[Game API] SLOVENIAN.txt not found');
-        }
-
-        // Initialize active dictionary with CSW21 by default
-        updateActiveDictionary({ csw21: true, nwl2023: false, slovenian: false });
-
-    } catch (error) {
-        console.error('[Game API] Failed to load dictionaries:', error);
-    }
-}
-
-// Update which dictionaries are active
-function updateActiveDictionary(selection) {
-    activeDictionary = new Set();
-
-    if (selection.csw21) {
-        for (const word of csw21Dictionary.keys()) {
-            activeDictionary.add(word);
-        }
-    }
-
-    if (selection.nwl2023) {
-        for (const word of nwl2023Dictionary.keys()) {
-            activeDictionary.add(word);
-        }
-    }
-
-    if (selection.slovenian) {
-        for (const word of slovenianDictionary.keys()) {
-            activeDictionary.add(word);
-        }
-    }
-
-    const activeNames = [];
-    if (selection.csw21) activeNames.push('CSW21');
-    if (selection.nwl2023) activeNames.push('NWL2023');
-    if (selection.slovenian) activeNames.push('Slovenian 🇸🇮');
-
-    activeSelection = {
-        csw21: Boolean(selection.csw21),
-        nwl2023: Boolean(selection.nwl2023),
-        slovenian: Boolean(selection.slovenian),
-    };
-    // The tile language is fixed for the life of a game; only the dictionaries can change mid-game.
-    if (gameState) gameState.dictionaries = { ...activeSelection };
-
-    console.log(`[Game API] Active dictionary updated: ${activeDictionary.size} words (${activeNames.join(' + ')})`);
-}
-
-// Get definition for a word from active dictionaries
-function getDefinition(word) {
-    const lowerWord = word.toLowerCase();
-
-    // Try CSW21 first
-    if (csw21Dictionary.has(lowerWord)) {
-        return csw21Dictionary.get(lowerWord);
-    }
-
-    // Then try NWL2023
-    if (nwl2023Dictionary.has(lowerWord)) {
-        return nwl2023Dictionary.get(lowerWord);
-    }
-
-    // Then try Slovenian
-    if (slovenianDictionary.has(lowerWord)) {
-        return slovenianDictionary.get(lowerWord);
-    }
-
-    return null;
+/** Keep only what the odd-one-out screens use: a few short words and the index of the odd one. */
+function sanitizePuzzle(puzzle) {
+    if (!puzzle || !Array.isArray(puzzle.words) || puzzle.words.length < 2 || puzzle.words.length > 8) return null;
+    const words = puzzle.words.map((w) => cleanString(w, 30));
+    const correctIndex = intIn(puzzle.correctIndex, 0, words.length - 1);
+    return correctIndex === null ? null : { words, correctIndex };
 }
 
 export function gameApiPlugin() {
     return {
         name: 'game-api-v2',
         configureServer(server) {
-            // Load dictionaries on startup
-            loadDictionaries();
+            const store = createDictionaryStore();
+            loadDictionaries(store);
+            const engine = createEngine(store);
+            console.log('[Game API] Game initialized with', engine.getState().playerCount, 'players, language:', engine.getState().language);
 
-            // Initialize game with 4 players by default, English language
-            gameState = createInitialGameState(4, 'english');
-            for (let i = 1; i <= gameState.playerCount; i++) {
-                fillRack(gameState[`player${i}`]);
-            }
-            console.log('[Game API] Game initialized with', gameState.playerCount, 'players, language:', gameState.language);
+            server.middlewares.use(async (req, res, next) => {
+                const url = req.url || '';
 
-            server.middlewares.use((req, res, next) => {
                 // GET /api/game-state - Returns complete game state
-                if (req.url === '/api/game-state' && req.method === 'GET') {
+                if (url === '/api/game-state' && req.method === 'GET') {
                     res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify(gameState));
+                    res.end(JSON.stringify(engine.getState()));
                     return;
                 }
 
-                // POST /api/action - Handles all player actions
-                if (req.url === '/api/action' && req.method === 'POST') {
-                    let body = '';
-                    req.on('data', chunk => {
-                        body += chunk.toString();
-                    });
-                    req.on('end', () => {
-                        try {
-                            const action = JSON.parse(body);
-                            let result;
-
-                            switch (action.type) {
-                                case 'place-tile':
-                                    result = handlePlaceTile(action.playerId, action.letter, action.rackIndex, action.row, action.col, action.chosenLetter);
-                                    break;
-                                case 'set-blank-letter':
-                                    result = handleSetBlankLetter(action.row, action.col, action.chosenLetter);
-                                    break;
-                                case 'recall':
-                                    result = handleRecallTiles(action.playerId);
-                                    break;
-                                case 'play-word':
-                                    result = handlePlayWord(action.playerId);
-                                    break;
-                                case 'pass':
-                                    result = handlePass(action.playerId);
-                                    break;
-                                case 'update-viewport':
-                                    gameState.viewportCenter = action.viewportCenter;
-                                    result = { success: true };
-                                    break;
-                                case 'restart': {
-                                    const playerCount = action.playerCount || gameState.playerCount || 4;
-                                    const languageChosen = Object.hasOwn(TILE_DISTRIBUTIONS, action.language);
-                                    const language = languageChosen ? action.language : (gameState?.language || 'english');
-                                    updateActiveDictionary(
-                                        languageChosen ? selectionForNewGame(language, activeSelection) : defaultSelectionFor(language, activeSelection)
-                                    );
-                                    console.log(`[Restart] Creating new game with ${playerCount} players, language: ${language}`);
-                                    gameState = createInitialGameState(playerCount, language);
-                                    for (let i = 1; i <= gameState.playerCount; i++) {
-                                        fillRack(gameState[`player${i}`]);
-                                    }
-                                    console.log(`[Restart] Game created. Current player: ${gameState.currentPlayer}, Language: ${gameState.language}, Available players:`, Object.keys(gameState).filter(k => k.startsWith('player')));
-                                    result = { success: true };
-                                    break;
-                                }
-                                case 'reorder-rack':
-                                    const player = gameState[`player${action.playerId}`];
-                                    if (player && Array.isArray(action.newRack)) {
-                                        player.rack = action.newRack;
-                                        result = { success: true };
-                                    } else {
-                                        result = { success: false, error: 'Invalid rack data or player' };
-                                    }
-                                    break;
-                                case 'exchange-tiles':
-                                    result = handleExchangeTiles(action.playerId, action.indices);
-                                    break;
-                                case 'update-dictionary':
-                                    updateActiveDictionary(action.dictionaries);
-                                    result = { success: true };
-                                    break;
-                                case 'validate-word':
-                                    const wordToValidate = action.word?.toLowerCase();
-                                    if (!wordToValidate) {
-                                        result = { success: false, valid: false, error: 'No word provided' };
-                                    } else {
-                                        const isValid = activeDictionary.has(wordToValidate);
-                                        console.log(`[Validate] Word: "${wordToValidate}", Valid: ${isValid}, Active Dict Size: ${activeDictionary.size}`);
-                                        result = {
-                                            success: true,
-                                            valid: isValid,
-                                            word: wordToValidate.toUpperCase()
-                                        };
-                                    }
-                                    break;
-                                default:
-                                    result = { success: false, error: 'Unknown action' };
-                            }
-
-                            res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify({ ...result, gameState }));
-                        } catch (e) {
-                            console.error('[Game API] Error handling action:', e);
-                            res.statusCode = 400;
-                            res.end(JSON.stringify({ success: false, error: e.message }));
-                        }
-                    });
+                // POST /api/action - Handles all player actions (validated inside engine.dispatch)
+                if (url === '/api/action' && req.method === 'POST') {
+                    res.setHeader('Content-Type', 'application/json');
+                    const action = await readJson(req, res, MAX_ACTION_BYTES);
+                    if (action === null) return;
+                    try {
+                        res.end(JSON.stringify(engine.dispatch(action)));
+                    } catch (e) {
+                        console.error('[Game API] Error handling action:', e);
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ success: false, error: 'Action failed' }));
+                    }
                     return;
                 }
 
-                // GET /api/words?dictionary=csw21 - Returns all words from specified dictionary
-                if (req.url?.startsWith('/api/words') && req.method === 'GET') {
-                    const url = new URL(req.url, `http://${req.headers.host}`);
-                    const dictionary = url.searchParams.get('dictionary');
-                    const length = url.searchParams.get('length');
-                    const contains = url.searchParams.get('contains');
-                    const containsAny = url.searchParams.get('containsAny');
-                    const startsWith = url.searchParams.get('startsWith');
-                    const endsWith = url.searchParams.get('endsWith');
-                    const excludes = url.searchParams.get('excludes');
+                // Test-only hook (exists only when the server is started with OXY_TEST=1): set a player's rack.
+                if (process.env.OXY_TEST === '1' && url === '/api/dev/set-rack' && req.method === 'POST') {
+                    const body = await readJson(req, res);
+                    if (body === null) return;
+                    engine.debugSetRack(body.playerId, body.rack);
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                }
 
-                    let words = [];
-                    if (dictionary === 'csw21') {
-                        words = Array.from(csw21Dictionary.keys());
-                    } else if (dictionary === 'nwl2023') {
-                        words = Array.from(nwl2023Dictionary.keys());
-                    } else if (dictionary === 'slovenian') {
-                        words = Array.from(slovenianDictionary.keys());
+                // GET /api/words?dictionary=csw21&length=5&... - Word queries for the practice modes
+                if (url.startsWith('/api/words') && req.method === 'GET') {
+                    const params = new URL(url, 'http://localhost').searchParams;
+                    const query = {};
+                    for (const key of ['dictionary', 'length', 'contains', 'containsAny', 'startsWith', 'endsWith', 'excludes']) {
+                        const value = params.get(key);
+                        if (value) query[key] = value.slice(0, 100);
+                    }
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(store.words(query)));
+                    return;
+                }
+
+                // ODD ONE OUT MULTIPLAYER API (laptop-host mode only)
+                if (url === '/api/odd-one-out/create' && req.method === 'POST') {
+                    res.setHeader('Content-Type', 'application/json');
+                    const body = await readJson(req, res);
+                    if (body === null) return;
+                    const sessionId = Math.random().toString(36).substring(2, 8).toUpperCase().padEnd(6, '0');
+                    oddOneOutSessions.set(sessionId, {
+                        id: sessionId,
+                        players: {}, // { 1: { connected: true, answer: null }, 2: ... }
+                        status: 'waiting', // waiting, playing, review
+                        puzzle: null,
+                        startTime: null,
+                        roundDuration: intIn(body.roundDuration, 1, 60) ?? 5,
+                    });
+                    res.end(JSON.stringify({ sessionId }));
+                    return;
+                }
+
+                if (url === '/api/odd-one-out/join' && req.method === 'POST') {
+                    res.setHeader('Content-Type', 'application/json');
+                    const body = await readJson(req, res);
+                    if (body === null) return;
+                    const session = sessionFrom(body.sessionId);
+                    const playerId = intIn(body.playerId, 1, 8);
+                    if (session && playerId) {
+                        session.players[playerId] = { connected: true, answer: null };
+                        res.end(JSON.stringify({ success: true }));
                     } else {
-                        // Return all active dictionary words
-                        words = Array.from(activeDictionary);
+                        res.statusCode = 404;
+                        res.end(JSON.stringify({ error: 'Session not found' }));
                     }
+                    return;
+                }
 
-                    // Apply filters
-                    if (length) {
-                        const targetLength = parseInt(length);
-                        words = words.filter(w => w.length === targetLength);
-                    }
-
-                    if (contains) {
-                        // Word must contain ALL specified letters
-                        const containsLetters = contains.toUpperCase().split(',');
-                        words = words.filter(w => {
-                            const upper = w.toUpperCase();
-                            return containsLetters.every(letter => upper.includes(letter.trim()));
-                        });
-                    }
-
-                    if (containsAny) {
-                        // Word must contain AT LEAST ONE of the specified letters
-                        const containsLetters = containsAny.toUpperCase().split(',');
-                        words = words.filter(w => {
-                            const upper = w.toUpperCase();
-                            return containsLetters.some(letter => upper.includes(letter.trim()));
-                        });
-                    }
-
-                    if (startsWith) {
-                        const prefix = startsWith.toUpperCase();
-                        words = words.filter(w => w.toUpperCase().startsWith(prefix));
-                    }
-
-                    if (endsWith) {
-                        const suffix = endsWith.toUpperCase();
-                        words = words.filter(w => w.toUpperCase().endsWith(suffix));
-                    }
-
-                    if (excludes) {
-                        const excludeLetters = excludes.toUpperCase().split(',');
-                        words = words.filter(w => {
-                            const upper = w.toUpperCase();
-                            return !excludeLetters.some(letter => upper.includes(letter.trim()));
-                        });
-                    }
-
+                if (url.startsWith('/api/odd-one-out/state') && req.method === 'GET') {
+                    const session = sessionFrom(new URL(url, 'http://localhost').searchParams.get('sessionId'));
                     res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({ words, count: words.length }));
-                    return;
-                }
-
-                // ODD ONE OUT MULTIPLAYER API
-
-                // POST /api/odd-one-out/create
-                if (req.url === '/api/odd-one-out/create' && req.method === 'POST') {
-                    let body = '';
-                    req.on('data', chunk => body += chunk);
-                    req.on('end', () => {
-                        const { roundDuration } = JSON.parse(body || '{}');
-                        const sessionId = Math.random().toString(36).substring(2, 8).toUpperCase();
-                        oddOneOutSessions.set(sessionId, {
-                            id: sessionId,
-                            players: {}, // { 1: { connected: false, answer: null }, 2: ... }
-                            status: 'waiting', // waiting, playing, review
-                            puzzle: null,
-                            startTime: null,
-                            roundDuration: roundDuration || 5
-                        });
-                        res.setHeader('Content-Type', 'application/json');
-                        res.end(JSON.stringify({ sessionId }));
-                    });
-                    return;
-                }
-
-                // POST /api/odd-one-out/join
-                if (req.url === '/api/odd-one-out/join' && req.method === 'POST') {
-                    let body = '';
-                    req.on('data', chunk => body += chunk);
-                    req.on('end', () => {
-                        const { sessionId, playerId } = JSON.parse(body);
-                        const session = oddOneOutSessions.get(sessionId);
-                        if (session) {
-                            session.players[playerId] = { connected: true, answer: null };
-                            res.end(JSON.stringify({ success: true }));
-                        } else {
-                            res.statusCode = 404;
-                            res.end(JSON.stringify({ error: 'Session not found' }));
-                        }
-                    });
-                    return;
-                }
-
-                // GET /api/odd-one-out/state
-                if (req.url?.startsWith('/api/odd-one-out/state') && req.method === 'GET') {
-                    const url = new URL(req.url, `http://${req.headers.host}`);
-                    const sessionId = url.searchParams.get('sessionId');
-                    const session = oddOneOutSessions.get(sessionId);
                     if (session) {
-                        res.setHeader('Content-Type', 'application/json');
                         res.end(JSON.stringify(session));
                     } else {
                         res.statusCode = 404;
@@ -895,51 +170,48 @@ export function gameApiPlugin() {
                 }
 
                 // POST /api/odd-one-out/update (Host updates state)
-                if (req.url === '/api/odd-one-out/update' && req.method === 'POST') {
-                    let body = '';
-                    req.on('data', chunk => body += chunk);
-                    req.on('end', () => {
-                        const { sessionId, status, puzzle } = JSON.parse(body);
-                        const session = oddOneOutSessions.get(sessionId);
-                        if (session) {
-                            if (status) session.status = status;
-                            if (puzzle) session.puzzle = puzzle;
-
-                            if (status === 'playing') {
-                                // Reset answers and start timer
-                                Object.values(session.players).forEach(p => p.answer = null);
-                                session.startTime = Date.now();
-                            }
-
-                            res.end(JSON.stringify({ success: true }));
-                        } else {
-                            res.statusCode = 404;
-                            res.end(JSON.stringify({ error: 'Session not found' }));
-                        }
-                    });
+                if (url === '/api/odd-one-out/update' && req.method === 'POST') {
+                    res.setHeader('Content-Type', 'application/json');
+                    const body = await readJson(req, res);
+                    if (body === null) return;
+                    const session = sessionFrom(body.sessionId);
+                    if (!session) {
+                        res.statusCode = 404;
+                        res.end(JSON.stringify({ error: 'Session not found' }));
+                        return;
+                    }
+                    if (['waiting', 'playing', 'review'].includes(body.status)) session.status = body.status;
+                    const puzzle = sanitizePuzzle(body.puzzle);
+                    if (puzzle) session.puzzle = puzzle;
+                    if (body.status === 'playing') {
+                        // Reset answers and start timer
+                        Object.values(session.players).forEach((p) => (p.answer = null));
+                        session.startTime = Date.now();
+                    }
+                    res.end(JSON.stringify({ success: true }));
                     return;
                 }
 
                 // POST /api/odd-one-out/submit (Player submits answer)
-                if (req.url === '/api/odd-one-out/submit' && req.method === 'POST') {
-                    let body = '';
-                    req.on('data', chunk => body += chunk);
-                    req.on('end', () => {
-                        const { sessionId, playerId, answerIndex } = JSON.parse(body);
-                        const session = oddOneOutSessions.get(sessionId);
-                        if (session && session.players[playerId]) {
-                            session.players[playerId].answer = answerIndex;
-                            res.end(JSON.stringify({ success: true }));
-                        } else {
-                            res.statusCode = 404;
-                            res.end(JSON.stringify({ error: 'Session or player not found' }));
-                        }
-                    });
+                if (url === '/api/odd-one-out/submit' && req.method === 'POST') {
+                    res.setHeader('Content-Type', 'application/json');
+                    const body = await readJson(req, res);
+                    if (body === null) return;
+                    const session = sessionFrom(body.sessionId);
+                    const playerId = intIn(body.playerId, 1, 8);
+                    const answerIndex = intIn(body.answerIndex, 0, 7);
+                    if (session && playerId && answerIndex !== null && session.players[playerId]) {
+                        session.players[playerId].answer = answerIndex;
+                        res.end(JSON.stringify({ success: true }));
+                    } else {
+                        res.statusCode = 404;
+                        res.end(JSON.stringify({ error: 'Session or player not found' }));
+                    }
                     return;
                 }
 
                 next();
             });
-        }
+        },
     };
 }
