@@ -7,6 +7,7 @@
 
 <script>
 import ConnectionBadge from './components/ConnectionBadge.vue';
+import { applyViewSettings, readViewSettings } from './composables/useViewSettings.js';
 
 const THEME_KEY = 'oxy-theme';
 
@@ -24,6 +25,13 @@ export default {
   name: 'App',
   components: { ConnectionBadge },
   mounted() {
+    // Reader tiers first: a stored choice beats the media hint (R21), and CSS
+    // owns every appearance from the data-* attributes it publishes (R20).
+    try {
+      applyViewSettings(document.documentElement, readViewSettings());
+    } catch {
+      /* no storage or no DOM — the CSS defaults still hold */
+    }
     // Explicit [data-theme] override wins; otherwise the CSS layer follows
     // prefers-color-scheme on its own. Expose a test hook for agents/e2e.
     const theme = resolveTheme();

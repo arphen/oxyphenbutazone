@@ -50,6 +50,44 @@ Proposed additions for layout/owner agents (additive, never rename):
 cells, `bag-count`, `pass-confirm`, `swap-modal`, `blank-picker`,
 `game-over-modal`, `challenge-toast`. Keep kebab-case, stable across themes.
 
+## Afterglow adoption (complete, guide v2)
+
+All slices S1–S10 applied; acceptance is `npm run design:check` (static audit +
+Playwright suite) plus the `design-e2e` CI job. Evidence: `e2e-design/design-evidence.md`.
+
+- **Identity (S3).** Words on the board are the items; direction is the pole
+  (horizontal warm 2→142, vertical cool 183→323). Rank = distinct strings
+  sorted, index/(n−1), shared across poles (§3.3). Chips in history, tile ink
+  traces, gate ticks, spill and the territory light all compute from `--rank`
+  in CSS (`useWordCues.js` only names numbers). Engine history stores
+  lowercase; matching uppercases at the boundary.
+- **Seats are neutral** (number + steady accent fill for the current turn):
+  with 2–4 seats a hue ramp teaches nothing, and hue is reserved for words.
+- Interaction spends the accent; green/red (`--success`/`--danger`) are
+  reserved for validation and win over selection (R7). Invalid history rows
+  carry fill + ink with no glow and no hue.
+- Nothing loops (R14): every remaining animation runs once; `prefers-reduced-motion`
+  keeps all light. Root carries `overflow-x: clip` so the backlight layer can
+  never widen the layout viewport and steal taps (guide §15 item 34).
+- **Reader tiers (S5).** `useViewSettings.js` publishes `data-*` on `<html>`
+  (stored choice beats media hint, unknown values fall back, single Reset);
+  `ViewPanel.vue` (`details`/`summary`, tier accents, upward sheet) is mounted
+  on the desktop sidebar and the phone view. Low-bloom dim/veil tiers drop all
+  bloom. Dials compose; the `[D1]` matrix covers the corners.
+- **Territory (S6).** Four registered corner ranks glide (900ms) as words are
+  played; the ground's radials + conic bezel edge use exactly the on-screen
+  word hues (R27). `[J5]` asserts the light moves.
+- **Economy (S7).** Anchors mark playable squares; `--remaining` (tiles left)
+  and `--libido` (1 − 8% per pass/exchange/invalid) feed `--charge`; help
+  dims every light including the backlight. `[J8]` asserts the drain.
+- **Celebration (S8).** Tiered finale (flawless/strong/steady/finished) with
+  drawn check, rainbow rule, four stats and an honest note; sparks are flat
+  ramp dots fired from the rule, finite, no canvas. `[J7]` reaches the finish.
+- Glass (`backdrop-filter`) budget: phone dock, history tooltip, QR card,
+  finale card — 4 rules, none repeated (R10).
+- Remaining standard WARNs (non-blocking): hex fallbacks in `var()` (required
+  pattern), text glyphs (★✕✓▶↩, not emoji presentation), none on layout.
+
 ## Checks
 
 - `npm run build` in `frontend/` must pass.
