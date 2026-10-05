@@ -15,7 +15,14 @@ export default [
   },
   {
     // build tooling and tests that run under Node (the e2e suites also contain code that runs inside the page)
-    files: ['vite*.js', 'vitest.config.js', 'scripts/**/*.{js,mjs,cjs}', 'e2e/**/*.mjs'],
+    files: [
+      'vite*.js',
+      'vitest.config.js',
+      'scripts/**/*.{js,mjs,cjs}',
+      'e2e/**/*.mjs',
+      'e2e-design/**/*.mjs',
+      'ui/**/*.mjs',
+    ],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
