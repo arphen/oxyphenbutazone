@@ -1,5 +1,5 @@
 <template>
-  <div class="board" data-testid="board">
+  <div class="board oxy-ground" data-testid="board" :style="groundStyle">
     <div v-for="(row, rowIndex) in board" :key="rowIndex" class="board-row">
       <div
         v-for="(cell, colIndex) in row"
@@ -14,7 +14,10 @@
             'drag-over':
               dragOverCell && dragOverCell.row === rowIndex && dragOverCell.col === colIndex,
           },
+          cueClass(rowIndex, colIndex),
         ]"
+        :style="cueStyle(rowIndex, colIndex)"
+        :data-pole="cuePole(rowIndex, colIndex)"
         @dragover.prevent="onDragOver($event, rowIndex, colIndex)"
         @dragenter.prevent="onDragEnter($event, rowIndex, colIndex)"
         @dragleave.prevent="onDragLeave($event)"
@@ -24,6 +27,13 @@
         :data-testid="`cell-${rowIndex}-${colIndex}`"
         @dragstart="onDragStart($event, cell.letter, rowIndex, colIndex)"
       >
+        <i
+          v-if="tickDir(rowIndex, colIndex)"
+          class="wtick"
+          :class="`wtick-${tickDir(rowIndex, colIndex)}`"
+          aria-hidden="true"
+        ></i>
+        <i v-if="isAnchor(rowIndex, colIndex)" class="wanchor" aria-hidden="true"></i>
         <span v-if="cell.letter || cell.isBlank === true" class="tile-letter">{{
           cell.isBlank === true
             ? (cell.chosenLetter || '★').toUpperCase()
@@ -54,13 +64,75 @@ export default {
       type: String,
       default: 'english',
     },
+    // Word identity cues (S3/S6/S7): { cell: { "r,c": { rank, pole, spill,
+    // latest, tick } }, anchorKeys: Set, ground: { remaining, libido,
+    // taTop, taBottom, tbTop, tbBottom } }. Empty cues render a plain board.
+    cues: {
+      type: Object,
+      default: null,
+    },
+    // "r,c" cells that just changed: committed tiles arrive once (S9.5).
+    // Uncommitted (isNew) tiles carry their own settle instead.
+    freshKeys: {
+      type: Object,
+      default: null,
+    },
   },
   data() {
     return {
       dragOverCell: null,
     };
   },
+  computed: {
+    // The ground is lit by what is on screen and shares one charge of light
+    // among what is still open. JS only names numbers; CSS spends them.
+    groundStyle() {
+      const ground = this.cues?.ground;
+      if (!ground) return {};
+      return {
+        '--remaining': String(ground.remaining ?? 1),
+        '--libido': String(ground.libido ?? 1),
+        '--ta-top': String(ground.taTop ?? 0),
+        '--ta-bottom': String(ground.taBottom ?? 1),
+        '--tb-top': String(ground.tbTop ?? 0),
+        '--tb-bottom': String(ground.tbBottom ?? 1),
+      };
+    },
+  },
   methods: {
+    cellKey(row, col) {
+      return `${row},${col}`;
+    },
+    cueFor(row, col) {
+      return this.cues?.cell?.[this.cellKey(row, col)] || null;
+    },
+    cueClass(row, col) {
+      const cue = this.cueFor(row, col);
+      const classes = {};
+      if (cue) {
+        classes[cue.pole === 'b' ? 'wx-b' : 'wx-a'] = true;
+        if (cue.spill === 1) classes['wspill-1'] = true;
+        if (cue.spill === 2) classes['wspill-2'] = true;
+        if (cue.latest) classes['wlatest'] = true;
+      }
+      if (this.freshKeys?.has?.(this.cellKey(row, col))) classes['fresh'] = true;
+      return classes;
+    },
+    cueStyle(row, col) {
+      const cue = this.cueFor(row, col);
+      return cue ? { '--rank': String(cue.rank) } : {};
+    },
+    tickDir(row, col) {
+      return this.cueFor(row, col)?.tick || null;
+    },
+    cuePole(row, col) {
+      return this.cueFor(row, col)?.pole || null;
+    },
+    isAnchor(row, col) {
+      if (!this.cues?.anchorKeys?.has?.(this.cellKey(row, col))) return false;
+      const cell = this.board[row]?.[col];
+      return !(cell?.letter || cell?.isBlank);
+    },
     onDragOver(event, rowIndex, colIndex) {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
@@ -138,12 +210,13 @@ export default {
   aspect-ratio: 1 / 1;
   max-height: calc(100vh - 150px);
   min-width: 240px;
-  /* Macro depth lives on this one large surface — never per cell. */
-  background: var(--glass, rgba(0, 0, 0, 0.4));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* The board is the ground everything stands on, so it is matte and casts no
+     shadow (R11): a large drop shadow here showed as a dark band beside it, a
+     shadow cast onto nothing. Glass is reserved for the few floating
+     instruments (R10); cells stay cheap with flat fills and a 1px glint (R9).
+     A square bezel: the grid has no soft corners (R12). */
+  background: var(--board-bezel, #151b21);
   border: 2px solid var(--board-edge, rgba(255, 255, 255, 0.15));
-  box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.5));
 }
 
 .board-row {
@@ -157,7 +230,8 @@ export default {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--board-line, rgba(255, 255, 255, 0.1));
-  font-size: clamp(16px, 2vw, 28px);
+  /* The reader's size dial (mini) multiplies here, nowhere else. */
+  font-size: calc(clamp(16px, 2vw, 28px) * var(--scale, 1));
   font-weight: bold;
   text-transform: uppercase;
   position: relative;
@@ -168,6 +242,12 @@ export default {
     transform var(--dur-quick, 160ms) var(--ease-out, ease-out),
     background-color var(--dur-quick, 160ms) var(--ease-out, ease-out),
     box-shadow var(--dur-settle, 240ms) var(--ease-out, ease-out);
+}
+
+/* A committed tile arrives once, then rests. Uncommitted tiles carry their
+   own settle; the :not() keeps the two arrivals from ever stacking. */
+.board-cell.fresh:not(.new-tile) {
+  animation: oxy-arrive 220ms var(--ease-out, ease-out);
 }
 
 .board-cell:not(.has-tile):hover {
@@ -181,8 +261,10 @@ export default {
 }
 
 .board-cell.drag-over {
-  background: var(--success-soft, rgba(134, 239, 172, 0.4));
-  box-shadow: inset 0 0 0 2px var(--success-edge, rgba(74, 222, 128, 0.6));
+  /* Interaction reads as the accent, never as a verdict colour: green and red
+     are reserved for validation and must win over selection (R7). */
+  background: var(--accent-soft, rgba(122, 168, 255, 0.16));
+  box-shadow: inset 0 0 0 2px var(--accent-edge, rgba(122, 168, 255, 0.55));
   transform: scale(1.05);
   z-index: 10;
 }
@@ -227,14 +309,14 @@ export default {
   border-color: var(--tile-edge, #2a323d);
 }
 
-/* New tiles settle ONCE (220ms) — validation-green edge, then rest as tile.
-   No infinite animation: motion runs on interaction, never while idle. */
+/* A placed tile arrives once (160ms) and rests as porcelain. The edge it
+   arrives with is the accent: the tile is being worked, not judged (R7). */
 .new-tile {
   background: linear-gradient(135deg, var(--tile-face-hi, #fff), var(--tile-face-lo, #e9e6da));
   box-shadow:
-    0 0 0 2px var(--success-edge, rgba(74, 222, 128, 0.6)),
+    0 0 0 2px var(--accent-edge, rgba(122, 168, 255, 0.55)),
     var(--shadow-sm, 0 4px 8px rgba(0, 0, 0, 0.3));
-  border-color: var(--success-edge, rgba(74, 222, 128, 0.6));
+  border-color: var(--accent-edge, rgba(122, 168, 255, 0.55));
   animation: oxy-tile-settle 220ms var(--ease-out, ease-out);
 }
 

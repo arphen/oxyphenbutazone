@@ -1,5 +1,5 @@
 <template>
-  <div class="phone-board">
+  <div class="phone-board oxy-ground" :style="groundStyle">
     <div
       ref="viewportEl"
       class="pb-viewport"
@@ -11,30 +11,30 @@
       @pointercancel="onPointerCancel"
       @contextmenu.prevent
     >
-      <div
-        ref="contentEl"
-        class="pb-content"
-      >
-        <template
-          v-for="(row, r) in board"
-          :key="r"
-        >
+      <div ref="contentEl" class="pb-content">
+        <template v-for="(row, r) in board" :key="r">
           <div
             v-for="(cell, c) in row"
             :key="c"
             class="pb-cell drop-zone"
             :class="cellClass(cell, r, c)"
+            :style="cellStyle(r, c)"
+            :data-pole="poleFor(r, c)"
             :data-board-row="r"
             :data-board-col="c"
           >
+            <i
+              v-if="tickFor(r, c)"
+              class="wtick"
+              :class="`wtick-${tickFor(r, c)}`"
+              aria-hidden="true"
+            ></i>
+            <i v-if="anchorFor(r, c)" class="wanchor" aria-hidden="true"></i>
             <template v-if="isOccupied(cell)">
               <span class="pb-letter">{{ letterOf(cell) }}</span>
               <span class="pb-points">{{ pointsOf(cell) }}</span>
             </template>
-            <span
-              v-else-if="cell.type"
-              class="pb-label"
-            >{{ LABELS[cell.type] }}</span>
+            <span v-else-if="cell.type" class="pb-label">{{ LABELS[cell.type] }}</span>
           </div>
         </template>
       </div>
@@ -61,9 +61,19 @@
 // tap did something (placed or took back a tile), and only taps that did nothing can start a double-tap zoom.
 //
 // The transform is written straight to the element (never through Vue), so a gesture costs no re-render.
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { letterValue, BOARD_SIZE } from '../shared/rules';
-import { fitScale, clampView, toContent, pinchView, centerOn, cellAt, lerpView, distance, midpoint } from '../utils/panzoom';
+import {
+  fitScale,
+  clampView,
+  toContent,
+  pinchView,
+  centerOn,
+  cellAt,
+  lerpView,
+  distance,
+  midpoint,
+} from '../utils/panzoom';
 
 const props = defineProps({
   board: { type: Array, default: () => [] },
@@ -73,6 +83,10 @@ const props = defineProps({
   centerCol: { type: Number, default: 7 },
   /** A rack tile is selected: empty squares are highlighted as targets. */
   placing: { type: Boolean, default: false },
+  /** Word identity cues (S3/S6/S7); see Board.vue for the shape. */
+  cues: { type: Object, default: null },
+  /** "r,c" cells that just changed: committed tiles arrive once. */
+  freshKeys: { type: Object, default: null },
 });
 const emit = defineEmits(['cell-tap']);
 
@@ -112,6 +126,7 @@ const pointsOf = (cell) => (cell.isBlank ? 0 : letterValue(props.language, cell.
 
 function cellClass(cell, r, c) {
   const occupied = isOccupied(cell);
+  const cue = props.cues?.cell?.[`${r},${c}`] || null;
   return {
     [cell.type]: Boolean(cell.type) && !occupied,
     tile: occupied,
@@ -119,8 +134,46 @@ function cellClass(cell, r, c) {
     'is-blank': occupied && cell.isBlank,
     empty: !occupied,
     'pb-focus': focusCell.value && focusCell.value.row === r && focusCell.value.col === c,
+    'wx-a': Boolean(cue) && cue.pole !== 'b',
+    'wx-b': Boolean(cue) && cue.pole === 'b',
+    'wspill-1': cue?.spill === 1,
+    'wspill-2': cue?.spill === 2,
+    wlatest: cue?.latest === true,
+    fresh: props.freshKeys?.has?.(`${r},${c}`) === true && !cell.isNew,
   };
 }
+
+function cellStyle(r, c) {
+  const cue = props.cues?.cell?.[`${r},${c}`] || null;
+  return cue ? { '--rank': String(cue.rank) } : {};
+}
+
+function tickFor(r, c) {
+  return props.cues?.cell?.[`${r},${c}`]?.tick || null;
+}
+
+function poleFor(r, c) {
+  return props.cues?.cell?.[`${r},${c}`]?.pole || null;
+}
+
+function anchorFor(r, c) {
+  if (!props.cues?.anchorKeys?.has?.(`${r},${c}`)) return false;
+  const cell = props.board[r]?.[c];
+  return !isOccupied(cell);
+}
+
+const groundStyle = computed(() => {
+  const ground = props.cues?.ground;
+  if (!ground) return {};
+  return {
+    '--remaining': String(ground.remaining ?? 1),
+    '--libido': String(ground.libido ?? 1),
+    '--ta-top': String(ground.taTop ?? 0),
+    '--ta-bottom': String(ground.taBottom ?? 1),
+    '--tb-top': String(ground.tbTop ?? 0),
+    '--tb-bottom': String(ground.tbBottom ?? 1),
+  };
+});
 
 const limits = () => [fit, fit * MAX_ZOOM];
 const clamped = (v) => clampView(v, CONTENT, size, ...limits());
@@ -263,10 +316,23 @@ function onPointerMove(e) {
     gesture.type = 'pan';
   }
   if (gesture.type === 'pan') {
-    setView({ scale: gesture.start.scale, x: gesture.start.x + p.x - gesture.origin.x, y: gesture.start.y + p.y - gesture.origin.y });
+    setView({
+      scale: gesture.start.scale,
+      x: gesture.start.x + p.x - gesture.origin.x,
+      y: gesture.start.y + p.y - gesture.origin.y,
+    });
   } else if (gesture.type === 'pinch' && pointers.size === 2) {
     const [a, b] = [...pointers.values()];
-    setView(pinchView(gesture.start, gesture.focal, gesture.dist, midpoint(a, b), distance(a, b), ...limits()));
+    setView(
+      pinchView(
+        gesture.start,
+        gesture.focal,
+        gesture.dist,
+        midpoint(a, b),
+        distance(a, b),
+        ...limits()
+      )
+    );
   }
 }
 
@@ -274,7 +340,8 @@ function release(e, cancelled) {
   if (!pointers.has(e.pointerId)) return;
   const p = localPoint(e);
   pointers.delete(e.pointerId);
-  const wasTap = !cancelled && gesture?.type === 'pending' && e.timeStamp - gesture.time < TAP_MAX_MS;
+  const wasTap =
+    !cancelled && gesture?.type === 'pending' && e.timeStamp - gesture.time < TAP_MAX_MS;
 
   if (pointers.size === 1) {
     // pinch -> pan with the finger that stayed
@@ -290,7 +357,11 @@ const onPointerUp = (e) => release(e, false);
 const onPointerCancel = (e) => release(e, true);
 
 function handleTap(point, time) {
-  if (lastTap && time - lastTap.time < DOUBLE_TAP_MS && distance(lastTap.point, point) < DOUBLE_TAP_DIST) {
+  if (
+    lastTap &&
+    time - lastTap.time < DOUBLE_TAP_MS &&
+    distance(lastTap.point, point) < DOUBLE_TAP_DIST
+  ) {
     lastTap = null;
     toggleZoom(point);
     return;
@@ -366,9 +437,11 @@ defineExpose({
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  background: #0b1220;
+  /* The board is the ground: a matte bezel, never glass, never a hand-picked
+     hex (R10, R11). Cells and tiles below spend the shared tokens. */
+  background: var(--board-bezel, #151b21);
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--board-edge, rgba(255, 255, 255, 0.12));
 }
 
 .pb-content {
@@ -388,49 +461,89 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1c2740;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+  /* Grout-dark seams between tiles so a run of empty squares never reads as
+     one bar (R9); premium tints below name the square kind, nothing else. */
+  background: var(--board-cell, rgb(32 40 52 / 0.72));
+  box-shadow: inset 0 0 0 1px var(--board-line, rgb(255 255 255 / 0.09));
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
 }
 
-.pb-cell.tw { background: #9f1d35; }
-.pb-cell.dw { background: #9d3a6b; }
-.pb-cell.tl { background: #1f4fb8; }
-.pb-cell.dl { background: #2f6f95; }
-.pb-cell.center { background: #9d3a6b; }
+/* Premium squares: muted jewel washes keyed to meaning, never wood tones.
+   Labels carry the kind in ink, so hue is never the only carrier. */
+.pb-cell.tw {
+  background: var(--premium-tw);
+  color: var(--premium-tw-ink);
+}
+.pb-cell.dw {
+  background: var(--premium-dw);
+  color: var(--premium-dw-ink);
+}
+.pb-cell.tl {
+  background: var(--premium-tl);
+  color: var(--premium-tl-ink);
+}
+.pb-cell.dl {
+  background: var(--premium-dl);
+  color: var(--premium-dl-ink);
+}
+.pb-cell.center {
+  background: var(--premium-center);
+  color: var(--premium-center-ink);
+}
 
 .pb-label {
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  color: rgba(255, 255, 255, 0.92);
+  color: inherit;
 }
 
 .pb-cell.center .pb-label {
   font-size: 22px;
-  color: #fde68a;
 }
 
+/* Tiles stay light porcelain in both themes with dark ink (AAA); only the
+   edge adapts. This is the anti-Scrabble rule: no khaki, no beige. */
 .pb-cell.tile {
-  background: linear-gradient(160deg, #fbecc0, #e9cf8c);
-  box-shadow: inset 0 0 0 1px rgba(120, 80, 20, 0.55), inset 0 -2px 0 rgba(120, 80, 20, 0.35);
+  background: linear-gradient(160deg, var(--tile-face-hi, #fff), var(--tile-face-lo, #e9e6da));
+  box-shadow:
+    inset 0 0 0 1px var(--tile-edge, #2a323d),
+    inset 0 -2px 0 rgb(0 0 0 / 0.12);
   border-radius: 3px;
 }
 
 .pb-cell.tile.is-new {
-  background: linear-gradient(160deg, #fff3a8, #facc15);
-  box-shadow: inset 0 0 0 3px #22c55e;
+  background: linear-gradient(160deg, var(--tile-face-hi, #fff), var(--tile-face-lo, #e9e6da));
+  box-shadow: inset 0 0 0 3px var(--accent-edge, rgb(122 168 255 / 0.55));
+  /* A placed tile arrives, it does not appear (§9.5). */
+  animation: pbArrive 220ms var(--ease-out, ease-out);
 }
 
 .pb-letter {
-  font-size: 25px;
+  font-size: calc(25px * var(--scale, 1));
   font-weight: 800;
   line-height: 1;
-  color: #1a1a2e;
+  color: var(--tile-ink, #1a1a2e);
+}
+
+/* A committed tile arrives once, then rests (§9.5). */
+.pb-cell.fresh {
+  animation: pbArrive 220ms var(--ease-out, ease-out);
+}
+
+@keyframes pbArrive {
+  from {
+    opacity: 0.35;
+    transform: translateY(2px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .pb-cell.is-blank .pb-letter {
-  color: #b45309;
+  color: var(--warn-deep, #92600a);
   font-style: italic;
 }
 
@@ -441,11 +554,11 @@ defineExpose({
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
-  color: #3f3f46;
+  color: var(--tile-sub, #52525b);
 }
 
 .pb-viewport.placing .pb-cell.empty {
-  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.55);
+  box-shadow: inset 0 0 0 1px var(--accent-edge, rgb(122 168 255 / 0.55));
 }
 
 .pb-cell.pb-focus {
@@ -455,17 +568,17 @@ defineExpose({
 @keyframes pbFocus {
   0%,
   60% {
-    box-shadow: inset 0 0 0 4px #fde047;
+    box-shadow: inset 0 0 0 4px var(--focus-ring, #8dc7ff);
   }
   100% {
     box-shadow: inset 0 0 0 0 transparent;
   }
 }
 
-/* drag-and-drop from the rack (class set by the parent view) */
+/* A finger's drop target is interaction, not a verdict: the accent, steady. */
 .pb-cell.drop-target-active {
-  background: rgba(34, 197, 94, 0.75);
-  box-shadow: inset 0 0 0 3px #86efac;
+  background: var(--accent-soft, rgb(122 168 255 / 0.16));
+  box-shadow: inset 0 0 0 3px var(--accent-edge, rgb(122 168 255 / 0.55));
 }
 
 .pb-toolbar {
@@ -487,9 +600,9 @@ defineExpose({
   min-height: 44px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: #e4e4e7;
+  border: 1px solid var(--surface-edge, rgba(255, 255, 255, 0.2));
+  background: var(--surface-2, rgba(255, 255, 255, 0.08));
+  color: var(--ink, #e4e4e7);
   font-weight: 700;
   font-size: 0.85rem;
 }
