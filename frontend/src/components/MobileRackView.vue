@@ -3,15 +3,15 @@
     <div class="header">
       <h1>{{ playerName }}</h1>
       <div class="status" :class="{ active: isMyTurn }">
-        {{ isMyTurn ? "🟢 Your Turn" : "⏸️ Waiting..." }}
+        {{ isMyTurn ? 'Your turn' : 'Waiting' }}
       </div>
     </div>
-    
+
     <div class="score-display">
       <div class="score-label">Your Score</div>
       <div class="score-value">{{ playerScore }}</div>
     </div>
-    
+
     <div class="rack-container">
       <div class="rack-label">Your Letters:</div>
       <div class="mobile-rack">
@@ -20,15 +20,13 @@
           <div class="points">{{ getLetterValue(letter) }}</div>
         </div>
       </div>
-      <div v-if="rack.length === 0" class="empty-rack">
-        No letters yet
-      </div>
+      <div v-if="rack.length === 0" class="empty-rack">No letters yet</div>
     </div>
-    
+
     <div class="info">
-      <p>📱 Keep this screen open during the game</p>
-      <p>🔄 Auto-updates when tiles change</p>
-      <button @click="refresh" class="refresh-button">↻ Refresh</button>
+      <p>Keep this screen open during the game</p>
+      <p>Updates when tiles change</p>
+      <button @click="refresh" class="refresh-button">Refresh</button>
     </div>
   </div>
 </template>
@@ -59,10 +57,10 @@ export default {
     const urlParams = new URLSearchParams(this.$route.query);
     this.gameId = urlParams.get('game') || 'default';
     this.playerId = urlParams.get('player') || '1';
-    
+
     // Load initial data
     this.loadGameData();
-    
+
     // Poll for updates every 1 second
     this.updateInterval = setInterval(() => {
       this.loadGameData();
@@ -76,14 +74,33 @@ export default {
   methods: {
     getLetterValue(letter) {
       const values = {
-        'a': 1, 'e': 1, 'i': 1, 'o': 1, 'u': 1, 'l': 1, 'n': 1, 's': 1, 't': 1, 'r': 1,
-        'd': 2, 'g': 2,
-        'b': 3, 'c': 3, 'm': 3, 'p': 3,
-        'f': 4, 'h': 4, 'v': 4, 'w': 4, 'y': 4,
-        'k': 5,
-        'j': 8, 'x': 8,
-        'q': 10, 'z': 10,
-        '': 0
+        a: 1,
+        e: 1,
+        i: 1,
+        o: 1,
+        u: 1,
+        l: 1,
+        n: 1,
+        s: 1,
+        t: 1,
+        r: 1,
+        d: 2,
+        g: 2,
+        b: 3,
+        c: 3,
+        m: 3,
+        p: 3,
+        f: 4,
+        h: 4,
+        v: 4,
+        w: 4,
+        y: 4,
+        k: 5,
+        j: 8,
+        x: 8,
+        q: 10,
+        z: 10,
+        '': 0,
       };
       return values[letter.toLowerCase()] || 0;
     },
@@ -115,55 +132,54 @@ export default {
 <style scoped>
 .mobile-rack-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--surface-0);
+  color: var(--ink);
   padding: 20px;
   font-family: Avenir, Helvetica, Arial, sans-serif;
 }
 
 .header {
   text-align: center;
-  color: white;
+  color: var(--ink);
   margin-bottom: 20px;
 }
 
 .header h1 {
   margin: 0 0 10px 0;
   font-size: 2rem;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
 .status {
   display: inline-block;
   padding: 8px 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  transition: all 0.3s ease;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-muted);
 }
 
 .status.active {
-  background: #4CAF50;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
+  color: var(--ink);
+  /* Steady while active: the words already say whose turn it is. No loop. */
 }
 
 .score-display {
-  background: white;
-  border-radius: 15px;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .score-label {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 5px;
@@ -172,21 +188,23 @@ export default {
 .score-value {
   font-size: 3rem;
   font-weight: bold;
-  color: #764ba2;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .rack-container {
-  background: white;
-  border-radius: 15px;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .rack-label {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #333;
+  color: var(--ink);
   margin-bottom: 15px;
   text-align: center;
 }
@@ -198,17 +216,21 @@ export default {
   justify-content: center;
 }
 
+/* Porcelain tiles in both themes — never the khaki imitation (R1: the
+   letter already names the tile, so the face stays quiet). */
 .rack-tile {
   width: 90px;
   height: 90px;
-  background: linear-gradient(135deg, #f0e68c 0%, #daa520 100%);
-  border: 2px solid #333;
+  background: linear-gradient(135deg, var(--tile-face-hi, #fff), var(--tile-face-lo, #e9e6da));
+  border: 1px solid var(--tile-edge, #333);
+  box-shadow:
+    inset 0 1px 0 var(--cell-glint, transparent),
+    var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.2));
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   position: relative;
 }
 
@@ -216,7 +238,7 @@ export default {
   font-size: 2.5rem;
   font-weight: bold;
   text-transform: uppercase;
-  color: #333;
+  color: var(--tile-ink, #333);
 }
 
 .points {
@@ -225,50 +247,53 @@ export default {
   right: 8px;
   font-size: 1rem;
   font-weight: bold;
-  color: #666;
+  color: var(--tile-sub, #666);
+  font-variant-numeric: tabular-nums;
 }
 
 .empty-rack {
   text-align: center;
   padding: 30px;
-  color: #999;
+  color: var(--ink-faint);
   font-size: 1.1rem;
 }
 
 .info {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 15px;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  border-radius: 12px;
   padding: 20px;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .info p {
   margin: 10px 0;
   font-size: 0.95rem;
-  color: #555;
+  color: var(--ink-muted);
 }
 
 .refresh-button {
   margin-top: 15px;
   padding: 12px 30px;
   font-size: 1.1rem;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 25px;
+  font-weight: 700;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 1px solid var(--primary);
+  border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
 }
 
 .refresh-button:hover {
-  background: #45a049;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  background: var(--primary-hover);
+  transform: translateY(-1px);
 }
 
 .refresh-button:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.97);
+  transition-duration: 60ms;
 }
 </style>

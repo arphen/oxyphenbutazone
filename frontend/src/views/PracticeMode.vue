@@ -9,17 +9,19 @@
       </div>
 
       <div class="categories-grid">
-        <div 
-          v-for="(category, key) in categories" 
+        <div
+          v-for="(category, key) in categories"
           :key="key"
           class="category-card"
           @click="selectCategory(key)"
         >
-          <div class="category-icon">{{ category.icon }}</div>
+          <!-- why: data icons are emoji; render the category initial instead so no emoji ships -->
+          <div class="category-icon" aria-hidden="true">{{ category.name.charAt(0) }}</div>
           <h2>{{ category.name }}</h2>
           <p>{{ category.description }}</p>
           <div class="scenario-count">
-            {{ getCategoryScenarioCount(key) }} {{ getCategoryScenarioCount(key) === 1 ? 'scenario' : 'scenarios' }}
+            {{ getCategoryScenarioCount(key) }}
+            {{ getCategoryScenarioCount(key) === 1 ? 'scenario' : 'scenarios' }}
           </div>
         </div>
       </div>
@@ -30,8 +32,8 @@
       <div class="practice-layout">
         <!-- Board Section -->
         <div class="board-section">
-          <Board 
-            :board="currentBoard" 
+          <Board
+            :board="currentBoard"
             @place-letter="handlePlaceLetter"
             @cell-click="handleCellClick"
           />
@@ -41,9 +43,7 @@
         <div class="sidebar">
           <!-- Header -->
           <div class="sidebar-header">
-            <button @click="exitScenario" class="icon-button" title="Back to Categories">
-              ←
-            </button>
+            <button @click="exitScenario" class="icon-button" title="Back to Categories">←</button>
             <div class="scenario-info">
               <div class="scenario-title">{{ selectedScenario.title }}</div>
               <div class="difficulty-badge" :class="selectedScenario.difficulty">
@@ -56,20 +56,19 @@
           <div class="description-section">
             <p>{{ selectedScenario.description }}</p>
             <div class="category-badge">
-              {{ categories[selectedScenario.category].icon }}
               {{ categories[selectedScenario.category].name }}
             </div>
           </div>
 
           <!-- Rack -->
           <div class="rack-section">
-            <h3>Your Rack</h3>
+            <h3>Rack</h3>
             <div class="rack">
-              <div 
-                v-for="(letter, index) in rack" 
+              <div
+                v-for="(letter, index) in rack"
                 :key="`rack-${index}`"
                 class="tile"
-                :class="{ 'used': usedTiles.includes(index) }"
+                :class="{ used: usedTiles.includes(index) }"
                 draggable="true"
                 @dragstart="handleDragStart($event, letter, index)"
                 @dragend="handleDragEnd"
@@ -83,8 +82,9 @@
           <!-- Feedback Section -->
           <div class="feedback-section" v-if="feedback">
             <div class="feedback-box" :class="feedback.type">
-              <div class="feedback-icon">
-                {{ feedback.type === 'success' ? '🎉' : feedback.type === 'error' ? '❌' : 'ℹ️' }}
+              <!-- why: plain text glyphs (not emoji) mark validation state; color comes from --success/--danger/--accent -->
+              <div class="feedback-icon" aria-hidden="true">
+                {{ feedback.type === 'success' ? '✓' : feedback.type === 'error' ? '×' : 'i' }}
               </div>
               <div class="feedback-content">
                 <div class="feedback-title">{{ feedback.title }}</div>
@@ -100,14 +100,10 @@
           <div class="hints-section" v-if="!showSolution">
             <h3>Hints</h3>
             <div class="hints-list">
-              <div 
-                v-for="(hint, index) in visibleHints" 
-                :key="index"
-                class="hint-item"
-              >
+              <div v-for="(hint, index) in visibleHints" :key="index" class="hint-item">
                 {{ hint }}
               </div>
-              <button 
+              <button
                 v-if="visibleHints.length < selectedScenario.hints.length"
                 @click="showNextHint"
                 class="hint-button"
@@ -120,18 +116,15 @@
           <!-- Solution Section -->
           <div class="solution-section" v-if="showSolution">
             <h3>Solution{{ selectedScenario.solutions.length > 1 ? 's' : '' }}</h3>
-            <div 
-              v-for="(solution, index) in selectedScenario.solutions" 
+            <div
+              v-for="(solution, index) in selectedScenario.solutions"
               :key="index"
               class="solution-item"
             >
               <div class="solution-word">{{ solution.word }}</div>
               <div class="solution-score">{{ solution.score }} points</div>
               <div class="solution-explanation">{{ solution.explanation }}</div>
-              <button 
-                @click="showSolutionOnBoard(solution)"
-                class="show-solution-button"
-              >
+              <button @click="showSolutionOnBoard(solution)" class="show-solution-button">
                 Show on Board
               </button>
             </div>
@@ -139,21 +132,12 @@
 
           <!-- Action Buttons -->
           <div class="actions-section">
-            <button @click="checkSolution" class="action-button primary">
-              ✓ Check My Solution
+            <button @click="checkSolution" class="action-button primary">Check solution</button>
+            <button @click="resetBoard" class="action-button secondary">↺ Reset Board</button>
+            <button @click="toggleSolution" class="action-button secondary">
+              {{ showSolution ? 'Hide' : 'Show' }} solution
             </button>
-            <button @click="resetBoard" class="action-button secondary">
-              ↺ Reset Board
-            </button>
-            <button 
-              @click="toggleSolution" 
-              class="action-button secondary"
-            >
-              {{ showSolution ? '👁️ Hide' : '💡 Show' }} Solution
-            </button>
-            <button @click="nextScenario" class="action-button success">
-              Next Scenario →
-            </button>
+            <button @click="nextScenario" class="action-button success">Next Scenario →</button>
           </div>
         </div>
       </div>
@@ -163,17 +147,23 @@
 
 <script>
 import Board from '../components/Board.vue';
-import { 
-  practiceCategories, 
+import {
+  practiceCategories,
   getScenariosByCategory,
-  getRandomScenario 
+  getRandomScenario,
 } from '../data/practiceScenarios.js';
-import { scenarioCells, evaluatePlay, findInvalidWords, findSolution, sameTiles } from '../data/practiceCheck.js';
+import {
+  scenarioCells,
+  evaluatePlay,
+  findInvalidWords,
+  findSolution,
+  sameTiles,
+} from '../data/practiceCheck.js';
 
 export default {
   name: 'PracticeMode',
   components: {
-    Board
+    Board,
   },
   data() {
     return {
@@ -188,7 +178,7 @@ export default {
       feedback: null,
       showSolution: false,
       visibleHints: [],
-      placedTiles: [] // Track tiles placed by the player
+      placedTiles: [], // Track tiles placed by the player
     };
   },
   methods: {
@@ -228,15 +218,18 @@ export default {
 
     handleDragStart(event, letter, index) {
       if (this.usedTiles.includes(index)) return;
-      
+
       this.draggedTile = letter;
       this.draggedIndex = index;
       event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', JSON.stringify({
-        letter,
-        from: 'rack',
-        index
-      }));
+      event.dataTransfer.setData(
+        'text/plain',
+        JSON.stringify({
+          letter,
+          from: 'rack',
+          index,
+        })
+      );
     },
 
     handleDragEnd() {
@@ -268,9 +261,11 @@ export default {
             this.currentBoard[toRowIndex][toColIndex].isNew = true;
             this.currentBoard[fromRowIndex][fromColIndex].letter = '';
             this.currentBoard[fromRowIndex][fromColIndex].isNew = false;
-            
+
             // Update placedTiles tracking
-            const tileIndex = this.placedTiles.findIndex(t => t.row === fromRowIndex && t.col === fromColIndex);
+            const tileIndex = this.placedTiles.findIndex(
+              (t) => t.row === fromRowIndex && t.col === fromColIndex
+            );
             if (tileIndex !== -1) {
               this.placedTiles[tileIndex].row = toRowIndex;
               this.placedTiles[tileIndex].col = toColIndex;
@@ -287,23 +282,23 @@ export default {
       // Allow removing only player-placed tiles
       if (this.currentBoard[row][col].letter && !this.currentBoard[row][col].isPracticeOriginal) {
         // Find the tile in placedTiles
-        const tileIndex = this.placedTiles.findIndex(t => t.row === row && t.col === col);
+        const tileIndex = this.placedTiles.findIndex((t) => t.row === row && t.col === col);
         if (tileIndex !== -1) {
           const tile = this.placedTiles[tileIndex];
-          
+
           // Remove from board
           this.currentBoard[row][col].letter = '';
           this.currentBoard[row][col].isNew = false;
-          
+
           // Return to rack
           const rackIndex = this.usedTiles.indexOf(tile.rackIndex);
           if (rackIndex !== -1) {
             this.usedTiles.splice(rackIndex, 1);
           }
-          
+
           // Remove from placedTiles
           this.placedTiles.splice(tileIndex, 1);
-          
+
           this.currentBoard = [...this.currentBoard];
         }
       }
@@ -311,14 +306,33 @@ export default {
 
     getLetterValue(letter) {
       const values = {
-        'A': 1, 'E': 1, 'I': 1, 'O': 1, 'U': 1, 'L': 1, 'N': 1, 'S': 1, 'T': 1, 'R': 1,
-        'D': 2, 'G': 2,
-        'B': 3, 'C': 3, 'M': 3, 'P': 3,
-        'F': 4, 'H': 4, 'V': 4, 'W': 4, 'Y': 4,
-        'K': 5,
-        'J': 8, 'X': 8,
-        'Q': 10, 'Z': 10,
-        '': 0
+        A: 1,
+        E: 1,
+        I: 1,
+        O: 1,
+        U: 1,
+        L: 1,
+        N: 1,
+        S: 1,
+        T: 1,
+        R: 1,
+        D: 2,
+        G: 2,
+        B: 3,
+        C: 3,
+        M: 3,
+        P: 3,
+        F: 4,
+        H: 4,
+        V: 4,
+        W: 4,
+        Y: 4,
+        K: 5,
+        J: 8,
+        X: 8,
+        Q: 10,
+        Z: 10,
+        '': 0,
       };
       return values[letter] || 0;
     },
@@ -328,7 +342,7 @@ export default {
         this.feedback = {
           type: 'error',
           title: 'No tiles placed',
-          message: 'Place some tiles on the board first!'
+          message: 'Place tiles on the board first.',
         };
         return;
       }
@@ -347,19 +361,23 @@ export default {
           const response = await fetch('/api/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'validate-word', word })
+            body: JSON.stringify({ type: 'validate-word', word }),
           });
           return (await response.json()).valid === true;
         });
       } catch {
-        this.feedback = { type: 'error', title: 'Could not check', message: 'The words could not be checked. Please try again.' };
+        this.feedback = {
+          type: 'error',
+          title: 'Could not check',
+          message: 'The words could not be checked. Please try again.',
+        };
         return;
       }
       if (invalid.length > 0) {
         this.feedback = {
           type: 'error',
           title: 'Not a word',
-          message: `${invalid.join(', ')} ${invalid.length === 1 ? 'is' : 'are'} not in your word list, so this play is not allowed.`
+          message: `${invalid.join(', ')} ${invalid.length === 1 ? 'is' : 'are'} not in your word list, so this play is not allowed.`,
         };
         return;
       }
@@ -369,31 +387,31 @@ export default {
         const exact = sameTiles(this.currentBoard, matchingSolution);
         this.feedback = {
           type: 'success',
-          title: 'Correct! 🎉',
+          title: 'Correct',
           message: exact
             ? matchingSolution.explanation
             : `You found ${matchingSolution.word}. ${matchingSolution.explanation}`,
-          score: play.score
+          score: play.score,
         };
         return;
       }
 
       // A valid play of your own: compare it with the best listed play
-      const bestSolutionScore = Math.max(...this.selectedScenario.solutions.map(s => s.score));
+      const bestSolutionScore = Math.max(...this.selectedScenario.solutions.map((s) => s.score));
       if (play.score >= bestSolutionScore * 0.9) {
         const longest = [...play.words].sort((a, b) => b.word.length - a.word.length)[0].word;
         this.feedback = {
           type: 'success',
-          title: 'Good play!',
-          message: `${longest} is a real word and your play scored ${play.score} points. That's a strong move!`,
-          score: play.score
+          title: 'Good play',
+          message: `${longest} is valid. Scored ${play.score} points.`,
+          score: play.score,
         };
       } else {
         this.feedback = {
           type: 'info',
           title: 'Not the optimal solution',
-          message: `You scored ${play.score} points, but there's a better move worth ${bestSolutionScore} points. Try again or check the solution!`,
-          score: play.score
+          message: `Scored ${play.score} points. Best listed move is ${bestSolutionScore} points.`,
+          score: play.score,
         };
       }
     },
@@ -415,14 +433,16 @@ export default {
 
     showSolutionOnBoard(solution) {
       this.resetBoard();
-      
+
       // Place solution tiles on board
-      solution.tiles.forEach(tile => {
+      solution.tiles.forEach((tile) => {
         const { letter, row, col } = tile;
-        
+
         // Find this letter in rack
-        const rackIndex = this.rack.findIndex((l, i) => l === letter && !this.usedTiles.includes(i));
-        
+        const rackIndex = this.rack.findIndex(
+          (l, i) => l === letter && !this.usedTiles.includes(i)
+        );
+
         if (rackIndex !== -1 && !this.currentBoard[row][col].isPracticeOriginal) {
           this.currentBoard[row][col].letter = letter;
           this.currentBoard[row][col].isNew = true;
@@ -430,14 +450,14 @@ export default {
           this.placedTiles.push({ row, col, letter, rackIndex });
         }
       });
-      
+
       this.currentBoard = [...this.currentBoard];
-      
+
       this.feedback = {
         type: 'info',
         title: 'Solution shown',
         message: solution.explanation,
-        score: solution.score
+        score: solution.score,
       };
     },
 
@@ -450,17 +470,17 @@ export default {
     exitScenario() {
       this.selectedScenario = null;
       this.selectedCategory = null;
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
+/* why: Afterglow page is flat surface-0; depth lives on cards via 1px edge + glint, never gradients */
 #practice-mode {
-  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   min-height: 100vh;
-  color: #e4e4e7;
+  background: var(--surface-0);
+  color: var(--ink);
 }
 
 /* Category Selection View */
@@ -478,34 +498,40 @@ export default {
   position: absolute;
   top: 20px;
   left: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e4e4e7;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
   padding: 10px 20px;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
   border-radius: 6px;
 }
 
+/* why: hover lifts 1px with an accent edge; press is a 60ms scale(0.97); no blur outside modals */
 .back-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateX(-5px);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
+}
+
+.back-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .header h1 {
   font-size: 3.5rem;
   margin: 0 0 10px 0;
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--ink);
 }
 
 .subtitle {
   font-size: 1.3rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -519,45 +545,66 @@ export default {
   gap: 30px;
 }
 
+/* why: matte surface-1 card + 1px edge + glint; glass blur is reserved for modals, never cards */
 .category-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   border-radius: 12px;
   padding: 30px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
   text-align: center;
 }
 
 .category-card:hover {
-  transform: translateY(-10px);
-  border-color: rgba(96, 165, 250, 0.5);
-  box-shadow: 0 20px 40px rgba(96, 165, 250, 0.2);
+  transform: translateY(-1px);
+  border-color: var(--accent-edge);
 }
 
+.category-card:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+
+/* why: category initial in a neutral surface-2 badge; hue is reserved, ink names the card */
 .category-icon {
-  font-size: 4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
   margin-bottom: 20px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink-muted);
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 .category-card h2 {
   font-size: 1.5rem;
   margin: 0 0 15px 0;
-  color: #e4e4e7;
+  color: var(--ink);
 }
 
 .category-card p {
-  color: #a1a1aa;
+  color: var(--ink-muted);
   line-height: 1.6;
   margin: 0 0 20px 0;
   min-height: 50px;
 }
 
 .scenario-count {
-  color: #60a5fa;
+  color: var(--ink-muted);
   font-weight: 600;
   font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Practice View */
@@ -578,15 +625,14 @@ export default {
   padding: 20px;
 }
 
+/* why: sidebar is a docked panel, not a floating modal — flat surface-1, no blur, no cast shadow */
 .sidebar {
   width: 420px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-1);
+  border-left: 1px solid var(--surface-edge);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-header {
@@ -594,24 +640,33 @@ export default {
   align-items: center;
   gap: 15px;
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--surface-edge);
+  background: var(--surface-1);
 }
 
 .icon-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e4e4e7;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
   padding: 10px 15px;
   font-size: 1.2rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
   border-radius: 6px;
 }
 
 .icon-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateX(-3px);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
+}
+
+.icon-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .scenario-info {
@@ -621,7 +676,7 @@ export default {
 .scenario-title {
   font-size: 1.2rem;
   font-weight: 700;
-  color: #e4e4e7;
+  color: var(--ink);
   margin-bottom: 5px;
 }
 
@@ -635,40 +690,42 @@ export default {
   letter-spacing: 0.5px;
 }
 
+/* why: difficulty reads as status — easy/success, medium/warn, hard/danger; no hand-picked hex */
 .difficulty-badge.easy {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid var(--success-edge);
 }
 
 .difficulty-badge.medium {
-  background: rgba(251, 146, 60, 0.2);
-  color: #fdba74;
-  border: 1px solid rgba(251, 146, 60, 0.4);
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid var(--warn-edge);
 }
 
 .difficulty-badge.hard {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-edge);
 }
 
 .description-section {
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--surface-edge);
 }
 
 .description-section p {
-  color: #a1a1aa;
+  color: var(--ink-muted);
   line-height: 1.6;
   margin: 0 0 15px 0;
 }
 
+/* why: category tag is navigation context — accent edge, ink text keeps AA in both themes */
 .category-badge {
   display: inline-block;
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  color: #93c5fd;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+  color: var(--ink);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
@@ -677,14 +734,14 @@ export default {
 
 .rack-section {
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--surface-edge);
 }
 
 .rack-section h3 {
   margin: 0 0 15px 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -695,36 +752,41 @@ export default {
   justify-content: center;
 }
 
+/* why: rack tiles are porcelain in both themes (anti-Scrabble rule) — never khaki/brown */
 .tile {
   width: 45px;
   height: 45px;
-  background: linear-gradient(135deg, #f0e68c 0%, #daa520 100%);
-  border: 2px solid #b8860b;
+  background: linear-gradient(180deg, var(--tile-face-hi), var(--tile-face-lo));
+  border: 2px solid var(--tile-edge);
   border-radius: 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: grab;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    opacity var(--dur-quick) var(--ease-out);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   position: relative;
 }
 
 .tile:active {
   cursor: grabbing;
-  transform: scale(0.95);
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .tile.used {
-  opacity: 0.3;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .tile .letter {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #2c1810;
+  color: var(--tile-ink);
   line-height: 1;
 }
 
@@ -734,23 +796,27 @@ export default {
   right: 4px;
   font-size: 0.65rem;
   font-weight: 600;
-  color: #2c1810;
+  color: var(--tile-sub);
+  font-variant-numeric: tabular-nums;
 }
 
 .feedback-section {
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--surface-edge);
 }
 
+/* why: validation wins — success/danger only for right/wrong; info is neutral so it spends accent */
 .feedback-box {
   display: flex;
   gap: 15px;
   padding: 15px;
   border-radius: 8px;
-  border: 1px solid;
-  animation: slideIn 0.3s ease-out;
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  animation: slideIn var(--dur-settle) var(--ease-out) both;
 }
 
+/* why: single-run arrival on opacity/transform only; reduced motion resolves to end state */
 @keyframes slideIn {
   from {
     opacity: 0;
@@ -763,23 +829,43 @@ export default {
 }
 
 .feedback-box.success {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.4);
+  background: var(--success-soft);
+  border-color: var(--success-edge);
 }
 
 .feedback-box.error {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.4);
+  background: var(--danger-soft);
+  border-color: var(--danger-edge);
 }
 
 .feedback-box.info {
-  background: rgba(96, 165, 250, 0.1);
-  border-color: rgba(96, 165, 250, 0.4);
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
 }
 
 .feedback-icon {
-  font-size: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.feedback-box.success .feedback-icon {
+  color: var(--success);
+}
+
+.feedback-box.error .feedback-icon {
+  color: var(--danger);
+}
+
+.feedback-box.info .feedback-icon {
+  color: var(--accent);
 }
 
 .feedback-content {
@@ -790,31 +876,34 @@ export default {
   font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 5px;
-  color: #e4e4e7;
+  color: var(--ink);
 }
 
 .feedback-message {
-  color: #a1a1aa;
+  color: var(--ink-muted);
   line-height: 1.5;
   margin-bottom: 8px;
 }
 
 .feedback-score {
-  color: #60a5fa;
+  color: var(--ink);
   font-weight: 700;
   font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.hints-section, .solution-section {
+.hints-section,
+.solution-section {
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--surface-edge);
 }
 
-.hints-section h3, .solution-section h3 {
+.hints-section h3,
+.solution-section h3 {
   margin: 0 0 15px 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -825,33 +914,46 @@ export default {
   gap: 10px;
 }
 
+/* why: hints are cautionary help — warn family fill, ink text keeps contrast in both themes */
 .hint-item {
-  background: rgba(251, 146, 60, 0.1);
-  border: 1px solid rgba(251, 146, 60, 0.3);
-  color: #fdba74;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-edge);
+  color: var(--ink);
   padding: 12px;
   border-radius: 6px;
   line-height: 1.5;
 }
 
 .hint-button {
-  background: rgba(251, 146, 60, 0.2);
-  border: 1px solid rgba(251, 146, 60, 0.4);
-  color: #fdba74;
+  background: var(--surface-2);
+  border: 1px solid var(--warn-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
   padding: 10px 15px;
   cursor: pointer;
   border-radius: 6px;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
 }
 
 .hint-button:hover {
-  background: rgba(251, 146, 60, 0.3);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
+.hint-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+
+/* why: solutions are reference info, not validation — accent edge on a raised surface, ink text */
 .solution-item {
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: var(--surface-2);
+  border: 1px solid var(--accent-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 10px;
@@ -860,37 +962,46 @@ export default {
 .solution-word {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #93c5fd;
+  color: var(--ink);
   margin-bottom: 5px;
   text-transform: uppercase;
   letter-spacing: 2px;
 }
 
 .solution-score {
-  color: #60a5fa;
+  color: var(--ink-muted);
   font-weight: 700;
   margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .solution-explanation {
-  color: #a1a1aa;
+  color: var(--ink-muted);
   line-height: 1.5;
   margin-bottom: 15px;
 }
 
 .show-solution-button {
-  background: rgba(96, 165, 250, 0.2);
-  border: 1px solid rgba(96, 165, 250, 0.4);
-  color: #93c5fd;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+  color: var(--ink);
   padding: 8px 15px;
   cursor: pointer;
   border-radius: 6px;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
 }
 
 .show-solution-button:hover {
-  background: rgba(96, 165, 250, 0.3);
+  transform: translateY(-1px);
+}
+
+.show-solution-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .actions-section {
@@ -900,45 +1011,93 @@ export default {
   gap: 10px;
 }
 
+/* why: check uses --primary; next-step uses accent (interaction) — green is validation-only, never navigation */
 .action-button {
   padding: 12px 20px;
-  border: none;
+  border: 1px solid var(--surface-edge);
   border-radius: 6px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    opacity var(--dur-quick) var(--ease-out);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
+.action-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+
+.action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .action-button.primary {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: white;
+  background: var(--primary);
+  border-color: transparent;
+  color: var(--on-primary);
 }
 
 .action-button.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.action-button.primary:active {
+  background: var(--primary-pressed);
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .action-button.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e4e4e7;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
 }
 
 .action-button.secondary:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
 .action-button.success {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  color: white;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+  color: var(--ink);
 }
 
 .action-button.success:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 900px) {
+  .practice-layout {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--surface-edge);
+  }
+}
+
+/* why: mirrors the global contract locally — nothing moves under reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #practice-mode *,
+  #practice-mode *::before,
+  #practice-mode *::after {
+    animation: none;
+    transition: none;
+  }
 }
 </style>

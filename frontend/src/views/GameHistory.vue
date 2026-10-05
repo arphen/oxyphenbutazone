@@ -2,19 +2,17 @@
   <div class="game-history-view">
     <div class="history-container">
       <div class="history-header">
-        <button @click="goHome" class="back-button">
-          ← Back
-        </button>
+        <button @click="goHome" class="back-button">← Back</button>
         <h1>Game History</h1>
         <button @click="clearAllGames" class="clear-button" v-if="games.length > 0">
-          🗑️ Clear All
+          Clear All
         </button>
       </div>
 
       <div class="games-list" v-if="games.length > 0">
-        <div 
-          v-for="game in games" 
-          :key="game.id" 
+        <div
+          v-for="game in games"
+          :key="game.id"
           class="game-card"
           :class="{ 'in-progress': game.status === 'in-progress' }"
           @click="viewGame(game.id)"
@@ -35,56 +33,54 @@
             <div class="players-scores">
               <div class="player-score">
                 <div class="player-name">{{ game.metadata.player1Name || 'Player 1' }}</div>
-                <div class="score">{{ game.metadata.finalScore1 || game.finalState?.player1?.score || 0 }}</div>
+                <div class="score">
+                  {{ game.metadata.finalScore1 || game.finalState?.player1?.score || 0 }}
+                </div>
               </div>
               <div class="vs">vs</div>
               <div class="player-score">
                 <div class="player-name">{{ game.metadata.player2Name || 'Player 2' }}</div>
-                <div class="score">{{ game.metadata.finalScore2 || game.finalState?.player2?.score || 0 }}</div>
+                <div class="score">
+                  {{ game.metadata.finalScore2 || game.finalState?.player2?.score || 0 }}
+                </div>
               </div>
             </div>
 
             <div class="game-stats">
               <div class="stat">
-                <span class="stat-icon">📊</span>
+                <span class="stat-icon">•</span>
                 <span class="stat-value">{{ game.moves.length }} moves</span>
               </div>
               <div class="stat">
-                <span class="stat-icon">⏱️</span>
+                <span class="stat-icon">•</span>
                 <span class="stat-value">{{ formatDuration(game) }}</span>
               </div>
               <div class="stat" v-if="game.metadata.winner">
-                <span class="stat-icon">🏆</span>
+                <span class="stat-icon">•</span>
                 <span class="stat-value">{{ game.metadata.winner }}</span>
               </div>
             </div>
           </div>
 
           <div class="game-actions">
-            <button @click.stop="viewGame(game.id)" class="action-btn primary">
-              🔍 Analyze
-            </button>
-            <button 
-              v-if="game.status === 'in-progress'" 
-              @click.stop="resumeGame(game.id)" 
+            <button @click.stop="viewGame(game.id)" class="action-btn primary">Analyze</button>
+            <button
+              v-if="game.status === 'in-progress'"
+              @click.stop="resumeGame(game.id)"
               class="action-btn secondary"
             >
-              ▶️ Resume
+              Resume
             </button>
-            <button @click.stop="deleteGame(game.id)" class="action-btn danger">
-              🗑️
-            </button>
+            <button @click.stop="deleteGame(game.id)" class="action-btn danger">Delete</button>
           </div>
         </div>
       </div>
 
       <div class="empty-state" v-else>
-        <div class="empty-icon">🎲</div>
-        <h2>No Games Yet</h2>
-        <p>Start playing to see your game history here!</p>
-        <button @click="goHome" class="start-game-button">
-          Start a New Game
-        </button>
+        <div class="empty-icon">0</div>
+        <h2>No games recorded</h2>
+        <p>Games appear here after the first move.</p>
+        <button @click="goHome" class="start-game-button">Start a game</button>
       </div>
     </div>
   </div>
@@ -98,7 +94,7 @@ export default {
   data() {
     return {
       games: [],
-      gamePersistence: null
+      gamePersistence: null,
     };
   },
   mounted() {
@@ -144,10 +140,10 @@ export default {
       if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
       if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
       });
     },
     formatDuration(game) {
@@ -155,23 +151,26 @@ export default {
       const end = game.completedAt ? new Date(game.completedAt) : new Date(game.lastMoveAt);
       const diffMs = end - start;
       const diffMins = Math.floor(diffMs / 60000);
-      
+
       if (diffMins < 60) return `${diffMins}m`;
-      
+
       const hours = Math.floor(diffMins / 60);
       const mins = diffMins % 60;
       return `${hours}h ${mins}m`;
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
+/* Afterglow history: flat page, matte cards, token-only state. No glass on
+   cards or rows; interaction spends accent, validation spends success/danger. */
 .game-history-view {
+  /* why: the page is flat surface-0; depth lives on the cards, not the ground. */
   min-height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: var(--surface-0);
   padding: 20px;
-  color: #e4e4e7;
+  color: var(--ink);
 }
 
 .history-container {
@@ -190,39 +189,51 @@ export default {
 .history-header h1 {
   flex: 1;
   text-align: center;
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  color: #e4e4e7;
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  color: var(--ink);
+  margin: 0;
 }
 
 .back-button,
 .clear-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e4e4e7;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
   padding: 10px 20px;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
   font-weight: 600;
+  /* why: motion spends transform/border/background only, ≤240ms; press is 60ms. */
+  transition:
+    transform var(--dur-settle, 240ms) var(--ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out),
+    background-color var(--dur-quick, 160ms) var(--ease-out);
 }
 
 .back-button:hover,
 .clear-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
+}
+
+.back-button:active,
+.clear-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .clear-button {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
+  /* why: destructive action spends danger only, never a hand-picked red. */
+  background: var(--danger-soft);
+  border-color: var(--danger-edge);
+  color: var(--danger);
 }
 
 .clear-button:hover {
-  background: rgba(239, 68, 68, 0.3);
+  border-color: var(--danger);
 }
 
 .games-list {
@@ -232,26 +243,31 @@ export default {
 }
 
 .game-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* why: matte card — surface-1 + edge + glint; blur is reserved for overlays. */
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   padding: 20px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-settle, 240ms) var(--ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out),
+    background-color var(--dur-quick, 160ms) var(--ease-out);
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
 .game-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
 .game-card.in-progress {
-  border-color: rgba(59, 130, 246, 0.5);
-  background: rgba(59, 130, 246, 0.05);
+  /* why: in-progress is attention/selection, so it spends accent, not green. */
+  border-color: var(--accent-edge);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-1));
 }
 
 .game-header {
@@ -269,24 +285,27 @@ export default {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-radius: 12px;
+  border-radius: var(--radius-pill);
 }
 
 .status-badge.completed {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  /* why: completed is validation, so it spends success; validation wins. */
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid var(--success-edge);
 }
 
 .status-badge.in-progress {
-  background: rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  /* why: in-progress is selection/attention, so it spends accent. */
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-edge);
 }
 
 .game-date {
   font-size: 0.9rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .game-body {
@@ -313,7 +332,7 @@ export default {
 .player-name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -321,13 +340,15 @@ export default {
 .score {
   font-size: 2rem;
   font-weight: 700;
-  color: #e4e4e7;
+  color: var(--ink);
+  /* why: tabular figures keep scores aligned instead of jittering. */
+  font-variant-numeric: tabular-nums;
 }
 
 .vs {
   font-size: 1rem;
   font-weight: 600;
-  color: #71717a;
+  color: var(--ink-faint);
   text-transform: uppercase;
 }
 
@@ -335,7 +356,7 @@ export default {
   display: flex;
   gap: 15px;
   padding: 10px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--surface-edge);
 }
 
 .stat {
@@ -343,18 +364,21 @@ export default {
   align-items: center;
   gap: 5px;
   font-size: 0.85rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-icon {
+  /* why: decorative marker only, so it keeps faint ink and spends no hue. */
   font-size: 1rem;
+  color: var(--ink-faint);
 }
 
 .game-actions {
   display: flex;
   gap: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--surface-edge);
 }
 
 .action-btn {
@@ -363,83 +387,117 @@ export default {
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
   border: 1px solid;
+  border-radius: var(--radius-sm);
+  /* why: keyboard focus keeps the global 2px ring; it is never removed here. */
+  transition:
+    transform var(--dur-quick, 160ms) var(--ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out),
+    background-color var(--dur-quick, 160ms) var(--ease-out);
+}
+
+.action-btn:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .action-btn.primary {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #93c5fd;
+  /* why: the default row action spends accent, the interaction token. */
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
+  color: var(--accent);
 }
 
 .action-btn.primary:hover {
-  background: rgba(59, 130, 246, 0.3);
+  border-color: var(--accent);
+  transform: translateY(-1px);
 }
 
 .action-btn.secondary {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #86efac;
+  /* why: secondary action claims no state, so it stays neutral surface + ink. */
+  background: var(--surface-2);
+  border-color: var(--surface-edge);
+  color: var(--ink);
 }
 
 .action-btn.secondary:hover {
-  background: rgba(34, 197, 94, 0.3);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
 .action-btn.danger {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
+  /* why: destructive action spends danger only. */
+  background: var(--danger-soft);
+  border-color: var(--danger-edge);
+  color: var(--danger);
   flex: 0 0 auto;
-  padding: 10px;
+  padding: 10px 15px;
 }
 
 .action-btn.danger:hover {
-  background: rgba(239, 68, 68, 0.3);
+  border-color: var(--danger);
+  transform: translateY(-1px);
 }
 
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 2px dashed rgba(255, 255, 255, 0.2);
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   margin-top: 40px;
 }
 
 .empty-icon {
+  /* why: honest count (0 games) in faint ink instead of a playful glyph. */
   font-size: 4rem;
+  font-weight: 700;
+  line-height: 1;
   margin-bottom: 20px;
-  opacity: 0.5;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .empty-state h2 {
   font-size: 1.8rem;
   margin-bottom: 10px;
-  color: #e4e4e7;
+  color: var(--ink);
 }
 
 .empty-state p {
   font-size: 1.1rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   margin-bottom: 30px;
 }
 
 .start-game-button {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: #93c5fd;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--on-primary);
   padding: 15px 30px;
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick, 160ms) var(--ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out),
+    background-color var(--dur-quick, 160ms) var(--ease-out);
 }
 
 .start-game-button:hover {
-  background: rgba(59, 130, 246, 0.3);
-  transform: translateY(-2px);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.start-game-button:active {
+  background: var(--primary-pressed);
+  border-color: var(--primary-pressed);
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 @media (max-width: 768px) {

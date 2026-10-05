@@ -5,7 +5,7 @@
         <h3>Choose Letter for Blank</h3>
         <button @click="$emit('cancel')" class="close-btn">✕</button>
       </div>
-      
+
       <div class="letter-grid">
         <button
           v-for="letter in alphabet"
@@ -36,8 +36,8 @@ export default {
   methods: {
     selectLetter(letter) {
       this.$emit('select', letter.toLowerCase());
-    }
-  }
+    },
+  },
 };
 </script>
 
@@ -49,7 +49,6 @@ export default {
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -67,17 +66,16 @@ export default {
 }
 
 .blank-picker {
-  background: linear-gradient(135deg, rgba(26, 26, 46, 0.98), rgba(22, 33, 62, 0.98));
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
+  background: var(--surface-3);
+  border: 1px solid var(--surface-edge, rgba(255, 255, 255, 0.2));
+  border-radius: 14px;
   padding: 24px;
   max-width: 400px;
   width: 90%;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.6));
   animation: slideUp 0.3s ease-out;
 }
 
@@ -102,14 +100,14 @@ export default {
 .picker-header h3 {
   margin: 0;
   font-size: 1.2rem;
-  color: #e4e4e7;
+  color: var(--ink);
   font-weight: 700;
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e4e4e7;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge, rgba(255, 255, 255, 0.2));
+  color: var(--ink);
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -118,13 +116,19 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition:
+    transform var(--dur-quick, 160ms) var(--ease-out, ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out, ease-out);
   padding: 0;
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(1.1);
+  border-color: var(--accent-edge);
+}
+
+.close-btn:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .letter-grid {
@@ -137,26 +141,30 @@ export default {
 
 .letter-btn {
   aspect-ratio: 1;
-  background: linear-gradient(135deg, rgba(254, 240, 138, 0.9), rgba(252, 211, 77, 0.9));
-  border: 2px solid rgba(161, 98, 7, 0.6);
+  background: linear-gradient(135deg, var(--tile-face-hi, #fff), var(--tile-face-lo, #e9e6da));
+  border: 1px solid var(--tile-edge, rgba(161, 98, 7, 0.6));
+  box-shadow:
+    inset 0 1px 0 var(--cell-glint, transparent),
+    var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.3));
   border-radius: 8px;
   font-size: 1.1rem;
   font-weight: 800;
-  color: #1a1a2e;
+  color: var(--tile-ink, #1a1a2e);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    transform var(--dur-quick, 160ms) var(--ease-out, ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out, ease-out);
   text-transform: uppercase;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .letter-btn:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 6px 16px rgba(254, 240, 138, 0.5);
-  background: linear-gradient(135deg, rgba(254, 240, 138, 1), rgba(252, 211, 77, 1));
+  transform: translateY(-1px);
+  border-color: var(--accent-edge);
 }
 
 .letter-btn:active {
-  transform: translateY(-1px) scale(1.02);
+  transform: translateY(0) scale(0.97);
+  transition-duration: 60ms;
 }
 
 @media (max-width: 480px) {
@@ -164,12 +172,12 @@ export default {
     padding: 16px;
     width: 95%;
   }
-  
+
   .letter-grid {
     gap: 8px;
     grid-template-columns: repeat(5, 1fr);
   }
-  
+
   .letter-btn {
     font-size: 1.2rem;
   }

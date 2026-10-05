@@ -1,7 +1,9 @@
 <template>
   <div v-if="visible" class="conn-badge" data-testid="conn-badge" :class="tone" role="status">
     <span>{{ text }}</span>
-    <router-link v-if="action" :to="action.to" class="conn-link" data-testid="conn-action">{{ action.label }}</router-link>
+    <router-link v-if="action" :to="action.to" class="conn-link" data-testid="conn-action">{{
+      action.label
+    }}</router-link>
   </div>
 </template>
 
@@ -24,7 +26,7 @@ export default {
     },
     text() {
       if (net.role === 'guest') {
-        if (net.guestStatus === 'open') return `Connected · you are Player ${net.seat}`;
+        if (net.guestStatus === 'open') return `Connected · Player ${net.seat}`;
         if (net.guestStatus === 'closed') return 'Connection to host lost';
         return 'Connecting…';
       }
@@ -55,10 +57,9 @@ export default {
   border-radius: var(--radius-pill, 999px);
   font-size: 13px;
   color: var(--ink, #fff);
-  background: var(--glass, rgba(15, 23, 42, 0.92));
+  /* Matte: a 13px status pill spends no blur from the budget (R10). */
+  background: var(--surface-3, rgba(15, 23, 42, 0.92));
   border: 1px solid var(--glass-edge, rgba(255, 255, 255, 0.2));
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   box-shadow:
     inset 0 1px 0 var(--surface-glint, transparent),
     var(--shadow-sm, none);

@@ -4,9 +4,18 @@
     <h1>Join a game</h1>
 
     <section v-if="!answer" class="card">
-      <button class="secondary" data-testid="join-scan-btn" @click="scanning = true">📷 Scan the host's invite</button>
+      <button class="secondary" data-testid="join-scan-btn" @click="scanning = true">
+        Scan the host's invite
+      </button>
       <label class="field">Or paste the host's invite (or open their link)</label>
-      <textarea v-model="invite" rows="4" class="paste" data-testid="join-invite" placeholder="OXY1…" aria-label="Invite from the host"></textarea>
+      <textarea
+        v-model="invite"
+        rows="4"
+        class="paste"
+        data-testid="join-invite"
+        placeholder="OXY1…"
+        aria-label="Invite from the host"
+      ></textarea>
       <p v-if="wasGuestHint" class="hint" data-testid="join-was-guest-hint">{{ wasGuestHint }}</p>
 
       <label class="check">
@@ -14,24 +23,44 @@
         <span>We are on different networks (uses the internet)</span>
       </label>
 
-      <button class="primary" data-testid="join-submit" :disabled="busy || !invite.trim()" @click="join">{{ busy ? 'Connecting…' : 'Join' }}</button>
+      <button
+        class="primary"
+        data-testid="join-submit"
+        :disabled="busy || !invite.trim()"
+        @click="join"
+      >
+        {{ busy ? 'Connecting…' : 'Join' }}
+      </button>
       <p v-if="error" class="error" data-testid="join-error">{{ error }}</p>
     </section>
 
     <section v-else class="card">
       <p v-if="net.guestStatus !== 'open'" class="hint">
-        Now give this answer to the host: they scan it, or paste it into their screen. This page will continue by itself once they connect.
+        Now give this answer to the host: they scan it, or paste it into their screen. This page
+        will continue by itself once they connect.
       </p>
-      <SignalBox :text="answer" label="Your answer" share-title="Game answer" data-testid="join-answer" />
-      <p class="wait" data-testid="join-wait">{{ net.guestStatus === 'open' ? '✓ Connected!' : '⏳ Waiting for the host…' }}</p>
+      <SignalBox
+        :text="answer"
+        label="Your answer"
+        share-title="Game answer"
+        data-testid="join-answer"
+      />
+      <p class="wait" data-testid="join-wait">
+        {{ net.guestStatus === 'open' ? 'Connected' : 'Waiting for the host…' }}
+      </p>
       <p v-if="waitingLong" class="hint" data-testid="join-stale-hint">
-        Still waiting? Make sure the host scanned this answer. If the host restarted the app, ask them for a fresh
-        invite: an invite stops working when the host restarts.
+        Still waiting? Make sure the host scanned this answer. If the host restarted the app, ask
+        them for a fresh invite: an invite stops working when the host restarts.
       </p>
       <button class="link" data-testid="join-cancel" @click="cancel">Cancel</button>
     </section>
 
-    <QrScanner v-if="scanning" title="Scan the host's invite" @scan="onScan" @cancel="scanning = false" />
+    <QrScanner
+      v-if="scanning"
+      title="Scan the host's invite"
+      @scan="onScan"
+      @cancel="scanning = false"
+    />
   </div>
 </template>
 
