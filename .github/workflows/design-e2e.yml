@@ -29,12 +29,6 @@ jobs:
         run: npm run build
       - name: Install the browser Playwright expects
         run: npx playwright install --with-deps chromium
-      - name: Debug font environment (temporary)
-        run: |
-          fc-match "system-ui" || true
-          fc-match "sans-serif" || true
-          fc-list : family | sort -u | head -40 || true
-          dpkg -l | grep -E "freetype|fontconfig" || true
       - name: Journeys, design contracts and screenshots
         run: npx playwright test -c e2e-design/playwright.config.mjs
       - name: Upload the report and screenshot diffs, even on failure
