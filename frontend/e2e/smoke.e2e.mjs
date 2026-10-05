@@ -140,6 +140,9 @@ run(async () => {
   await phone.waitForFunction(() => !document.querySelector('[data-testid="play-btn"]').disabled);
   await phone.getByTestId('play-btn').tap();
   await phone.waitForFunction(() => window.__oxy.backend.engine.getState().player1.score === 10);
+  // The strip renders from the view's 500ms poll, not from the engine: wait
+  // for the UI itself, or this reads the pre-poll strip and flakes.
+  await phone.waitForFunction(() => /P1\s*10/.test(document.querySelector('[data-testid="score-strip"]')?.innerText ?? ''));
   const strip = await phone.getByTestId('score-strip').innerText();
   assert.match(strip, /P1\s*10/);
   assert.match(strip, /P2\s*0/);
