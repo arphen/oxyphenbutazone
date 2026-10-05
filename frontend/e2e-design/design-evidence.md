@@ -24,6 +24,22 @@ Initial set generated on macOS for functional review, then regenerated inside
 the Linux set is committed. Local macOS runs may show font anti-aliasing diffs
 against the Linux baselines; the Linux run is authoritative.
 
+## The last 11 pixels (j2-staged, phone-dark)
+
+CI compares the committed baselines against its own render and reports 669
+differing pixels (budget: 658) on exactly one shot, twice deterministically.
+Cluster analysis shows the pixels sit only on large-glyph edges (rack letters,
+points, dock icons) and tile shadow bands — layout, shapes, colours and hues
+are identical, and every contract probe passes on that page. Eliminated:
+DejaVu (worse), Ubuntu (never selected), grayscale AA (worse), upgraded nobles
+(no change), layout/timing (deterministic across reruns). Remaining explanation:
+freetype/fontconfig patch skew or ARM-vs-x64 float noise between the baseline
+container and the weekly-updated CI runners. No product change can fix an
+environmental raster delta, and the thresholds must not move for it. Remedy,
+by design (§17.4): merge, then run the `update-screenshots` workflow (it
+appears in Actions once the file is on main) and commit its PNGs — same-OS
+generation is self-consistent by construction.
+
 ## Red herrings encountered (kept for the next agent)
 
 - Phone tap timeout (`[J2]`-class): an unclosed paren in `--charge` dropped every
