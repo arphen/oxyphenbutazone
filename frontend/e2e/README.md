@@ -5,6 +5,7 @@ Real Chromium (via `playwright-core`, no browser download), real WebRTC, the bui
 
 | Suite | What it proves |
 | --- | --- |
+| `smoke` | the fast happy path in one place: home loads, host-create → guest-join via code/link, rejoin after host reload, a tapped-out move that scores on a phone viewport, BYOD word-list import. Run this first; the suites below go deeper |
 | `static` | the app runs with no API server: a full game, restore after reload, practice endpoints |
 | `ui` | the phone view driven by real taps: select tile + tap square, take it back, Play, Recall, Pass, Shuffle, not-your-turn |
 | `p2p` | two browsers pair through the real Host/Join screens over a real data channel, play both ways, seat/turn enforcement, host reload + rejoin, garbage invites |
@@ -18,3 +19,38 @@ Real Chromium (via `playwright-core`, no browser download), real WebRTC, the bui
 
 Page errors and CSP violations fail every suite. Not covered (needs real phones): iOS Safari, local-network discovery,
 camera focus, screen locking. See `docs/PHONE_TEST.md`.
+
+## Harness design
+
+`run.mjs` builds the public-style site (`OXY_EXCLUDE_LISTS=csw21,nwl2023`, like the
+deployed site), serves it with `vite preview` on :4173, then runs each `*.e2e.mjs` suite
+with `E2E_BASE` pointed at it (the `laptop` suite instead gets the dev server on :4174
+with `OXY_TEST=1`). `lib.mjs` holds the shared bits: `launch()` (playwright-core +
+system Chromium, no browser download), `newPage()` (an isolated storage context per
+call at a 390x844 touch viewport, recording page errors and CSP violations), `api()`
+(the app's own `/api` from inside the page), `noPageErrors()`.
+
+`smoke.e2e.mjs` is the minimal reliable entry point: `npm run e2e -- smoke`. It uses
+only explicit waits (`getByTestId(...).waitFor()`, `waitForFunction` on
+`window.__oxy`/engine state, `waitForURL`), the paste flow instead of a real camera,
+and stable `data-testid` hooks (`home-title`, `host-start`, `host-invite-btn`,
+`signal-text`, `join-invite`, `join-submit`, `host-answer`, `host-connect`,
+`host-resume`, `conn-badge`, `rack`, `score-strip`, `play-btn`, `word-status`,
+`word-import`).
+
+## Running locally / in CI
+
+Needs a Chromium. Set `CHROMIUM=/path/to/chromium` if none is found; on macOS the
+bundled Google Chrome is picked up automatically. There is no `playwright` dependency
+on purpose (only `playwright-core`): on a fresh machine either point `CHROMIUM` at a
+system browser or install one once with `npx playwright install chromium` (from a
+separate `playwright` install) or the `browser-actions/setup-chrome` GitHub Action.
+
+```sh
+npm run e2e -- smoke   # the fast happy path (~1 min)
+npm run e2e            # everything (builds once, then all suites incl. laptop)
+npm run e2e -- p2p csp # only the named suites
+```
+
+CI (`.github/workflows/e2e.yml`) runs `vitest`, builds, installs system Chrome and runs
+the smoke suite headless on every push to `main` and every pull request.

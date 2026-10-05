@@ -8,7 +8,7 @@ import crypto from 'crypto';
 //  - writes wordlists.json describing the lists that ARE shipped (the app picks its default list from it),
 //  - generates sw.js (from sw.template.js) with the list of files to precache, so the installed app works offline.
 
-const LISTS = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
+const LISTS = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', friendly: 'FRIENDLY.txt', slovenian: 'SLOVENIAN.txt' };
 // Big lists are cached the first time they are used instead of at install, to keep installing a phone quick
 const LAZY = new Set(['CSW21.txt', 'NWL2023.txt']);
 

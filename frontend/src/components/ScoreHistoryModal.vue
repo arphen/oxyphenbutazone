@@ -20,36 +20,61 @@
             <tbody>
               <tr v-for="turn in maxTurns" :key="turn" class="data-row">
                 <td class="turn-cell">{{ turn }}</td>
-                
+
                 <!-- Player 1 -->
                 <td class="player-cell" :class="{ active: activePlayer === 1 }">
                   <div v-if="player1History[turn - 1]">
                     <!-- Word Play -->
-                    <div v-if="player1History[turn - 1].action === 'play' || !player1History[turn - 1].action">
+                    <div
+                      v-if="
+                        player1History[turn - 1].action === 'play' ||
+                        !player1History[turn - 1].action
+                      "
+                    >
                       <div class="words-list">
-                        <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="word-item">
+                        <span
+                          v-for="(word, idx) in player1History[turn - 1].words"
+                          :key="idx"
+                          class="word-item"
+                        >
                           {{ word.word }}
                         </span>
                       </div>
                       <div class="word-details">
-                        <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="word-score">
+                        <span
+                          v-for="(word, idx) in player1History[turn - 1].words"
+                          :key="idx"
+                          class="word-score"
+                        >
                           {{ word.word }}:{{ word.score }}
                         </span>
-                        <span v-if="player1History[turn - 1].bingoBonus" class="bingo-text">+BINGO</span>
+                        <span v-if="player1History[turn - 1].bingoBonus" class="bingo-text"
+                          >+BINGO</span
+                        >
                       </div>
                     </div>
                     <!-- Exchange -->
-                    <div v-else-if="player1History[turn - 1].action === 'exchange'" class="action-text">
-                      <span class="action-icon">🔄</span> Exchanged {{ player1History[turn - 1].count }} tiles
+                    <div
+                      v-else-if="player1History[turn - 1].action === 'exchange'"
+                      class="action-text"
+                    >
+                      Exchanged {{ player1History[turn - 1].count }} tiles
                     </div>
                     <!-- Pass -->
                     <div v-else-if="player1History[turn - 1].action === 'pass'" class="action-text">
-                      <span class="action-icon">⏭️</span> Passed turn
+                      Passed turn
                     </div>
                     <!-- Invalid Word -->
-                    <div v-else-if="player1History[turn - 1].action === 'invalid'" class="action-text invalid">
-                      <span class="action-icon">❌</span> Invalid word(s):
-                      <span v-for="(word, idx) in player1History[turn - 1].words" :key="idx" class="invalid-word">
+                    <div
+                      v-else-if="player1History[turn - 1].action === 'invalid'"
+                      class="action-text invalid"
+                    >
+                      Invalid word(s):
+                      <span
+                        v-for="(word, idx) in player1History[turn - 1].words"
+                        :key="idx"
+                        class="invalid-word"
+                      >
                         {{ word.word }}
                       </span>
                     </div>
@@ -57,39 +82,66 @@
                   <span v-else class="empty-cell">—</span>
                 </td>
                 <td class="score-cell" :class="{ active: activePlayer === 1 }">
-                  <strong v-if="player1History[turn - 1]">{{ player1History[turn - 1].totalScore }}</strong>
+                  <strong v-if="player1History[turn - 1]">{{
+                    player1History[turn - 1].totalScore
+                  }}</strong>
                   <span v-else>—</span>
                 </td>
-                
+
                 <!-- Player 2 -->
                 <td class="player-cell" :class="{ active: activePlayer === 2 }">
                   <div v-if="player2History[turn - 1]">
                     <!-- Word Play -->
-                    <div v-if="player2History[turn - 1].action === 'play' || !player2History[turn - 1].action">
+                    <div
+                      v-if="
+                        player2History[turn - 1].action === 'play' ||
+                        !player2History[turn - 1].action
+                      "
+                    >
                       <div class="words-list">
-                        <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="word-item">
+                        <span
+                          v-for="(word, idx) in player2History[turn - 1].words"
+                          :key="idx"
+                          class="word-item"
+                        >
                           {{ word.word }}
                         </span>
                       </div>
                       <div class="word-details">
-                        <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="word-score">
+                        <span
+                          v-for="(word, idx) in player2History[turn - 1].words"
+                          :key="idx"
+                          class="word-score"
+                        >
                           {{ word.word }}:{{ word.score }}
                         </span>
-                        <span v-if="player2History[turn - 1].bingoBonus" class="bingo-text">+BINGO</span>
+                        <span v-if="player2History[turn - 1].bingoBonus" class="bingo-text"
+                          >+BINGO</span
+                        >
                       </div>
                     </div>
                     <!-- Exchange -->
-                    <div v-else-if="player2History[turn - 1].action === 'exchange'" class="action-text">
-                      <span class="action-icon">🔄</span> Exchanged {{ player2History[turn - 1].count }} tiles
+                    <div
+                      v-else-if="player2History[turn - 1].action === 'exchange'"
+                      class="action-text"
+                    >
+                      Exchanged {{ player2History[turn - 1].count }} tiles
                     </div>
                     <!-- Pass -->
                     <div v-else-if="player2History[turn - 1].action === 'pass'" class="action-text">
-                      <span class="action-icon">⏭️</span> Passed turn
+                      Passed turn
                     </div>
                     <!-- Invalid Word -->
-                    <div v-else-if="player2History[turn - 1].action === 'invalid'" class="action-text invalid">
-                      <span class="action-icon">❌</span> Invalid word(s):
-                      <span v-for="(word, idx) in player2History[turn - 1].words" :key="idx" class="invalid-word">
+                    <div
+                      v-else-if="player2History[turn - 1].action === 'invalid'"
+                      class="action-text invalid"
+                    >
+                      Invalid word(s):
+                      <span
+                        v-for="(word, idx) in player2History[turn - 1].words"
+                        :key="idx"
+                        class="invalid-word"
+                      >
                         {{ word.word }}
                       </span>
                     </div>
@@ -97,11 +149,13 @@
                   <span v-else class="empty-cell">—</span>
                 </td>
                 <td class="score-cell" :class="{ active: activePlayer === 2 }">
-                  <strong v-if="player2History[turn - 1]">{{ player2History[turn - 1].totalScore }}</strong>
+                  <strong v-if="player2History[turn - 1]">{{
+                    player2History[turn - 1].totalScore
+                  }}</strong>
                   <span v-else>—</span>
                 </td>
               </tr>
-              
+
               <!-- Total Row -->
               <tr class="total-row">
                 <td class="turn-cell"><strong>TOTAL</strong></td>
@@ -189,14 +243,15 @@ export default {
 }
 
 .modal-content {
-  background: white;
-  border-radius: 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--surface-edge);
+  border-radius: 12px;
   width: 95%;
   max-width: 900px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.3));
   animation: slideUp 0.3s ease-out;
 }
 
@@ -213,13 +268,13 @@ export default {
 
 .modal-header {
   padding: 15px 20px;
-  border-bottom: 2px solid #217346;
+  border-bottom: 1px solid var(--surface-edge);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #217346;
-  color: white;
-  border-radius: 8px 8px 0 0;
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: 12px 12px 0 0;
 }
 
 .modal-header h2 {
@@ -231,47 +286,48 @@ export default {
 .close-button {
   background: none;
   border: none;
-  color: white;
+  color: var(--ink-muted);
   font-size: 1.8rem;
   cursor: pointer;
   line-height: 1;
   padding: 0;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.2s;
 }
 
 .close-button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  color: var(--ink);
 }
 
 .modal-body {
   padding: 0;
   overflow: auto;
   flex: 1;
-  background: #f3f3f3;
+  background: var(--surface-1);
 }
 
 .table-container {
   overflow-x: auto;
-  background: white;
+  background: var(--surface-1);
 }
 
 .score-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 0.9rem;
-  background: white;
+  background: var(--surface-1);
+  font-variant-numeric: tabular-nums;
 }
 
 .score-table thead {
-  background: #217346;
-  color: white;
+  background: var(--surface-2);
+  color: var(--ink);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -281,17 +337,16 @@ export default {
   padding: 12px 8px;
   text-align: center;
   font-weight: 600;
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--surface-edge);
   font-size: 0.95rem;
 }
 
 .score-table th.active {
-  background: #2d9b5f;
+  background: var(--accent-soft);
 }
 
 .turn-col {
   width: 60px;
-  background: #2d9b5f;
 }
 
 .player-col {
@@ -304,23 +359,19 @@ export default {
 
 .score-table td {
   padding: 8px;
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--surface-edge);
   text-align: center;
-  background: white;
-}
-
-.data-row:nth-child(even) td {
-  background: #f9f9f9;
+  background: var(--surface-1);
+  color: var(--ink);
 }
 
 .data-row:hover td {
-  background: #e8f5e9;
+  background: var(--surface-2);
 }
 
 .turn-cell {
   font-weight: 600;
-  color: #333;
-  background: #e8e8e8 !important;
+  color: var(--ink-muted);
 }
 
 .player-cell {
@@ -329,18 +380,18 @@ export default {
 }
 
 .player-cell.active {
-  background: #e3f2fd !important;
-  border-left: 3px solid #2196F3;
+  border-left: 3px solid var(--accent-edge);
+  background: var(--accent-soft);
 }
 
 .score-cell {
   font-weight: 600;
   font-size: 1rem;
-  color: #333;
+  color: var(--ink);
 }
 
 .score-cell.active {
-  background: #e3f2fd !important;
+  background: var(--accent-soft);
 }
 
 .words-list {
@@ -352,13 +403,14 @@ export default {
 
 .word-item {
   font-weight: 600;
-  color: #1976D2;
+  color: var(--ink);
   font-size: 0.95rem;
+  text-transform: uppercase;
 }
 
 .word-details {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--ink-muted);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -366,15 +418,17 @@ export default {
 }
 
 .word-score {
-  background: #e8e8e8;
+  background: var(--surface-3);
+  border: 1px solid var(--surface-edge);
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--mono, ui-monospace, monospace);
 }
 
 .bingo-text {
-  background: #ff9800;
-  color: white;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid var(--warn-edge);
   padding: 2px 8px;
   border-radius: 3px;
   font-weight: bold;
@@ -383,45 +437,41 @@ export default {
 
 .action-text {
   font-style: italic;
-  color: #555;
+  color: var(--ink-muted);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .action-text.invalid {
-  color: #d32f2f;
+  color: var(--danger);
   font-style: normal;
   font-weight: 500;
 }
 
 .invalid-word {
-  font-family: 'Courier New', monospace;
-  background: #ffebee;
+  font-family: var(--mono, ui-monospace, monospace);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-edge);
   padding: 2px 5px;
   border-radius: 3px;
   margin-left: 4px;
-}
-
-.action-icon {
-  font-size: 1.1rem;
+  text-transform: uppercase;
 }
 
 .empty-cell {
-  color: #ccc;
+  color: var(--ink-faint);
   font-size: 1.2rem;
 }
 
 .total-row {
-  background: #217346 !important;
-  color: white;
   font-weight: bold;
 }
 
 .total-row td {
-  background: #217346 !important;
-  color: white;
-  border-color: #1a5c38 !important;
+  background: var(--surface-2) !important;
+  color: var(--ink);
+  border-color: var(--surface-edge) !important;
   padding: 14px 8px;
   font-size: 1.1rem;
 }
@@ -430,7 +480,23 @@ export default {
   font-size: 1.3rem !important;
 }
 
-.total-row .score-cell.active {
-  background: #2d9b5f !important;
+/* Narrow screens: the 5-column table keeps its columns and scrolls
+   horizontally inside .table-container (overflow-x: auto already set);
+   just tighten padding/type so more fits. */
+@media (max-width: 640px) {
+  .modal-header h2 {
+    font-size: 1.05rem;
+  }
+  .score-table {
+    font-size: 0.8rem;
+    min-width: 520px;
+  }
+  .score-table th,
+  .score-table td {
+    padding: 6px 4px;
+  }
+  .player-col {
+    min-width: 140px;
+  }
 }
 </style>

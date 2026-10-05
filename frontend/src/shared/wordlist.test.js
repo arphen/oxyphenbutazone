@@ -257,6 +257,14 @@ describe('validateWordListText: real lists and performance', () => {
     expect(ok(readFileSync(new URL('../../public/SLOVENIAN.txt', import.meta.url), 'utf8')).count).toBeGreaterThan(10000);
   });
 
+  it('accepts the shipped Friendly shorts: ZA/ZO/QI playable, header ignored, full short set included', () => {
+    const raw = readFileSync(new URL('../../public/FRIENDLY.txt', import.meta.url), 'utf8');
+    const r = ok(raw);
+    expect(r.count).toBeGreaterThan(900);
+    const parsed = parseDictionaryFile(r.text);
+    for (const w of ['za', 'zo', 'qi', 'xi', 'ja', 'ch', 'ze', 'fag', 'lez', 'wog', 'wop', 'yid']) expect(parsed.has(w)).toBe(true);
+  });
+
   it('handles a 30 MB file in a few seconds', () => {
     const line = 'abcdefgh a fairly typical definition of about this length [n -S]\n';
     const text = line.repeat(Math.ceil((30 * 1024 * 1024) / line.length));

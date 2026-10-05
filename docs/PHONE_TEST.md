@@ -12,4 +12,7 @@ local-network discovery and screen locking). Please note what happens at each st
 4. **Play**: place tiles, play a word, pass, exchange. *Report anything slow, fiddly or wrong.*
 5. **Lock the host's screen for 30 s**, unlock: does the game recover? (Wake Lock should prevent locking while hosting.)
 6. **Close and reopen the host app** mid-game: *Continue it*, invite again, guest rejoins: is the game intact?
+   Also try it **mid-turn** (tiles placed but not played): the placed tiles must still be on the board.
+   Then **close and reopen the guest app**: it should say which player it was and ask for a fresh invite
+   (it cannot rejoin by itself — there is no server holding the pairing).
 7. **Remote (optional)**: one phone on Wi-Fi, one on 5G, tick *different networks*. It may fail behind carrier NAT.

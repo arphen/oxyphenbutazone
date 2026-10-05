@@ -106,19 +106,23 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
-  background: #1a1a2e;
+  background: var(--surface-3);
   border-radius: 12px;
   width: 90%;
   max-width: 400px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.5));
+  border: 1px solid var(--surface-edge, rgba(255, 255, 255, 0.1));
   animation: slideUp 0.3s ease-out;
 }
 
@@ -135,11 +139,11 @@ export default {
 
 .modal-header {
   padding: 15px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--surface-edge, rgba(255, 255, 255, 0.1));
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: white;
+  color: var(--ink);
 }
 
 .modal-header h2 {
@@ -151,22 +155,26 @@ export default {
 .close-button {
   background: none;
   border: none;
-  color: white;
+  color: var(--ink-muted);
   font-size: 1.8rem;
   cursor: pointer;
   line-height: 1;
 }
 
+.close-button:hover {
+  color: var(--ink);
+}
+
 .modal-body {
   padding: 20px;
-  color: #e4e4e7;
+  color: var(--ink);
 }
 
 .instructions {
   text-align: center;
   margin-bottom: 20px;
   font-size: 0.9rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
 }
 
 .tiles-container {
@@ -181,28 +189,34 @@ export default {
   position: relative;
   width: 50px;
   height: 50px;
-  background: linear-gradient(135deg, #fde68a, #f59e0b);
+  background: linear-gradient(135deg, var(--tile-face-hi, #fff), var(--tile-face-lo, #e9e6da));
   border-radius: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  box-shadow:
+    inset 0 1px 0 var(--cell-glint, transparent),
+    var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.3));
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
+  border: 2px solid var(--tile-edge, #2a323d);
+  transition:
+    transform var(--dur-quick, 160ms) var(--ease-out, ease-out),
+    border-color var(--dur-quick, 160ms) var(--ease-out, ease-out);
 }
 
 .tile.selected {
-  border-color: #60a5fa;
-  transform: scale(1.1);
-  box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
+  border-color: var(--accent-edge);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 2px var(--accent-edge),
+    var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.3));
 }
 
 .tile .letter {
   font-size: 1.6rem;
   font-weight: 800;
-  color: #1a1a2e;
+  color: var(--tile-ink, #1a1a2e);
 }
 
 .tile .value {
@@ -210,8 +224,9 @@ export default {
   bottom: 3px;
   right: 5px;
   font-size: 0.65rem;
-  color: #52525b;
+  color: var(--tile-sub, #52525b);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .action-buttons {
@@ -222,35 +237,43 @@ export default {
 .action-btn {
   flex: 1;
   padding: 12px;
-  border: none;
+  border: 1px solid var(--surface-edge);
   border-radius: 8px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    transform var(--dur-quick, 160ms) var(--ease-out, ease-out),
+    background-color var(--dur-quick, 160ms) var(--ease-out, ease-out);
   font-size: 0.9rem;
 }
 
 .cancel-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e4e4e7;
+  background: var(--surface-2);
+  color: var(--ink);
 }
 
 .cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--accent-edge);
 }
 
 .swap-btn {
-  background: #3b82f6;
-  color: white;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 
 .swap-btn:disabled {
-  background: #374151;
+  opacity: 0.45;
   cursor: not-allowed;
-  opacity: 0.7;
 }
 
 .swap-btn:not(:disabled):hover {
-  background: #2563eb;
+  background: var(--primary-hover);
+}
+
+.swap-btn:not(:disabled):active,
+.cancel-btn:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 </style>

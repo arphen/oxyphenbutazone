@@ -31,7 +31,7 @@ export const ACTION_TYPES = [
 const LANGUAGES = ['english', 'slovenian'];
 const SQUARE_TYPES = ['', 'tw', 'dw', 'tl', 'dl', 'center'];
 const MESSAGE_TYPES = ['', 'info', 'success', 'error'];
-const DICTIONARY_KEYS = ['csw21', 'nwl2023', 'enable', 'slovenian'];
+const DICTIONARY_KEYS = ['csw21', 'nwl2023', 'enable', 'friendly', 'slovenian'];
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]', 'g');
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);

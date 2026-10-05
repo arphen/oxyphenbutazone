@@ -7,6 +7,7 @@
 import { ProtocolError, safeJsonParse } from '../shared/protocol.js';
 
 export const SIGNAL_PREFIX = 'OXY1.';
+export const SIGNAL_PREFIX_V2 = 'OXY2.';
 export const MAX_SIGNAL_CHARS = 8000; // the encoded text
 const MAX_SIGNAL_JSON = 16 * 1024; // after decompression (guards against decompression bombs)
 const MAX_SDP_CHARS = 8000;
@@ -19,16 +20,54 @@ const fail = (message) => {
   throw new ProtocolError(message);
 };
 
-const toBase64Url = (bytes) => {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-};
-
 const fromBase64Url = (text) => {
   if (!/^[A-Za-z0-9_-]+$/.test(text)) fail('Invite contains invalid characters');
   const binary = atob(text.replaceAll('-', '+').replaceAll('_', '/'));
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+};
+
+// Base32 (RFC 4648, no padding) for new invites. Its alphabet (A-Z, 2-7) is a
+// subset of the QR alphanumeric charset, so the QR encoder stores ~5.5 bits per
+// character instead of 8 (byte mode, which base64url's lowercase forces). For a
+// typical compressed SDP (~500-750 bytes) that drops the QR 2-3 versions
+// (e.g. V21 -> V18, ~20% fewer modules per side). It is also URL-safe with no
+// escaping, unlike base45 (whose space and % break bare `?c=` links).
+const B32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+const toBase32 = (bytes) => {
+  let bits = 0;
+  let nbits = 0;
+  let out = '';
+  for (const byte of bytes) {
+    bits = (bits << 8) | byte;
+    nbits += 8;
+    while (nbits >= 5) {
+      nbits -= 5;
+      out += B32_ALPHABET[(bits >> nbits) & 31];
+    }
+    bits &= (1 << nbits) - 1;
+  }
+  if (nbits > 0) out += B32_ALPHABET[(bits << (5 - nbits)) & 31];
+  return out;
+};
+
+const fromBase32 = (text) => {
+  if (!/^[A-Z2-7]+$/.test(text)) fail('Invite contains invalid characters');
+  if (text.length % 8 === 1) fail('Invite is damaged');
+  const out = [];
+  let bits = 0;
+  let nbits = 0;
+  for (const ch of text) {
+    bits = (bits << 5) | B32_ALPHABET.indexOf(ch);
+    nbits += 5;
+    if (nbits >= 8) {
+      nbits -= 8;
+      out.push((bits >> nbits) & 255);
+      bits &= (1 << nbits) - 1;
+    }
+  }
+  if (bits !== 0) fail('Invite is damaged'); // non-zero padding bits
+  return Uint8Array.from(out);
 };
 
 async function pump(stream, input, maxBytes) {
@@ -76,28 +115,36 @@ export function validateSdp(sdp) {
   return sdp;
 }
 
-/** { t: 'offer'|'answer', sdp, room, seat } -> 'OXY1.<compressed base64url>' */
+/** { t: 'offer'|'answer', sdp, room, seat } -> 'OXY2.<compressed base32>'.
+ *  V2 emits base32 (see above) so the QR stays 2-3 versions smaller than the
+ *  legacy OXY1 base64url form. The JSON envelope is unchanged on purpose: the
+ *  SDP itself is opaque to us (rewriting it risks WebRTC interop) and shorter
+ *  keys would save almost nothing after deflate. */
 export async function encodeSignal(signal) {
   const json = JSON.stringify({ v: 1, t: signal.t, sdp: signal.sdp, room: signal.room, seat: signal.seat });
   const compressed = await pump(new CompressionStream('deflate-raw'), new TextEncoder().encode(json), MAX_SIGNAL_JSON);
-  return SIGNAL_PREFIX + toBase64Url(compressed);
+  return SIGNAL_PREFIX_V2 + toBase32(compressed);
 }
 
 /**
  * Parse and validate a pasted/scanned invite or answer. Accepts the bare token or a link containing `c=<token>`.
+ * Both OXY2 (base32, current) and OXY1 (base64url, legacy) tokens decode; new invites are always OXY2.
  * Throws ProtocolError with a message that is safe to show to the user.
  */
 export async function decodeSignal(input) {
   if (typeof input !== 'string') fail('Nothing to read');
   let text = input.trim();
-  const inLink = /[?&]c=(OXY1\.[A-Za-z0-9_-]+)/.exec(text);
+  const inLink = /[?&]c=(OXY[12]\.[A-Za-z0-9_-]+)/.exec(text);
   if (inLink) text = inLink[1];
-  if (!text.startsWith(SIGNAL_PREFIX)) fail('That does not look like a game invite');
+  const v2 = text.startsWith(SIGNAL_PREFIX_V2);
+  if (!v2 && !text.startsWith(SIGNAL_PREFIX)) fail('That does not look like a game invite');
   if (text.length > MAX_SIGNAL_CHARS) fail('Invite is too large');
 
   let json;
   try {
-    const bytes = await pump(new DecompressionStream('deflate-raw'), fromBase64Url(text.slice(SIGNAL_PREFIX.length)), MAX_SIGNAL_JSON);
+    const body = text.slice(SIGNAL_PREFIX_V2.length); // both prefixes are 5 chars
+    const raw = v2 ? fromBase32(body) : fromBase64Url(body);
+    const bytes = await pump(new DecompressionStream('deflate-raw'), raw, MAX_SIGNAL_JSON);
     json = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (error) {
     if (error instanceof ProtocolError) throw error;

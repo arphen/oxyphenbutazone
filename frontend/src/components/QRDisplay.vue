@@ -3,7 +3,7 @@
     <div class="qr-header" v-if="!customUrl">
       <h3>{{ playerName }}</h3>
       <p class="qr-instruction">Scan with phone camera to view your letters</p>
-      <p class="qr-note">Updates automatically in real-time ✨</p>
+      <p class="qr-note">Updates automatically in real time</p>
     </div>
     <div class="qr-code-container">
       <QRCodeVue3
@@ -15,22 +15,20 @@
         :qrOptions="{
           typeNumber: 0,
           mode: 'Byte',
-          errorCorrectionLevel: 'L'
+          errorCorrectionLevel: 'L',
         }"
         :dotsOptions="{
           type: 'square',
-          color: '#000000'
+          color: '#000000',
         }"
         :backgroundOptions="{
-          color: '#ffffff'
+          color: '#ffffff',
         }"
       />
-      <div v-else style="color: #999;">Loading...</div>
+      <div v-else class="qr-loading">Loading…</div>
     </div>
     <div class="qr-footer">
-      <button @click="openInNewTab" class="copy-button">
-        🔍 Preview
-      </button>
+      <button @click="openInNewTab" class="copy-button">Preview</button>
     </div>
   </div>
 </template>
@@ -89,7 +87,7 @@ export default {
       playerName: this.playerName,
       rack: this.rack,
       score: this.score,
-      dataUrlLength: this.qrDataUrl?.length
+      dataUrlLength: this.qrDataUrl?.length,
     });
   },
   methods: {
@@ -102,30 +100,31 @@ export default {
 
 <style scoped>
 .qr-display {
-  background: white;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   border-radius: 12px;
   padding: 15px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   text-align: center;
   min-width: 380px;
 }
 
 .qr-header h3 {
   margin: 0 0 5px 0;
-  color: #333;
+  color: var(--ink);
   font-size: 1.2rem;
 }
 
 .qr-instruction {
   margin: 0 0 5px 0;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--ink-muted);
 }
 
 .qr-note {
   margin: 0 0 10px 0;
   font-size: 0.75rem;
-  color: #999;
+  color: var(--ink-faint);
   font-style: italic;
 }
 
@@ -134,7 +133,7 @@ export default {
   justify-content: center;
   align-items: center;
   padding: 10px;
-  background: #f9f9f9;
+  background: #fff;
   border-radius: 8px;
   margin-bottom: 10px;
   min-height: 370px;
@@ -145,11 +144,11 @@ export default {
   justify-content: center;
   align-items: center;
   padding: 10px;
-  background: #f9f9f9;
+  background: var(--surface-2);
   border-radius: 8px;
   margin-bottom: 10px;
   min-height: 200px;
-  color: #666;
+  color: var(--ink-muted);
   font-size: 0.9rem;
 }
 
@@ -160,20 +159,25 @@ export default {
 .copy-button {
   padding: 8px 16px;
   font-size: 0.9rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 6px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--surface-edge);
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
   width: 100%;
+  min-height: 44px;
 }
 
 .copy-button:hover {
-  background: #5568d3;
+  border-color: var(--accent-edge);
 }
 
 .copy-button:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 </style>

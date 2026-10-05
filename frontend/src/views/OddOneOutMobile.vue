@@ -1,22 +1,23 @@
 <template>
   <div class="mobile-game">
     <div v-if="loading" class="loading">Connecting...</div>
-    
-    <div v-else-if="!session" class="error">
-      Session not found or connection lost.
-    </div>
+
+    <div v-else-if="!session" class="error">Session not found or connection lost.</div>
 
     <div v-else-if="session.status === 'waiting'" class="waiting">
       <h1>Waiting for Host...</h1>
-      <div class="player-badge">You are Player {{ playerId }}</div>
+      <div class="player-badge">Player {{ playerId }}</div>
     </div>
 
     <div v-else-if="session.status === 'playing'" class="playing">
-      <div class="timer-bar" :style="{ width: (timeLeft / (session.roundDuration || 5) * 100) + '%' }"></div>
-      
+      <div
+        class="timer-bar"
+        :style="{ transform: `scaleX(${timeLeft / (session.roundDuration || 5)})` }"
+      ></div>
+
       <div class="words-grid">
-        <button 
-          v-for="(word, index) in session.puzzle.words" 
+        <button
+          v-for="(word, index) in session.puzzle.words"
           :key="index"
           class="word-btn"
           :class="{ selected: selectedIndex === index }"
@@ -29,21 +30,23 @@
     </div>
 
     <div v-else-if="session.status === 'review'" class="review">
-      <h2>{{ isCorrect ? 'Correct! 🎉' : 'Wrong ❌' }}</h2>
-      
+      <h2>{{ isCorrect ? 'Correct' : 'Not quite' }}</h2>
+
       <div class="words-list">
-        <div 
-          v-for="(word, index) in session.puzzle.words" 
+        <div
+          v-for="(word, index) in session.puzzle.words"
           :key="index"
           class="review-item"
-          :class="{ 
+          :class="{
             correct: index === session.puzzle.correctIndex,
-            wrong: index === selectedIndex && index !== session.puzzle.correctIndex
+            wrong: index === selectedIndex && index !== session.puzzle.correctIndex,
           }"
         >
           <span class="word-text">{{ word }}</span>
           <div class="markers">
-            <span v-if="index === session.puzzle.correctIndex" class="marker correct-marker">✅</span>
+            <span v-if="index === session.puzzle.correctIndex" class="marker correct-marker"
+              >Odd one out</span
+            >
             <span v-if="selectedIndex === index" class="marker me-marker">You</span>
             <span v-if="opponentAnswer === index" class="marker opp-marker">P{{ opponentId }}</span>
           </div>
@@ -65,7 +68,7 @@ export default {
       selectedIndex: null,
       timeLeft: 5,
       timerInterval: null,
-      pollInterval: null
+      pollInterval: null,
     };
   },
   computed: {
@@ -77,7 +80,7 @@ export default {
     },
     opponentAnswer() {
       return this.session.players[this.opponentId]?.answer;
-    }
+    },
   },
   async created() {
     const params = new URLSearchParams(this.$route.query);
@@ -93,9 +96,9 @@ export default {
     try {
       await fetch('/api/odd-one-out/join', {
         method: 'POST',
-        body: JSON.stringify({ sessionId: this.sessionId, playerId: this.playerId })
+        body: JSON.stringify({ sessionId: this.sessionId, playerId: this.playerId }),
       });
-      
+
       this.startPolling();
     } catch (e) {
       console.error(e);
@@ -111,13 +114,13 @@ export default {
         try {
           const res = await fetch(`/api/odd-one-out/state?sessionId=${this.sessionId}`);
           const data = await res.json();
-          
+
           // Detect state change to playing
           if (this.session?.status !== 'playing' && data.status === 'playing') {
             this.startTimer();
             this.selectedIndex = null;
           }
-          
+
           this.session = data;
           this.loading = false;
         } catch (e) {
@@ -140,22 +143,22 @@ export default {
       this.selectedIndex = index;
       await fetch('/api/odd-one-out/submit', {
         method: 'POST',
-        body: JSON.stringify({ 
-          sessionId: this.sessionId, 
-          playerId: this.playerId, 
-          answerIndex: index 
-        })
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          playerId: this.playerId,
+          answerIndex: index,
+        }),
       });
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
 .mobile-game {
   min-height: 100vh;
-  background: #1a1a2e;
-  color: white;
+  background: var(--surface-0);
+  color: var(--ink);
   padding: 20px;
   font-family: sans-serif;
   display: flex;
@@ -164,14 +167,17 @@ export default {
   justify-content: center;
 }
 
-.waiting, .error {
+.waiting,
+.error {
   text-align: center;
 }
 
 .player-badge {
-  background: #e94560;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  color: var(--ink);
   padding: 10px 20px;
-  border-radius: 20px;
+  border-radius: 999px;
   margin-top: 20px;
   font-weight: bold;
 }
@@ -180,35 +186,74 @@ export default {
   position: fixed;
   top: 0;
   left: 0;
-  height: 10px;
-  background: #e94560;
-  transition: width 0.1s linear;
+  width: 100%;
+  height: 6px;
+  background: var(--accent);
+  /* Progress advances on transform, never on layout (R15). */
+  transform-origin: left center;
+  transition: transform 0.1s linear;
 }
 
-.words-grid {
-  display: grid;
-  gap: 15px;
+.playing {
   width: 100%;
   max-width: 400px;
 }
 
+.words-grid {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 400px;
+  margin-top: 24px;
+}
+
 .word-btn {
-  background: #16213e;
-  border: 2px solid #0f3460;
-  color: white;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
   padding: 20px;
   font-size: 1.5em;
   border-radius: 10px;
   width: 100%;
+  min-height: 64px;
+  cursor: pointer;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
+}
+
+.word-btn:hover:not(:disabled) {
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
 .word-btn.selected {
-  background: #e94560;
-  border-color: white;
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
 }
 
+.word-btn:disabled {
+  cursor: default;
+}
+
+.review {
+  width: 100%;
+  max-width: 400px;
+}
+
+.review h2 {
+  text-align: center;
+  color: var(--ink);
+}
+
+/* Verdicts are fill + ink with the glow off (R7): right and wrong keep the
+   verdict to themselves. */
 .review-item {
-  background: #16213e;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   padding: 15px;
   margin: 10px 0;
   border-radius: 8px;
@@ -218,11 +263,13 @@ export default {
 }
 
 .review-item.correct {
-  border: 2px solid #2ecc71;
+  border-color: var(--success-edge);
+  background: var(--success-soft);
 }
 
 .review-item.wrong {
-  border: 2px solid #e74c3c;
+  border-color: var(--danger-edge);
+  background: var(--danger-soft);
 }
 
 .markers {
@@ -238,13 +285,19 @@ export default {
   font-weight: bold;
 }
 
+.correct-marker {
+  color: var(--success);
+}
+
 .me-marker {
-  background: #3498db;
-  color: white;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+  color: var(--ink);
 }
 
 .opp-marker {
-  background: #f1c40f;
-  color: black;
+  background: var(--surface-3);
+  border: 1px solid var(--surface-edge);
+  color: var(--ink-muted);
 }
 </style>

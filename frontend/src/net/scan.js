@@ -1,10 +1,11 @@
 // Recognise a pairing code in scanned QR text. Pure and cheap: it only checks the shape of the text; decodeSignal
-// (signal.js) does the real decoding and validation later.
+// (signal.js) does the real decoding and validation later. Both OXY2 (base32, current) and OXY1 (base64url,
+// legacy) tokens are accepted; base32 is a subset of the base64url charset so one class covers both bodies.
 
-const TOKEN = /^OXY1\.[A-Za-z0-9_-]+$/;
-const LINK = /^https?:\/\/\S*[?&]c=OXY1\.[A-Za-z0-9_-]+(?:[&#]\S*)?$/;
+const TOKEN = /^OXY[12]\.[A-Za-z0-9_-]+$/;
+const LINK = /^https?:\/\/\S*[?&]c=OXY[12]\.[A-Za-z0-9_-]+(?:[&#]\S*)?$/;
 
-/** The trimmed `OXY1.` token, or the (trimmed) join link carrying `c=OXY1.…`, if `text` is one; otherwise null. */
+/** The trimmed `OXY1.`/`OXY2.` token, or the (trimmed) join link carrying `c=OXY….`, if `text` is one; otherwise null. */
 export function extractCode(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();

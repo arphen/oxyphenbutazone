@@ -1,37 +1,48 @@
 // Word lists and word queries. Pure: callers load list text (from fs, fetch or an imported file).
 
-export const DICTIONARY_IDS = ['csw21', 'nwl2023', 'enable', 'slovenian'];
-export const ENGLISH_IDS = ['csw21', 'nwl2023', 'enable'];
-export const DICTIONARY_LABELS = { csw21: 'CSW21', nwl2023: 'NWL2023', enable: 'ENABLE', slovenian: 'Slovenian' };
+export const DICTIONARY_IDS = ['csw21', 'nwl2023', 'enable', 'friendly', 'slovenian'];
+export const ENGLISH_IDS = ['csw21', 'nwl2023', 'enable', 'friendly'];
+export const DICTIONARY_LABELS = { csw21: 'CSW21', nwl2023: 'NWL2023', enable: 'ENABLE', friendly: 'Friendly', slovenian: 'Slovenian' };
 
-const NONE = { csw21: false, nwl2023: false, enable: false, slovenian: false };
+const NONE = { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: false };
 const only = (id) => ({ ...NONE, [id]: true });
+
+// New English games default to ENABLE + Friendly together ("between friends":
+// a word in ANY selected list is valid), so ZA/ZO/QI play out of the box.
+// Single-list fallbacks below cover deployments that ship only one of them.
+const defaultEnglishSelection = (available) => {
+  const hasEnable = available.includes('enable');
+  const hasFriendly = available.includes('friendly');
+  if (hasEnable && hasFriendly) return { ...NONE, enable: true, friendly: true };
+  return only(defaultEnglish(available));
+};
 
 // The English list to use when the player has not chosen one: CSW21, else NWL2023, else ENABLE (open list), from what
 // this deployment actually has. With nothing known it is CSW21 (the laptop host's default).
 const defaultEnglish = (available) => ENGLISH_IDS.find((id) => available.includes(id)) ?? 'csw21';
 
 // Dictionaries for a game whose language was chosen explicitly: Slovenian has a single list; English keeps the
-// player's English choices (dropping Slovenian), defaulting to the best available English list.
+// player's English choices (dropping Slovenian), defaulting to ENABLE + Friendly together.
 export function selectionForNewGame(language, current, available = DICTIONARY_IDS) {
   if (language === 'slovenian') return only('slovenian');
   const keep = ENGLISH_IDS.filter((id) => current[id]);
   if (keep.length) return { ...NONE, ...Object.fromEntries(keep.map((id) => [id, true])) };
-  return only(defaultEnglish(available));
+  return defaultEnglishSelection(available);
 }
 
 // Dictionaries for a plain restart: keep the selection unless it cannot suit the language.
 export function defaultSelectionFor(language, current, available = DICTIONARY_IDS) {
   if (language === 'slovenian') return current.slovenian ? current : only('slovenian');
-  return ENGLISH_IDS.some((id) => current[id]) ? current : only(defaultEnglish(available));
+  return ENGLISH_IDS.some((id) => current[id]) ? current : defaultEnglishSelection(available);
 }
 
-// Parse a list: one entry per line, either `WORD` or `WORD definition [metadata]`. Returns Map(word -> definition|null).
+// Parse a list: one entry per line, either `WORD` or `WORD definition [metadata]`. Blank lines and `#`
+// comment lines (licence headers, FRIENDLY.txt provenance header) are skipped. Returns Map(word -> definition|null).
 export function parseDictionaryFile(content) {
   const dictionary = new Map();
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
-    if (!trimmed) continue;
+    if (!trimmed || trimmed.startsWith('#')) continue;
     const match = trimmed.match(/^(\S+)\s+(.+)$/);
     if (match) dictionary.set(match[1].toLowerCase(), match[2]);
     else dictionary.set(trimmed.toLowerCase(), null);

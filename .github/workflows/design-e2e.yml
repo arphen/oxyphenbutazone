@@ -1,0 +1,42 @@
+# Design end-to-end: journeys, contracts and screenshots green on the branch
+name: design-e2e
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: design-e2e-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  design:
+    runs-on: ubuntu-24.04          # baselines must be generated on the same OS as this runner
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Static design audit (fast; fails while a core slice is missing)
+        run: node ui/audit-static.mjs --src src --e2e-dir e2e-design --workflows ../.github/workflows
+      - name: Build the app the suite drives
+        run: npm run build
+      - name: Install the browser Playwright expects
+        run: npx playwright install --with-deps chromium
+      - name: Journeys, design contracts and screenshots
+        run: npx playwright test -c e2e-design/playwright.config.mjs
+      - name: Upload the report and screenshot diffs, even on failure
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/e2e-design/playwright-report/
+            frontend/e2e-design/test-results/
+          retention-days: 14

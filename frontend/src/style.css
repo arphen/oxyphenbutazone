@@ -1,27 +1,887 @@
+/* ============================================================================
+ * Oxyphenbutazone — Design Tokens & Base Layer ("quiet glass" for word games)
+ * ----------------------------------------------------------------------------
+ * Philosophy (borrowed from sibling project `crossword`, adapted):
+ * - Crossword encodes MEANING with color: selection vs related vs validation,
+ *   and validation always wins over selection. We do the same:
+ *   selection (accent/cursor) < related (premium tint) < validation (green/red).
+ * - Macro depth: blurred glass ONLY on large floating surfaces (badges,
+ *   modals, overlays). Board cells and tiles stay cheap: flat fills, 1px
+ *   inner glint, layered soft shadows. Never backdrop-blur per cell.
+ * - Mini states: every interactive element has visible hover / press / focus /
+ *   disabled / loading states. Focus is always a 2px ring + offset, never
+ *   `outline: none` without replacement.
+ * - Micro motion: transitions on transform / opacity / border-color /
+ *   background-color only, 150–250ms, one shared ease-out curve. Entrances
+ *   play ONCE (no infinite pulses). `prefers-reduced-motion` kills all motion.
+ * - Numbers/scores use tabular figures so totals never jitter.
+ *
+ * Deliberate divergences from crossword:
+ * - Crossword is dark-only desktop console with Across=orange / Down=blue.
+ *   We are mobile-first and support light + dark (prefers-color-scheme AND
+ *   [data-theme] override). No direction colors; instead PREMIUM semantics
+ *   (DL/TL/DW/TW/center) get the jewel-tone tints (yellow/amber/violet/teal).
+ * - Tiles are physical objects: they stay light "porcelain" in BOTH themes
+ *   with dark ink, so letter contrast is always AAA. Only their edge/glow
+ *   adapts to theme. This is the anti-Scrabble rule: no khaki (#f0e68c),
+ *   no beige (#f5f5dc), no brown/tan board imitation anywhere.
+ *
+ * Token table (see frontend/DESIGN_TOKENS.md for full docs + contrast notes):
+ *   --surface-0/1/2/3  layered backgrounds (page → floating)
+ *   --ink / --ink-muted / --ink-faint   text ladder
+ *   --accent / --accent-ink / --accent-soft  selection + primary actions
+ *   --success / --warn / --danger (+ *-soft fills)  validation & status
+ *   --tile-face-* / --tile-ink  the porcelain tile (theme-independent)
+ *   --board-*  board bezel, grid lines, empty-cell fill
+ *   --premium-dl/tl/dw/tw/center (+ *-ink)  premium-square tints
+ *   --focus-ring  keyboard focus color (AA against both surfaces)
+ *   --ease-out / --dur-quick / --dur-settle  the one motion contract
+ *   --<arc/lift/contour/ember/flame/halo>  Afterglow identity ramp (section 6)
+ *   plus reader tiers (data-luma/vibrance/ramp). Hue names an identity by rank;
+ *   lightness names the pole; chroma names interaction. No hand-picked hex per
+ *   item (R1, R2, R6); nothing loops (R14).
+ * ========================================================================== */
+
+/* ==========================================================================
+   0. Afterglow foundation: registered numbers that light can ease through.
+   Without @property a custom property jumps; with it, ignition flares once
+   (640ms) and a solved tile settles over 1800ms. Reduced motion keeps the
+   light and drops only the transition (R17).
+   ========================================================================== */
+@property --glow-pulse {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+@property --settle {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+/* Territory ranks glide while lists scroll; they must not inherit, so a
+   drifting corner repaints only the ground's own edge and glow (R31: bug 30
+   in the guide taught us to mask the layer's rim too). */
+@property --ta-top {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+@property --ta-bottom {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+@property --tb-top {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+@property --tb-bottom {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  color-scheme: light dark;
+
+  /* ---- Motion contract (shared by every component) ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-quick: 160ms;
+  --dur-settle: 240ms;
+  --dur-ignite: 640ms; /* one flare when a thing lights, then rest (R14, §9.3) */
+
+  /* ---- Afterglow identity ramp (§6): rank -> hue, pole -> value ----
+     Each pole owns half of the OKLCH wheel so the gradients never overlap.
+     The contour lowers tight hues (pink/orange/violet) just enough to fit
+     sRGB at this chroma; generous ones (green/yellow) lift back (R6).
+     Interaction spends chroma/light, never hue: ember = at rest, flame =
+     being worked, halo = names the pole (R4, §6.4). JS publishes unitless
+     --rank (0..1); CSS owns every colour (R20). */
+  --a-start: 2;
+  --a-end: 142;
+  --b-start: 183;
+  --b-end: 323;
+  --ramp-l: 0.82;
+  --ramp-c: 0.14;
+  --a-l0: -0.115;
+  --a-l1: 0;
+  --a-l2: 0.105;
+  --b-l0: 0.035;
+  --b-l1: -0.24;
+  --b-l2: 0.24;
+  --a-lift: 0.07; /* pole A reads brighter; direction is value, never hue */
+  --b-drop: 0.07;
+  --ember-chroma: 0.7;
+  --flame-chroma: 1.75;
+  --ember-alpha: 14%;
+  --cross-alpha: 22%;
+  --flame-alpha: 34%;
+  --halo-alpha: 18%;
+  --backlight: 36%; /* light from behind; the territory layer (S6) spends it */
+  --glow-chroma: 1.3;
+
+  /* ---- Shape ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* ---- Depth (macro): glints + layered shadows, glass only up top ---- */
+  --surface-glint: #ffffff14;
+  --cell-glint: #ffffff0d;
+  --shadow-sm: 0 2px 6px rgb(0 0 0 / 0.22);
+  --shadow-md: 0 8px 24px -12px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 18px 40px -18px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.25);
+
+  /* ---- Dark theme is the default (matches game-room lighting) ---- */
+  --surface-0: #0c1015; /* page */
+  --surface-1: #161c24; /* panels, cards */
+  --surface-2: #1f2732; /* raised: inputs, wells */
+  --surface-3: #28323f; /* floating: modals, popovers */
+  --surface-edge: #39434f; /* hairline borders */
+  --glass: rgb(22 28 36 / 0.82); /* large floating surfaces only */
+  --glass-edge: rgb(242 242 246 / 0.12);
+
+  --ink: #f2f2f6;
+  --ink-muted: #b9c1cc; /* AA on surface-0/1 (~9:1) */
+  --ink-faint: #8d97a3; /* large text / icons only (~5:1) */
+
+  --accent: #7aa8ff; /* selection, links, focus-adjacent highlights */
+  --accent-ink: #0c1015; /* text on accent fills */
+  --accent-soft: rgb(122 168 255 / 0.16);
+  --accent-edge: rgb(122 168 255 / 0.55);
+
+  --primary: #5b54e8; /* primary buttons; white on this is ~6.2:1 (AA) */
+  --primary-hover: #6c66f0;
+  --primary-pressed: #4a44d6;
+  --on-primary: #ffffff;
+
+  --success: #4ade80; /* text-grade on dark (~10:1) */
+  --success-deep: #178a4c; /* text-grade on light */
+  --success-soft: rgb(74 222 128 / 0.14);
+  --success-edge: rgb(74 222 128 / 0.55);
+
+  --warn: #fbbf24;
+  --warn-deep: #92600a;
+  --warn-soft: rgb(251 191 36 / 0.14);
+  --warn-edge: rgb(251 191 36 / 0.55);
+
+  --danger: #f87171;
+  --danger-deep: #b4232f;
+  --danger-soft: rgb(248 113 113 / 0.14);
+  --danger-edge: rgb(248 113 113 / 0.55);
+
+  --focus-ring: #8dc7ff; /* 2px ring, AA against both surfaces */
+
+  /* ---- Tiles: porcelain in every theme (dark ink on light face = AAA) ---- */
+  --tile-face-hi: #ffffff;
+  --tile-face-lo: #e9e6da;
+  --tile-ink: #1c2330;
+  --tile-sub: #5b6472; /* points pip */
+  --tile-edge: #2a323d;
+  --tile-glow: rgb(122 168 255 / 0.45);
+
+  /* ---- Board ---- */
+  --board-bezel: #151b21;
+  --board-edge: #4d5661;
+  --board-line: rgb(255 255 255 / 0.09);
+  --board-cell: rgb(32 40 52 / 0.72);
+  --board-cell-hover: rgb(44 54 70 / 0.8);
+
+  /* ---- Premium squares: jewel tints, never wood tones ---- */
+  --premium-dl: rgb(253 224 71 / 0.22);
+  --premium-dl-ink: #fef3c7;
+  --premium-tl: rgb(245 158 11 / 0.38);
+  --premium-tl-ink: #fef3c7;
+  --premium-dw: rgb(167 139 250 / 0.26);
+  --premium-dw-ink: #ede9fe;
+  --premium-tw: rgb(124 58 237 / 0.4);
+  --premium-tw-ink: #ede9fe;
+  --premium-center: rgb(20 184 166 / 0.36);
+  --premium-center-ink: #ccfbf1;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* ---- Explicit theme override wins over OS preference ---- */
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-glint: #ffffffd9;
+  --cell-glint: #ffffff;
+  --shadow-sm: 0 2px 6px rgb(35 59 48 / 0.1);
+  --shadow-md: 0 8px 24px -12px rgb(35 59 48 / 0.28), 0 2px 6px rgb(35 59 48 / 0.08);
+  --shadow-lg: 0 18px 40px -18px rgb(35 59 48 / 0.32), 0 2px 6px rgb(35 59 48 / 0.1);
+
+  --surface-0: #f4f5f2;
+  --surface-1: #e9ece8;
+  --surface-2: #dde3dd;
+  --surface-3: #ffffff;
+  --surface-edge: #bfc8c1;
+  --glass: rgb(255 255 255 / 0.86);
+  --glass-edge: rgb(38 52 48 / 0.12);
+
+  --ink: #1e2a26;
+  --ink-muted: #45534c; /* ~7:1 on surface-0 */
+  --ink-faint: #5f6d65; /* large text / icons only (~4.6:1) */
+
+  --accent: #1d4ed8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(29 78 216 / 0.1);
+  --accent-edge: rgb(29 78 216 / 0.5);
+
+  --primary: #4338ca; /* white on this is ~9:1 */
+  --primary-hover: #4f46e5;
+  --primary-pressed: #3730a3;
+
+  --success: #178a4c;
+  --success-soft: rgb(23 138 76 / 0.12);
+  --success-edge: rgb(23 138 76 / 0.5);
+  --warn: #92600a;
+  --warn-soft: rgb(146 96 10 / 0.12);
+  --warn-edge: rgb(146 96 10 / 0.5);
+  --danger: #b4232f;
+  --danger-soft: rgb(180 35 47 / 0.1);
+  --danger-edge: rgb(180 35 47 / 0.5);
+
+  --focus-ring: #1d4ed8;
+
+  --tile-edge: #8a938c;
+  --tile-glow: rgb(29 78 216 / 0.4);
+
+  --board-bezel: #d7ded8;
+  --board-edge: #b3beb6;
+  --board-line: rgb(38 52 48 / 0.14);
+  --board-cell: rgb(255 255 255 / 0.66);
+  --board-cell-hover: #ffffff;
+
+  --premium-dl: rgb(185 130 8 / 0.16);
+  --premium-dl-ink: #6b4a05;
+  --premium-tl: rgb(185 130 8 / 0.3);
+  --premium-tl-ink: #5c3d04;
+  --premium-dw: rgb(109 88 246 / 0.16);
+  --premium-dw-ink: #4634b5;
+  --premium-tw: rgb(109 40 217 / 0.22);
+  --premium-tw-ink: #4c1d95;
+  --premium-center: rgb(13 148 136 / 0.22);
+  --premium-center-ink: #0b5f56;
 }
 
-a:hover {
-  color: #535bf2;
+/* ---- OS preference only applies with no explicit override ---- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --surface-glint: #ffffffd9;
+    --cell-glint: #ffffff;
+    --shadow-sm: 0 2px 6px rgb(35 59 48 / 0.1);
+    --shadow-md: 0 8px 24px -12px rgb(35 59 48 / 0.28), 0 2px 6px rgb(35 59 48 / 0.08);
+    --shadow-lg: 0 18px 40px -18px rgb(35 59 48 / 0.32), 0 2px 6px rgb(35 59 48 / 0.1);
+    --surface-0: #f4f5f2;
+    --surface-1: #e9ece8;
+    --surface-2: #dde3dd;
+    --surface-3: #ffffff;
+    --surface-edge: #bfc8c1;
+    --glass: rgb(255 255 255 / 0.86);
+    --glass-edge: rgb(38 52 48 / 0.12);
+    --ink: #1e2a26;
+    --ink-muted: #45534c;
+    --ink-faint: #5f6d65;
+    --accent: #1d4ed8;
+    --accent-ink: #ffffff;
+    --accent-soft: rgb(29 78 216 / 0.1);
+    --accent-edge: rgb(29 78 216 / 0.5);
+    --primary: #4338ca;
+    --primary-hover: #4f46e5;
+    --primary-pressed: #3730a3;
+    --success: #178a4c;
+    --success-soft: rgb(23 138 76 / 0.12);
+    --success-edge: rgb(23 138 76 / 0.5);
+    --warn: #92600a;
+    --warn-soft: rgb(146 96 10 / 0.12);
+    --warn-edge: rgb(146 96 10 / 0.5);
+    --danger: #b4232f;
+    --danger-soft: rgb(180 35 47 / 0.1);
+    --danger-edge: rgb(180 35 47 / 0.5);
+    --focus-ring: #1d4ed8;
+    --tile-edge: #8a938c;
+    --tile-glow: rgb(29 78 216 / 0.4);
+    --board-bezel: #d7ded8;
+    --board-edge: #b3beb6;
+    --board-line: rgb(38 52 48 / 0.14);
+    --board-cell: rgb(255 255 255 / 0.66);
+    --board-cell-hover: #ffffff;
+    --premium-dl: rgb(185 130 8 / 0.16);
+    --premium-dl-ink: #6b4a05;
+    --premium-tl: rgb(185 130 8 / 0.3);
+    --premium-tl-ink: #5c3d04;
+    --premium-dw: rgb(109 88 246 / 0.16);
+    --premium-dw-ink: #4634b5;
+    --premium-tw: rgb(109 40 217 / 0.22);
+    --premium-tw-ink: #4c1d95;
+    --premium-center: rgb(13 148 136 / 0.22);
+    --premium-center-ink: #0b5f56;
+  }
 }
+
+/* ==========================================================================
+   Afterglow reader tiers (R18–R20): mini = comfort, micro = reading aids.
+   JS publishes data-* on <html>; CSS owns every appearance. Low-bloom tiers
+   take the glow away on smudged/bright screens and keep structure and hue:
+   highlights bloom, not midtones, so the plane lowers and the ink stays.
+   ========================================================================== */
+/* Light theme: the ramp sits deeper; the narrow places move (yellows and
+   cyans hold colour only when lifted), so the contour bulges mid-arc. Light
+   from behind reads as a stain on paper: kept at 14%. */
+[data-theme='light'] {
+  --ramp-l: 0.42;
+  --ramp-c: 0.12;
+  --backlight: 14%;
+  --a-l0: -0.02;
+  --a-l1: 0.44;
+  --a-l2: -0.44;
+  --b-l0: 0.23;
+  --b-l1: -0.36;
+  --b-l2: 0.18;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ramp-l: 0.42;
+    --ramp-c: 0.12;
+    --backlight: 14%;
+    --a-l0: -0.02;
+    --a-l1: 0.44;
+    --a-l2: -0.44;
+    --b-l0: 0.23;
+    --b-l1: -0.36;
+    --b-l2: 0.18;
+  }
+}
+/* Vibrance dial (micro): how much colour the reader wants spent. */
+:root[data-vibrance='soft'] {
+  --ramp-c: 0.095;
+  --ember-chroma: 0.55;
+  --flame-chroma: 1.4;
+  --ember-alpha: 10%;
+  --cross-alpha: 16%;
+  --flame-alpha: 26%;
+  --halo-alpha: 14%;
+}
+:root[data-vibrance='bold'] {
+  --ramp-c: 0.18;
+  --ember-chroma: 0.8;
+  --flame-chroma: 1.9;
+  --ember-alpha: 17%;
+  --cross-alpha: 26%;
+  --flame-alpha: 39%;
+  --halo-alpha: 24%;
+}
+/* Item colours off (micro): keep the structure, drop the pigment, so the
+   option stays usable for readers who only want the rails. */
+:root[data-ramp='off'] {
+  --ramp-c: 0;
+}
+/* Dim / Veil (mini): ember and crossing go to 0%, flame to 11%, halo to 6%. */
+:root:is([data-luma='dim'], [data-luma='veil']) {
+  --ember-alpha: 0%;
+  --cross-alpha: 0%;
+  --flame-alpha: 11%;
+  --halo-alpha: 6%;
+  --backlight: 20%;
+}
+:root[data-luma='veil'] {
+  --backlight: 12%;
+}
+
+/* ==========================================================================
+   Ignition and arrival: finite motion only (R14, §9.3, §9.5). A selection
+   flares once over 640ms (only the glow's alpha moves; reading stays still);
+   a committed tile arrives over 160ms. Nothing loops; nothing moves while
+   the reader is just reading.
+   ========================================================================== */
+@keyframes oxy-ignite {
+  from {
+    --glow-pulse: 2;
+  }
+  to {
+    --glow-pulse: 1;
+  }
+}
+@keyframes oxy-arrive {
+  from {
+    opacity: 0.35;
+    transform: translateY(2px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes oxy-settle {
+  from {
+    --settle: 1;
+  }
+  to {
+    --settle: 0;
+  }
+}
+
+/* ==========================================================================
+   S3 identity: rank -> hue (R1–R6). Declare --rank (0..1) on EVERY element
+   that wears the colour; .wx-a owns the warm half of the wheel, .wx-b the
+   cool half, so the two directions never overlap (R3). Pole reads as value
+   (+0.07 / −0.07 lightness), interaction as chroma — never as a second hue.
+   ========================================================================== */
+.wx-a,
+.wx-b {
+  --is-b: 0;
+  --arc-start: var(--a-start);
+  --arc-end: var(--a-end);
+  --lane-l: calc(var(--ramp-l) + var(--a-lift));
+}
+.wx-b {
+  --is-b: 1;
+  --arc-start: var(--b-start);
+  --arc-end: var(--b-end);
+  --lane-l: calc(var(--ramp-l) - var(--b-drop));
+}
+.wx-a,
+.wx-b {
+  --hue: calc(var(--arc-start) + var(--rank, 0) * (var(--arc-end) - var(--arc-start)));
+  --contour: calc(
+    (1 - var(--is-b)) *
+      (var(--a-l0) + var(--a-l1) * var(--rank, 0) + var(--a-l2) * var(--rank, 0) * var(--rank, 0)) +
+      var(--is-b) *
+      (var(--b-l0) + var(--b-l1) * var(--rank, 0) + var(--b-l2) * var(--rank, 0) * var(--rank, 0))
+  );
+  --l: calc(var(--lane-l) + var(--contour));
+  --tint: oklch(var(--l) var(--ramp-c) var(--hue));
+  --ember: oklch(var(--l) calc(var(--ramp-c) * var(--ember-chroma)) var(--hue));
+  --flame: oklch(var(--l) calc(var(--ramp-c) * var(--flame-chroma)) var(--hue));
+}
+
+/* A history word wears its rank: the numeral learned on the board found in
+   the list (R26). Latest words ignite once, then rest at flame strength. */
+.wword {
+  color: var(--tint);
+}
+.wword.wlatest {
+  background: color-mix(in oklab, var(--flame) var(--flame-alpha), transparent);
+  border-radius: 4px;
+  animation: oxy-ignite var(--dur-ignite, 640ms) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Committed tiles rest as porcelain with a trace of their word's hue in the
+   ink — the remainder (§10.3). The latest word's trace runs deeper. */
+.wx-a .tile-letter,
+.wx-b .tile-letter,
+.wx-a .pb-letter,
+.wx-b .pb-letter {
+  position: relative;
+  z-index: 1;
+  color: color-mix(in oklab, var(--tile-ink, #1c2330) 80%, var(--tint));
+}
+.wx-a.wlatest .tile-letter,
+.wx-b.wlatest .tile-letter,
+.wx-a.wlatest .pb-letter,
+.wx-b.wlatest .pb-letter {
+  color: color-mix(in oklab, var(--tile-ink, #1c2330) 55%, var(--flame));
+}
+
+/* The spill falls off linearly and is gone by the third square, so the
+   notch's light stays where the notch is (§10.4). Each square holds its own
+   level flat instead of fading to transparent inside itself. */
+.wspill-1::after,
+.wspill-2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.wspill-1::after {
+  background: color-mix(in oklab, var(--tint) calc(18% * var(--charge, 1)), transparent);
+}
+.wspill-2::after {
+  background: color-mix(in oklab, var(--tint) calc(9% * var(--charge, 1)), transparent);
+}
+
+/* Gate ticks: 2px filaments on the edge where a word opens — east for
+   horizontal, south for vertical — bright-cored and softly bleeding in the
+   word's own hue (§10.5). Anchors (notches with no word yet) keep a quiet
+   ink dot until a word claims them. */
+.wtick {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  background: color-mix(in oklab, white var(--tick-core, 44%), var(--tint));
+  box-shadow: 0 0 var(--tick-glow, 6px)
+    color-mix(in oklab, var(--tint) var(--tick-glow-alpha, 62%), transparent);
+}
+.wtick-e {
+  top: 15%;
+  bottom: 15%;
+  right: 1px;
+  width: 2px;
+  border-radius: 2px;
+}
+.wtick-s {
+  left: 15%;
+  right: 15%;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 2px;
+}
+.wanchor {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--ink) 55%, transparent);
+  box-shadow: 0 0 var(--tick-glow, 6px) color-mix(in oklab, var(--ink) 30%, transparent);
+}
+
+/* ==========================================================================
+   S6/S7 ground: the board is lit by what is on screen (§6.7) and holds one
+   charge of light shared among what is still open (§10.1). JS only publishes
+   --remaining, --libido and the four corner ranks; CSS spends the light.
+   ========================================================================== */
+.oxy-ground {
+  --remaining: 1;
+  --libido: 1;
+  --charge: clamp(0.18, calc(var(--libido) * pow(max(var(--remaining), 0.05), -0.5)), 2.6);
+  --tick-glow: calc(6px * var(--charge));
+  --tick-glow-alpha: min(96%, calc(62% * var(--charge)));
+  --tick-core: min(78%, calc(44% * var(--charge)));
+  position: relative;
+  isolation: isolate;
+  transition:
+    --ta-top 900ms var(--ease-out),
+    --ta-bottom 900ms var(--ease-out),
+    --tb-top 900ms var(--ease-out),
+    --tb-bottom 900ms var(--ease-out);
+  --c-tl: oklch(
+    calc(
+        var(--ramp-l) + var(--a-lift) + var(--a-l0) + var(--a-l1) * var(--ta-top, 0) + var(--a-l2) *
+          var(--ta-top, 0) * var(--ta-top, 0)
+      )
+      calc(var(--ramp-c) * var(--glow-chroma))
+      calc(var(--a-start) + var(--ta-top, 0) * (var(--a-end) - var(--a-start)))
+  );
+  --c-bl: oklch(
+    calc(
+        var(--ramp-l) + var(--a-lift) + var(--a-l0) + var(--a-l1) * var(--ta-bottom, 1) +
+          var(--a-l2) * var(--ta-bottom, 1) * var(--ta-bottom, 1)
+      )
+      calc(var(--ramp-c) * var(--glow-chroma))
+      calc(var(--a-start) + var(--ta-bottom, 1) * (var(--a-end) - var(--a-start)))
+  );
+  --c-tr: oklch(
+    calc(
+        var(--ramp-l) - var(--b-drop) + var(--b-l0) + var(--b-l1) * var(--tb-top, 0) + var(--b-l2) *
+          var(--tb-top, 0) * var(--tb-top, 0)
+      )
+      calc(var(--ramp-c) * var(--glow-chroma))
+      calc(var(--b-start) + var(--tb-top, 0) * (var(--b-end) - var(--b-start)))
+  );
+  --c-br: oklch(
+    calc(
+        var(--ramp-l) - var(--b-drop) + var(--b-l0) + var(--b-l1) * var(--tb-bottom, 1) +
+          var(--b-l2) * var(--tb-bottom, 1) * var(--tb-bottom, 1)
+      )
+      calc(var(--ramp-c) * var(--glow-chroma))
+      calc(var(--b-start) + var(--tb-bottom, 1) * (var(--b-end) - var(--b-start)))
+  );
+}
+.oxy-ground::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -4rem;
+  pointer-events: none;
+  --a: calc(var(--backlight) * max(var(--libido), 0.3));
+  background:
+    radial-gradient(
+      50% 46% at 4rem 4rem,
+      color-mix(in oklab, var(--c-tl) var(--a), transparent),
+      transparent
+    ),
+    radial-gradient(
+      50% 46% at calc(100% - 4rem) 4rem,
+      color-mix(in oklab, var(--c-tr) var(--a), transparent),
+      transparent
+    ),
+    radial-gradient(
+      50% 46% at 4rem calc(100% - 4rem),
+      color-mix(in oklab, var(--c-bl) var(--a), transparent),
+      transparent
+    ),
+    radial-gradient(
+      50% 46% at calc(100% - 4rem) calc(100% - 4rem),
+      color-mix(in oklab, var(--c-br) var(--a), transparent),
+      transparent
+    );
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, #000 4rem, #000 calc(100% - 4rem), transparent),
+    linear-gradient(180deg, transparent, #000 4rem, #000 calc(100% - 4rem), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent, #000 4rem, #000 calc(100% - 4rem), transparent),
+    linear-gradient(180deg, transparent, #000 4rem, #000 calc(100% - 4rem), transparent);
+  mask-composite: intersect;
+}
+/* The bezel's hairline edge sweeps the same four corners, so the frame and
+   the light never disagree (R27). */
+.oxy-ground::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 4px;
+  padding: 1px;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    var(--c-tl),
+    var(--c-tr),
+    var(--c-br),
+    var(--c-bl),
+    var(--c-tl)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.55;
+}
+
+/* ==========================================================================
+   S5 reader tiers, continued: size, edge cues, letter weight (R19). Each
+   setting lives on exactly one scale; JS publishes, CSS spends.
+   ========================================================================== */
+:root[data-scale='compact'] {
+  --scale: 0.9;
+}
+:root[data-scale='full'] {
+  --scale: 1.16;
+}
+:root[data-cues='off'] .wtick,
+:root[data-cues='off'] .wanchor,
+:root[data-cues='off'] .wspill-1::after,
+:root[data-cues='off'] .wspill-2::after {
+  display: none;
+}
+:root[data-glyph='firm'] .tile-letter,
+:root[data-glyph='firm'] .pb-letter,
+:root[data-glyph='firm'] .tile .letter,
+:root[data-glyph='firm'] .letter-btn {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* ==========================================================================
+   S5 View panel: a native <details> with one fieldset per tier. Opens in
+   flow and scrolls rather than running past a short window. The pressed
+   choice takes its tier's accent so a row reads by colour alone: comfort
+   green, reading amber, cues blue. Single Reset at the foot (R22).
+   ========================================================================== */
+.view-cluster {
+  position: relative;
+}
+.view-cluster-summary {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--muted, var(--ink-muted));
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  list-style: none;
+  cursor: pointer;
+  transition:
+    color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    transform var(--dur-quick) var(--ease-out);
+}
+.view-cluster-summary::-webkit-details-marker {
+  display: none;
+}
+.view-cluster-summary:hover,
+.view-cluster[open] .view-cluster-summary {
+  background: color-mix(in oklab, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+.view-cluster-summary:active {
+  transform: scale(0.96);
+  transition-duration: 60ms;
+}
+.view-cluster-panel {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: grid;
+  gap: 9px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--surface-edge);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    var(--panel-light, var(--surface-3)),
+    var(--panel, var(--surface-1))
+  );
+  box-shadow: var(--shadow-lg);
+  max-height: min(72dvh, 620px);
+  overflow: auto;
+}
+.view-tier {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in oklab, var(--ink) 7%, transparent);
+  border-radius: 10px;
+}
+.view-tier legend {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 4px;
+  color: var(--muted, var(--ink-muted));
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.view-tier-hint {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.75;
+}
+.view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.view-row-label {
+  font-size: 0.76rem;
+}
+.view-choices {
+  display: inline-flex;
+  gap: 4px;
+}
+.view-choice {
+  min-height: 28px;
+  padding: 2px 9px;
+  border: 1px solid var(--surface-edge);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-choice:hover {
+  border-color: var(--ink-muted);
+  color: var(--ink);
+}
+.view-choice[aria-pressed='true'] {
+  border-color: currentColor;
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+}
+.view-tier[data-tier='mini'] .view-choice[aria-pressed='true'] {
+  color: var(--ok, var(--success));
+}
+.view-tier[data-tier='micro'] .view-choice[aria-pressed='true'] {
+  color: var(--pole-a, var(--warn));
+}
+.view-tier[data-tier='nano'] .view-choice[aria-pressed='true'] {
+  color: var(--pole-b, var(--accent));
+}
+/* On paper a tier-coloured label cannot carry text at 4.5:1 (mini green
+   measured 3.37:1, micro amber 4.13:1). The tier keeps its hairline and the
+   text drops back to ink — the same fix as the selected chip (guide §15
+   item 32). Measure contrast, do not eyeball it (R5). */
+[data-theme='light'] .view-tier[data-tier='mini'] .view-choice[aria-pressed='true'],
+[data-theme='light'] .view-tier[data-tier='micro'] .view-choice[aria-pressed='true'],
+[data-theme='light'] .view-tier[data-tier='nano'] .view-choice[aria-pressed='true'] {
+  color: var(--ink);
+}
+[data-theme='light'] .view-tier[data-tier='mini'] .view-choice[aria-pressed='true'] {
+  border-color: var(--ok, var(--success));
+}
+[data-theme='light'] .view-tier[data-tier='micro'] .view-choice[aria-pressed='true'] {
+  border-color: var(--pole-a, var(--warn));
+}
+[data-theme='light'] .view-tier[data-tier='nano'] .view-choice[aria-pressed='true'] {
+  border-color: var(--pole-b, var(--accent));
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .view-tier .view-choice[aria-pressed='true'] {
+    color: var(--ink);
+  }
+}
+.view-reset {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 0.7rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.view-reset:hover {
+  color: var(--ink);
+}
+/* A full-width sheet above its trigger: always on-screen horizontally, so a
+   trigger near the screen edge cannot push the panel past the viewport.
+   (Do not use position: fixed here: a parent with backdrop-filter or
+   transform becomes its containing block.) */
+.view-sheet-full .view-cluster-panel {
+  left: 0;
+  right: 0;
+  width: auto;
+  transform: none;
+}
+
+/* ================= Base elements (mini states for everything) ============ */
 
 body {
   margin: 0;
@@ -29,17 +889,19 @@ body {
   min-height: 100vh;
   min-height: -webkit-fill-available;
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
   overflow-y: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  background: var(--surface-0);
+  color: var(--ink);
 }
 
 html {
   height: -webkit-fill-available;
+  background: var(--surface-0);
+  /* The backlight pseudo-layer reaches past its box; without this the layout
+     viewport silently grows to fit it and taps miss their targets (guide
+     §15 item 34). `clip`, unlike `hidden`, makes no scroller. */
+  overflow-x: clip;
 }
 
 h1 {
@@ -47,25 +909,98 @@ h1 {
   line-height: 1.1;
 }
 
+a {
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* One focus treatment everywhere: 2px ring + offset, AA in both themes. */
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Buttons: shared motion curve, tactile press, honest disabled. */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-edge);
   padding: 0.6em 1.2em;
   font-size: 1em;
-  font-weight: 500;
+  font-weight: 550;
   font-family: inherit;
-  background-color: #1a1a1a;
+  color: var(--ink);
+  background: var(--surface-2);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    opacity var(--dur-quick) var(--ease-out);
 }
 
-button:hover {
-  border-color: #646cff;
+button:hover:not(:disabled) {
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 60ms;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-quick) var(--ease-out);
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--accent-edge);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Scores and tabular data never jitter. */
+.tnum,
+.score,
+.stat-value,
+.tile-points {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Loading placeholder: a static tint, no shimmer. The shimmer looped forever
+   (an infinite animation repainting while the reader only waited) and is
+   replaced by a flat surface; the content arrives once with oxy-arrive. */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
 }
 
 .card {
@@ -76,19 +1011,25 @@ button:focus-visible {
   width: 100%;
   margin: 0;
   padding: 0;
+  background: var(--surface-0);
+  color: var(--ink);
 }
 
-@media (prefers-color-scheme: light) {
+/* Displays that ask for more contrast get harder edges, not brighter ink. */
+@media (prefers-contrast: more) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    --surface-edge: #6b7480;
+    --board-edge: #78818c;
+    --focus-ring: currentColor;
   }
+}
 
-  a:hover {
-    color: #747bff;
-  }
-
-  button {
-    background-color: #f9f9f9;
+/* Motion contract opt-out: nothing moves, entrances resolve to end state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

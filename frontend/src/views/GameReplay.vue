@@ -7,9 +7,7 @@
     <div v-else class="replay-container">
       <!-- Header -->
       <div class="replay-header">
-        <button @click="goBack" class="back-button">
-          ← Back to History
-        </button>
+        <button @click="goBack" class="back-button">← Back to History</button>
         <div class="game-title">
           <h1>Game Analysis</h1>
           <div class="game-date">{{ formatDate(game.startedAt) }}</div>
@@ -22,53 +20,56 @@
         <!-- Board View -->
         <div class="board-section">
           <div class="board-container">
-            <Board :key="currentMoveIndex" :board="currentBoardState" :language="game?.metadata?.language" @cell-click="() => {}" />
+            <Board
+              :key="currentMoveIndex"
+              :board="currentBoardState"
+              :language="game?.metadata?.language"
+              @cell-click="() => {}"
+            />
           </div>
 
           <!-- Move Controls -->
           <div class="controls">
-            <button 
-              @click="firstMove" 
+            <button
+              @click="firstMove"
               :disabled="currentMoveIndex === 0"
               class="control-btn"
               title="First Move"
             >
-              ⏮️
+              |&lt;
             </button>
-            <button 
-              @click="previousMove" 
+            <button
+              @click="previousMove"
               :disabled="currentMoveIndex === 0"
               class="control-btn"
               title="Previous Move"
             >
-              ⏪
+              &lt;
             </button>
-            <div class="move-counter">
-              Move {{ currentMoveIndex }} / {{ game.moves.length }}
-            </div>
-            <button 
-              @click="nextMove" 
+            <div class="move-counter">Move {{ currentMoveIndex }} / {{ game.moves.length }}</div>
+            <button
+              @click="nextMove"
               :disabled="currentMoveIndex === game.moves.length"
               class="control-btn"
               title="Next Move"
             >
-              ⏩
+              &gt;
             </button>
-            <button 
-              @click="lastMove" 
+            <button
+              @click="lastMove"
               :disabled="currentMoveIndex === game.moves.length"
               class="control-btn"
               title="Last Move"
             >
-              ⏭️
+              &gt;|
             </button>
           </div>
 
           <div class="move-slider">
-            <input 
-              type="range" 
-              v-model.number="currentMoveIndex" 
-              :min="0" 
+            <input
+              type="range"
+              v-model.number="currentMoveIndex"
+              :min="0"
               :max="game.moves.length"
               class="slider"
             />
@@ -87,9 +88,9 @@
                   <span class="player-score">{{ currentState?.player1?.score || 0 }}</span>
                 </div>
                 <div class="player-rack" v-if="showRacks && currentState?.player1?.rack">
-                  <div 
-                    v-for="(tile, index) in currentState.player1.rack" 
-                    :key="index" 
+                  <div
+                    v-for="(tile, index) in currentState.player1.rack"
+                    :key="index"
                     class="rack-tile"
                   >
                     {{ (tile || '★').toUpperCase() }}
@@ -103,9 +104,9 @@
                   <span class="player-score">{{ currentState?.player2?.score || 0 }}</span>
                 </div>
                 <div class="player-rack" v-if="showRacks && currentState?.player2?.rack">
-                  <div 
-                    v-for="(tile, index) in currentState.player2.rack" 
-                    :key="index" 
+                  <div
+                    v-for="(tile, index) in currentState.player2.rack"
+                    :key="index"
                     class="rack-tile"
                   >
                     {{ (tile || '★').toUpperCase() }}
@@ -128,13 +129,20 @@
             <div class="move-info" v-if="currentMove">
               <div class="info-row">
                 <span class="label">Player:</span>
-                <span class="value">{{ currentMove.playerId === '1' ? game.metadata.player1Name : game.metadata.player2Name }}</span>
+                <span class="value">{{
+                  currentMove.playerId === '1'
+                    ? game.metadata.player1Name
+                    : game.metadata.player2Name
+                }}</span>
               </div>
               <div class="info-row">
                 <span class="label">Action:</span>
-                <span class="value action-type" :class="[currentMove.action, { invalid: currentMove.valid === false }]">
+                <span
+                  class="value action-type"
+                  :class="[currentMove.action, { invalid: currentMove.valid === false }]"
+                >
                   {{ formatAction(currentMove.action) }}
-                  <span v-if="currentMove.valid === false" class="invalid-badge">❌ Invalid</span>
+                  <span v-if="currentMove.valid === false" class="invalid-badge">Invalid</span>
                 </span>
               </div>
               <div class="info-row" v-if="currentMove.message">
@@ -143,10 +151,18 @@
                   {{ currentMove.message }}
                 </span>
               </div>
-              <div class="info-row" v-if="currentMove.wordsFormed && currentMove.wordsFormed.length > 0">
+              <div
+                class="info-row"
+                v-if="currentMove.wordsFormed && currentMove.wordsFormed.length > 0"
+              >
                 <span class="label">Words:</span>
                 <span class="value words">
-                  {{ currentMove.wordsFormed.map(w => w.word).join(', ').toUpperCase() }}
+                  {{
+                    currentMove.wordsFormed
+                      .map((w) => w.word)
+                      .join(', ')
+                      .toUpperCase()
+                  }}
                 </span>
               </div>
               <div class="info-row" v-if="currentMove.action === 'play-word'">
@@ -155,8 +171,13 @@
                   +{{ currentMove.scoreDelta }}
                 </span>
               </div>
-              <div class="info-row" v-if="currentMove.tilesPlaced && currentMove.tilesPlaced.length > 0">
-                <span class="label">{{ currentMove.valid === false ? 'Attempted Tiles:' : 'Tiles Placed:' }}</span>
+              <div
+                class="info-row"
+                v-if="currentMove.tilesPlaced && currentMove.tilesPlaced.length > 0"
+              >
+                <span class="label">{{
+                  currentMove.valid === false ? 'Attempted Tiles:' : 'Tiles Placed:'
+                }}</span>
                 <span class="value">
                   {{ formatTilesPlaced(currentMove.tilesPlaced) }}
                 </span>
@@ -173,23 +194,26 @@
             <div v-else class="no-move-message">
               This is the starting position of the game before any moves were made.
             </div>
-            
+
             <!-- Move Analysis Section -->
-            <div v-if="currentMove && currentMove.action === 'play-word'" class="move-analysis-section">
+            <div
+              v-if="currentMove && currentMove.action === 'play-word'"
+              class="move-analysis-section"
+            >
               <div class="analysis-note">
-                <strong>Note:</strong> Move analysis is currently in development. 
-                Full analysis requires backend support to validate moves and compute scores.
+                <strong>Note:</strong> Move analysis is currently in development. Full analysis
+                requires backend support to validate moves and compute scores.
               </div>
-              
-              <button 
-                @click="analyzeCurrentMove" 
+
+              <button
+                @click="analyzeCurrentMove"
                 class="analyze-button"
                 :disabled="moveAnalysis?.analyzing.value"
               >
                 <span v-if="moveAnalysis?.analyzing.value">Analyzing...</span>
-                <span v-else>🔍 Analyze Move (Beta)</span>
+                <span v-else>Analyze Move (Beta)</span>
               </button>
-              
+
               <div v-if="currentMoveAnalysis" class="analysis-results">
                 <h4>Move Analysis</h4>
                 <div class="analysis-rating" :class="currentMoveAnalysis.rating.toLowerCase()">
@@ -210,18 +234,38 @@
                 <div class="analysis-message">
                   {{ currentMoveAnalysis.message }}
                 </div>
-                <div v-if="currentMoveAnalysis.bestMove && currentMoveAnalysis.bestMove.found" class="best-move-details">
+                <div
+                  v-if="currentMoveAnalysis.bestMove && currentMoveAnalysis.bestMove.found"
+                  class="best-move-details"
+                >
                   <h5>Best Move:</h5>
-                  <div>{{ currentMoveAnalysis.bestMove.word }} at ({{ currentMoveAnalysis.bestMove.row }}, {{ currentMoveAnalysis.bestMove.col }})</div>
+                  <div>
+                    {{ currentMoveAnalysis.bestMove.word }} at ({{
+                      currentMoveAnalysis.bestMove.row
+                    }}, {{ currentMoveAnalysis.bestMove.col }})
+                  </div>
                 </div>
               </div>
             </div>
-            
+
             <!-- Debug Info -->
-            <div v-if="currentMove" class="debug-info" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); font-size: 0.75rem;">
+            <div
+              v-if="currentMove"
+              class="debug-info"
+              style="
+                margin-top: 15px;
+                padding: 10px;
+                background: var(--surface-2);
+                border: 1px solid var(--surface-edge);
+                border-radius: 8px;
+                font-size: 0.75rem;
+              "
+            >
               <details>
-                <summary style="cursor: pointer;">Debug: Raw Move Data</summary>
-                <pre style="overflow-x: auto; white-space: pre-wrap;">{{ JSON.stringify(currentMove, null, 2) }}</pre>
+                <summary style="cursor: pointer">Debug: Raw Move Data</summary>
+                <pre style="overflow-x: auto; white-space: pre-wrap">{{
+                  JSON.stringify(currentMove, null, 2)
+                }}</pre>
               </details>
             </div>
           </div>
@@ -230,8 +274,8 @@
           <div class="move-history">
             <h3>Move History</h3>
             <div class="history-list">
-              <div 
-                v-for="(move, index) in game.moves" 
+              <div
+                v-for="(move, index) in game.moves"
                 :key="index"
                 class="history-item"
                 :class="{ active: index + 1 === currentMoveIndex, [move.action]: true }"
@@ -240,14 +284,31 @@
                 <div class="history-move-number">{{ index + 1 }}</div>
                 <div class="history-move-info">
                   <div class="history-player">
-                    {{ move.playerId === '1' ? game.metadata.player1Name || 'P1' : game.metadata.player2Name || 'P2' }}
+                    {{
+                      move.playerId === '1'
+                        ? game.metadata.player1Name || 'P1'
+                        : game.metadata.player2Name || 'P2'
+                    }}
                   </div>
                   <div class="history-action">
-                    <span v-if="move.action === 'play-word' && move.wordsFormed && move.wordsFormed.length > 0">
-                      {{ move.wordsFormed.map(w => w.word).join(', ').toUpperCase() }}
+                    <span
+                      v-if="
+                        move.action === 'play-word' &&
+                        move.wordsFormed &&
+                        move.wordsFormed.length > 0
+                      "
+                    >
+                      {{
+                        move.wordsFormed
+                          .map((w) => w.word)
+                          .join(', ')
+                          .toUpperCase()
+                      }}
                     </span>
                     <span v-else-if="move.action === 'pass'">Passed</span>
-                    <span v-else-if="move.action === 'exchange'">Exchanged {{ move.tilesExchanged }}</span>
+                    <span v-else-if="move.action === 'exchange'"
+                      >Exchanged {{ move.tilesExchanged }}</span
+                    >
                     <span v-else>{{ formatAction(move.action) }}</span>
                   </div>
                 </div>
@@ -272,7 +333,7 @@ import { debug, logWarn, logError } from '../utils/log';
 export default {
   name: 'GameReplay',
   components: {
-    Board
+    Board,
   },
   data() {
     return {
@@ -282,46 +343,50 @@ export default {
       currentMoveIndex: 0,
       showRacks: false,
       showAnalysis: false,
-      moveAnalysisResults: {} // Cache analysis results by move index
+      moveAnalysisResults: {}, // Cache analysis results by move index
     };
   },
   computed: {
     currentState() {
       if (!this.game) return null;
-      
+
       if (this.currentMoveIndex === 0) {
         debug('[GameReplay] Showing initial state');
         return this.game.initialState;
       }
-      
+
       const move = this.game.moves[this.currentMoveIndex - 1];
       if (!move) {
         logWarn('[GameReplay] Move not found at index', this.currentMoveIndex - 1);
         return this.game.initialState;
       }
-      
+
       debug('[GameReplay] Current move:', {
         index: this.currentMoveIndex,
         move,
-        hasSnapshot: !!move.gameStateSnapshot
+        hasSnapshot: !!move.gameStateSnapshot,
       });
-      
+
       // Check if gameStateSnapshot exists
       if (!move.gameStateSnapshot) {
         logWarn('[GameReplay] Move has no gameStateSnapshot, reconstructing:', move);
         // Fallback: try to reconstruct state from move data
         return this.reconstructStateFromMove(move);
       }
-      
+
       debug('[GameReplay] Using gameStateSnapshot');
       return move.gameStateSnapshot;
     },
     currentBoardState() {
       // For invalid moves, show the board with attempted tiles
-      if (this.currentMove && this.currentMove.valid === false && this.currentMove.boardStateBefore) {
+      if (
+        this.currentMove &&
+        this.currentMove.valid === false &&
+        this.currentMove.boardStateBefore
+      ) {
         return this.currentMove.boardStateBefore;
       }
-      
+
       const board = this.currentState?.board;
       if (!board || board.length === 0) {
         logWarn('[GameReplay] No board state available');
@@ -335,14 +400,14 @@ export default {
     },
     currentMoveAnalysis() {
       return this.moveAnalysisResults[this.currentMoveIndex] || null;
-    }
+    },
   },
   watch: {
     currentMoveIndex(newIndex, oldIndex) {
       debug('[GameReplay] Move index changed:', { from: oldIndex, to: newIndex });
       debug('[GameReplay] Current move:', this.currentMove);
       debug('[GameReplay] Current state:', this.currentState);
-    }
+    },
   },
   mounted() {
     this.gamePersistence = useGamePersistence();
@@ -357,9 +422,10 @@ export default {
       }
 
       // Get the board state BEFORE this move
-      const previousState = this.currentMoveIndex > 1 
-        ? this.game.moves[this.currentMoveIndex - 2]?.gameStateSnapshot 
-        : this.game.initialState;
+      const previousState =
+        this.currentMoveIndex > 1
+          ? this.game.moves[this.currentMoveIndex - 2]?.gameStateSnapshot
+          : this.game.initialState;
 
       if (!previousState) {
         alert('Cannot analyze: missing board state before move');
@@ -379,14 +445,14 @@ export default {
         moveIndex: this.currentMoveIndex,
         playerId,
         rack,
-        boardState: previousState.board
+        boardState: previousState.board,
       });
 
       const result = await this.moveAnalysis.analyzeMoveQuality(
         {
           score: this.currentMove.scoreDelta,
           tilesPlaced: this.currentMove.tilesPlaced,
-          wordsFormed: this.currentMove.wordsFormed
+          wordsFormed: this.currentMove.wordsFormed,
         },
         rack,
         previousState.board,
@@ -400,56 +466,55 @@ export default {
     reconstructStateFromMove(move) {
       // For invalid moves, show the board with the attempted tiles (boardStateBefore)
       // For valid moves, show the board after the move (boardState)
-      const boardToShow = (move.valid === false && move.boardStateBefore) 
-        ? move.boardStateBefore 
-        : move.boardState;
-      
+      const boardToShow =
+        move.valid === false && move.boardStateBefore ? move.boardStateBefore : move.boardState;
+
       // If move has boardState, use it
       if (boardToShow) {
         return {
           board: boardToShow,
           player1: {
-            score: move.playerId === '1' ? move.scoreAfter : (move.scoreBefore || 0),
-            rack: move.playerId === '1' ? move.rackAfter : (move.rackBefore || []),
-            isCurrentPlayer: move.playerId !== '1'
+            score: move.playerId === '1' ? move.scoreAfter : move.scoreBefore || 0,
+            rack: move.playerId === '1' ? move.rackAfter : move.rackBefore || [],
+            isCurrentPlayer: move.playerId !== '1',
           },
           player2: {
-            score: move.playerId === '2' ? move.scoreAfter : (move.scoreBefore || 0),
-            rack: move.playerId === '2' ? move.rackAfter : (move.rackBefore || []),
-            isCurrentPlayer: move.playerId !== '2'
+            score: move.playerId === '2' ? move.scoreAfter : move.scoreBefore || 0,
+            rack: move.playerId === '2' ? move.rackAfter : move.rackBefore || [],
+            isCurrentPlayer: move.playerId !== '2',
           },
           currentPlayer: move.playerId === '1' ? 2 : 1,
           message: move.message || null,
-          gameOver: false
+          gameOver: false,
         };
       }
-      
+
       logError('[GameReplay] Cannot reconstruct state from move:', move);
       return this.game.initialState;
     },
-    
+
     loadGame() {
       const gameId = this.$route.params.gameId;
       this.game = this.gamePersistence.getGame(gameId);
-      
+
       if (!this.game) {
         alert('Game not found');
         this.$router.push('/history');
         return;
       }
-      
+
       debug('[GameReplay] Loaded game:', {
         id: this.game.id,
         moves: this.game.moves.length,
         hasInitialState: !!this.game.initialState,
         initialState: this.game.initialState,
         allMoves: this.game.moves,
-        firstMove: this.game.moves[0]
+        firstMove: this.game.moves[0],
       });
-      
+
       // Start at the last move
       this.currentMoveIndex = this.game.moves.length;
-      
+
       debug('[GameReplay] Set currentMoveIndex to:', this.currentMoveIndex);
     },
     goBack() {
@@ -477,45 +542,48 @@ export default {
     formatAction(action) {
       const actions = {
         'play-word': 'Played Word',
-        'pass': 'Passed Turn',
-        'exchange': 'Exchanged Tiles',
-        'recall': 'Recalled Tiles'
+        pass: 'Passed Turn',
+        exchange: 'Exchanged Tiles',
+        recall: 'Recalled Tiles',
       };
       return actions[action] || action;
     },
     formatTilesPlaced(tiles) {
-      return tiles.map(t => {
-        const letter = t.isBlank ? `${t.chosenLetter}★` : t.letter;
-        return `${letter.toUpperCase()}(${t.row},${t.col})`;
-      }).join(', ');
+      return tiles
+        .map((t) => {
+          const letter = t.isBlank ? `${t.chosenLetter}★` : t.letter;
+          return `${letter.toUpperCase()}(${t.row},${t.col})`;
+        })
+        .join(', ');
     },
     formatDate(dateString) {
       const date = new Date(dateString);
-      return date.toLocaleString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       });
     },
     formatTime(timestamp) {
       const date = new Date(timestamp);
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit'
+        second: '2-digit',
       });
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
+/* Why: flat page, matte panels with 1px edge + top glint; blur kept only on the sticky header overlay. */
 .game-replay-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  color: #e4e4e7;
+  background: var(--surface-0);
+  color: var(--ink);
 }
 
 .loading-state {
@@ -527,7 +595,7 @@ export default {
 
 .loader {
   font-size: 1.5rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
 }
 
 .replay-container {
@@ -541,29 +609,39 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 20px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  /* Matte, not glass: a sticky header is a repeated landmark, not a floating
+     instrument, so it spends no blur from the budget (R10). */
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(10px);
 }
 
 .back-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e4e4e7;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  color: var(--ink);
   padding: 10px 20px;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
   font-weight: 600;
 }
 
 .back-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
+}
+
+.back-button:active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .game-title {
@@ -574,11 +652,12 @@ export default {
   font-size: 1.8rem;
   font-weight: 700;
   margin-bottom: 5px;
+  color: var(--ink);
 }
 
 .game-date {
   font-size: 0.9rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
 }
 
 .spacer {
@@ -613,42 +692,53 @@ export default {
   max-height: 100% !important;
 }
 
+/* Why: transport bar is a matte panel, not glass; selection spends the accent family. */
 .controls {
   display: flex;
   align-items: center;
   gap: 15px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: var(--radius-md);
   padding: 15px 25px;
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .control-btn {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: #93c5fd;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+  color: var(--ink);
   padding: 10px 15px;
   font-size: 1.2rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
 }
 
 .control-btn:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.3);
-  transform: translateY(-2px);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.control-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .control-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .move-counter {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #e4e4e7;
+  color: var(--ink);
   min-width: 120px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .move-slider {
@@ -659,7 +749,8 @@ export default {
 .slider {
   width: 100%;
   height: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
   outline: none;
   cursor: pointer;
   border-radius: 4px;
@@ -670,7 +761,7 @@ export default {
   appearance: none;
   width: 20px;
   height: 20px;
-  background: #3b82f6;
+  background: var(--accent);
   cursor: pointer;
   border-radius: 50%;
 }
@@ -678,7 +769,7 @@ export default {
 .slider::-moz-range-thumb {
   width: 20px;
   height: 20px;
-  background: #3b82f6;
+  background: var(--accent);
   cursor: pointer;
   border-radius: 50%;
   border: none;
@@ -687,8 +778,8 @@ export default {
 .sidebar {
   width: 400px;
   min-width: 400px;
-  background: rgba(0, 0, 0, 0.3);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-1);
+  border-left: 1px solid var(--surface-edge);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -699,7 +790,7 @@ export default {
 .move-details,
 .move-history {
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--surface-edge);
 }
 
 .state-info h3,
@@ -707,7 +798,7 @@ export default {
 .move-history h3 {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 15px;
@@ -722,14 +813,19 @@ export default {
 
 .player-info {
   padding: 15px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: var(--radius-sm);
+  transition:
+    background-color var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
 }
 
+/* Why: current turn is selection, so it spends the accent, not blue hex. */
 .player-info.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
 }
 
 .player-header {
@@ -744,11 +840,14 @@ export default {
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 1px;
+  color: var(--ink);
 }
 
 .player-score {
   font-size: 1.5rem;
   font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .player-rack {
@@ -756,11 +855,15 @@ export default {
   gap: 5px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--surface-edge);
 }
 
+/* Why: rack tiles stay porcelain with dark ink in both themes. */
 .rack-tile {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, var(--tile-face-hi), var(--tile-face-lo));
+  border: 1px solid var(--tile-edge);
+  border-radius: var(--radius-sm);
+  color: var(--tile-ink);
   padding: 8px 10px;
   font-weight: 600;
   font-size: 0.85rem;
@@ -780,7 +883,7 @@ export default {
   cursor: pointer;
 }
 
-.view-options input[type="checkbox"] {
+.view-options input[type='checkbox'] {
   width: 18px;
   height: 18px;
   cursor: pointer;
@@ -797,12 +900,12 @@ export default {
   justify-content: space-between;
   align-items: flex-start;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--surface-edge);
 }
 
 .info-row .label {
   font-size: 0.85rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -810,7 +913,7 @@ export default {
 
 .info-row .value {
   font-size: 0.95rem;
-  color: #e4e4e7;
+  color: var(--ink);
   text-align: right;
   max-width: 60%;
 }
@@ -819,49 +922,58 @@ export default {
   font-weight: 600;
 }
 
+/* Why: validation wins over action color; caution uses warn, play uses success. */
 .value.action-type.play-word {
-  color: #86efac;
+  color: var(--success);
 }
 
 .value.action-type.pass {
-  color: #fde047;
+  color: var(--warn);
 }
 
 .value.action-type.exchange {
-  color: #c084fc;
+  color: var(--accent);
 }
 
 .value.action-type.invalid {
-  color: #f87171;
+  color: var(--danger);
 }
 
 .invalid-badge {
   display: inline-block;
   margin-left: 8px;
   font-size: 0.85em;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-edge);
+  color: var(--danger);
 }
 
 .error-message {
-  color: #f87171;
+  color: var(--danger);
   font-style: italic;
 }
 
 .value.words {
   font-weight: 700;
-  color: #93c5fd;
+  color: var(--accent);
 }
 
 .value.score.positive {
-  color: #86efac;
+  color: var(--success);
   font-weight: 700;
   font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .no-move-message {
   padding: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  color: #a1a1aa;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
   font-style: italic;
   text-align: center;
 }
@@ -869,59 +981,72 @@ export default {
 .move-analysis-section {
   margin-top: 20px;
   padding: 15px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
 }
 
 .analysis-note {
   padding: 10px;
-  background: rgba(59, 130, 246, 0.1);
-  border-left: 3px solid #3b82f6;
-  border-radius: 4px;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent-edge);
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
-  color: #93c5fd;
+  color: var(--ink-muted);
   margin-bottom: 10px;
   line-height: 1.4;
 }
 
 .analysis-note strong {
-  color: #bfdbfe;
+  color: var(--ink);
 }
 
+/* Why: primary action spends the primary token, flat with press shrink. */
 .analyze-button {
   width: 100%;
   padding: 12px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
-  color: white;
+  background: var(--primary);
+  border: 1px solid transparent;
+  color: var(--on-primary);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.3s ease;
+  border-radius: var(--radius-sm);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
 }
 
 .analyze-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  background: var(--primary-hover);
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
+}
+
+.analyze-button:active:not(:disabled) {
+  background: var(--primary-pressed);
+  transform: scale(0.97);
+  transition-duration: 60ms;
 }
 
 .analyze-button:disabled {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .analysis-results {
   margin-top: 15px;
   padding: 15px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-sm);
 }
 
 .analysis-results h4 {
   margin-bottom: 10px;
-  color: #e4e4e7;
+  color: var(--ink);
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -929,34 +1054,38 @@ export default {
 
 .analysis-rating {
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 700;
   text-align: center;
   margin-bottom: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  color: var(--ink);
 }
 
+/* Why: rating tiers reuse validation tokens; never hand-picked hex. */
 .analysis-rating.excellent {
-  background: rgba(134, 239, 172, 0.2);
-  color: #86efac;
-  border: 1px solid rgba(134, 239, 172, 0.3);
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid var(--success-edge);
 }
 
 .analysis-rating.good {
-  background: rgba(147, 197, 253, 0.2);
-  color: #93c5fd;
-  border: 1px solid rgba(147, 197, 253, 0.3);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-edge);
 }
 
 .analysis-rating.okay {
-  background: rgba(253, 224, 71, 0.2);
-  color: #fde047;
-  border: 1px solid rgba(253, 224, 71, 0.3);
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid var(--warn-edge);
 }
 
 .analysis-rating.weak {
-  background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-edge);
 }
 
 .analysis-detail {
@@ -967,44 +1096,46 @@ export default {
 }
 
 .analysis-detail .label {
-  color: #a1a1aa;
+  color: var(--ink-muted);
 }
 
 .analysis-detail .value {
-  color: #e4e4e7;
+  color: var(--ink);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .analysis-detail .value.improvement {
-  color: #86efac;
+  color: var(--success);
 }
 
 .analysis-message {
   margin-top: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
-  color: #d4d4d8;
+  color: var(--ink-muted);
   font-style: italic;
 }
 
 .best-move-details {
   margin-top: 10px;
   padding: 10px;
-  background: rgba(59, 130, 246, 0.1);
-  border-left: 3px solid #3b82f6;
-  border-radius: 4px;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent-edge);
+  border-radius: var(--radius-sm);
 }
 
 .best-move-details h5 {
   margin-bottom: 5px;
-  color: #93c5fd;
+  color: var(--accent);
   font-size: 0.85rem;
 }
 
 .best-move-details div {
-  color: #e4e4e7;
+  color: var(--ink);
   font-size: 0.9rem;
 }
 
@@ -1021,44 +1152,51 @@ export default {
   overflow-y: auto;
 }
 
+/* Why: history rows are matte; active row spends accent, type edge uses validation tokens. */
 .history-item {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
   border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
 }
 
 .history-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-edge);
 }
 
 .history-item.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-left-color: #3b82f6;
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
+  border-left-color: var(--accent);
 }
 
 .history-item.play-word {
-  border-left-color: rgba(134, 239, 172, 0.3);
+  border-left-color: var(--success-edge);
 }
 
 .history-item.pass {
-  border-left-color: rgba(253, 224, 71, 0.3);
+  border-left-color: var(--warn-edge);
   opacity: 0.7;
 }
 
 .history-item.exchange {
-  border-left-color: rgba(192, 132, 252, 0.3);
+  border-left-color: var(--accent-edge);
   opacity: 0.8;
 }
 
 .history-move-number {
   font-weight: 700;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   min-width: 30px;
+  font-variant-numeric: tabular-nums;
 }
 
 .history-move-info {
@@ -1070,25 +1208,26 @@ export default {
 
 .history-player {
   font-size: 0.75rem;
-  color: #a1a1aa;
+  color: var(--ink-muted);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .history-action {
   font-size: 0.85rem;
-  color: #e4e4e7;
+  color: var(--ink);
 }
 
 .invalid-move-text {
-  color: #f87171;
+  color: var(--danger);
   font-style: italic;
 }
 
 .history-score {
   font-weight: 700;
-  color: #86efac;
+  color: var(--success);
   font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 1024px) {
@@ -1096,7 +1235,7 @@ export default {
     width: 350px;
     min-width: 350px;
   }
-  
+
   .board-container {
     max-width: min(500px, 85vw);
   }
@@ -1112,13 +1251,13 @@ export default {
     min-width: unset;
     max-height: unset;
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--surface-edge);
   }
-  
+
   .board-section {
     min-height: 50vh;
   }
-  
+
   .board-container {
     max-width: min(500px, 95vw);
   }
@@ -1126,10 +1265,20 @@ export default {
   .spacer {
     display: none;
   }
-  
+
   .replay-header {
     flex-wrap: wrap;
     gap: 10px;
+  }
+}
+
+/* Why: reduced motion keeps the light, drops all movement. */
+@media (prefers-reduced-motion: reduce) {
+  .game-replay-view *,
+  .game-replay-view *::before,
+  .game-replay-view *::after {
+    animation: none;
+    transition: none;
   }
 }
 </style>

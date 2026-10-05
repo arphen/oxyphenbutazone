@@ -1,58 +1,76 @@
 <template>
   <transition name="modal-fade">
     <div v-if="show" class="modal-overlay" @click.self="$emit('close')">
-      <div class="modal-content">
-        <!-- Animated Background -->
-        <div class="animated-bg">
-          <div class="particle" v-for="i in 20" :key="i" :style="getParticleStyle(i)"></div>
-        </div>
-        
-        <!-- Trophy Icon -->
-        <div class="trophy-container">
-          <div class="trophy-icon">{{ isTie ? '🤝' : '🏆' }}</div>
-          <div class="trophy-glow"></div>
-        </div>
-        
-        <!-- Title -->
-        <h2 class="title">{{ isTie ? "It's a Tie!" : 'Game Over!' }}</h2>
-        
-        <!-- Winner Announcement -->
-        <div v-if="!isTie" class="winner-announcement">
-          <div class="winner-badge">
-            <span class="crown-icon">👑</span>
-            <span class="winner-name">{{ winnerName }}</span>
-            <span class="winner-label">Wins!</span>
+      <!-- The finale card: one glass instrument (R10). How much happens
+        scales with how much was played and whether anything went wrong
+        (§11): sparks are flat dots in the ramp's own colours, finite, with
+        no canvas and no glow. The message tells the truth about *how* the
+        finish was reached (R28). -->
+      <div class="modal-content finale" :class="stats.grade">
+        <svg class="finale-mark" viewBox="0 0 48 48" aria-hidden="true">
+          <path
+            d="M14 25l9 9 12-20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+
+        <h2 class="title">{{ title }}</h2>
+        <div class="finale-rule-wrap">
+          <div class="finale-rule" aria-hidden="true"></div>
+          <div v-if="sparkCount > 0" class="sparks" aria-hidden="true">
+            <i v-for="n in sparkCount" :key="n" class="spark" :style="sparkStyle(n)"></i>
           </div>
         </div>
-        
-        <!-- Podium for Players -->
+        <p class="finale-line">{{ stats.line }}</p>
+        <p class="finale-note">{{ stats.moves }} moves · {{ stats.helps }} helps used</p>
+
+        <div v-if="!isTie" class="winner-announcement">
+          <div class="winner-badge">
+            <span class="winner-name">{{ winnerName }}</span>
+            <span class="winner-label">wins</span>
+          </div>
+        </div>
+
+        <div class="finale-stats">
+          <div class="finale-stat">
+            <span class="stat-value">{{ stats.moves }}</span>
+            <span class="stat-label">Moves</span>
+          </div>
+          <div class="finale-stat">
+            <span class="stat-value">{{ stats.best ? stats.best.word : '—' }}</span>
+            <span class="stat-label">Best word{{ stats.best ? ` +${stats.best.score}` : '' }}</span>
+          </div>
+          <div class="finale-stat">
+            <span class="stat-value">{{ stats.helps }}</span>
+            <span class="stat-label">Helps used</span>
+          </div>
+          <div class="finale-stat">
+            <span class="stat-value">{{ stats.invalids }}</span>
+            <span class="stat-label">Invalid plays</span>
+          </div>
+        </div>
+
+        <!-- Standings -->
         <div class="podium-container">
-          <div 
-            v-for="(player, index) in sortedPlayers" 
+          <div
+            v-for="(player, index) in sortedPlayers"
             :key="index"
             class="podium-player"
-            :class="[
-              `place-${index + 1}`,
-              `player-${player.playerNum}`,
-              { 'is-winner': player.isWinner }
-            ]"
-            :style="{ animationDelay: `${index * 0.1}s` }"
+            :class="[{ 'is-winner': player.isWinner }]"
           >
-            <!-- Place Medal -->
             <div class="place-medal">
-              <span v-if="index === 0">🥇</span>
-              <span v-else-if="index === 1">🥈</span>
-              <span v-else-if="index === 2">🥉</span>
-              <span v-else>{{ index + 1 }}</span>
+              <span>{{ ordinal(index + 1) }}</span>
             </div>
-            
-            <!-- Player Info -->
+
             <div class="player-avatar">
-              <span>👤</span>
+              <span>P{{ player.playerNum }}</span>
             </div>
             <div class="player-name">Player {{ player.playerNum }}</div>
-            
-            <!-- Score Breakdown -->
+
             <div class="score-breakdown">
               <div class="breakdown-line">
                 <span class="label">Game Score:</span>
@@ -73,21 +91,15 @@
             </div>
           </div>
         </div>
-        
-        <!-- Explanation -->
-        <div class="explanation">
-          <span class="info-icon">💡</span>
-          Final scores adjusted for remaining tiles
-        </div>
-        
+
+        <div class="explanation">Final scores adjusted for remaining tiles</div>
+
         <!-- Action Buttons -->
         <div class="button-row">
           <button @click="$emit('new-game')" class="action-btn new-game-btn">
-            <span class="btn-icon">🔄</span>
             <span>New Game</span>
           </button>
           <button @click="$emit('close')" class="action-btn close-btn">
-            <span class="btn-icon">✕</span>
             <span>Close</span>
           </button>
         </div>
@@ -102,15 +114,15 @@ export default {
   props: {
     show: {
       type: Boolean,
-      default: false
+      default: false,
     },
     winner: {
       type: Number,
-      default: null
+      default: null,
     },
     gameState: {
       type: Object,
-      default: null
+      default: null,
     },
     // Legacy props for backwards compatibility
     finalScore1: Number,
@@ -131,49 +143,121 @@ export default {
       if (this.isTie) return '';
       return `Player ${this.winner}`;
     },
+    // Celebration tiers (§11.1): pure arithmetic from how the game was
+    // reached. Each tier adds one finite layer, capped, never looping.
+    // reached. Passes, exchanges and invalid plays all cost the turn, so all
+    // three count as help (R25). The note stays honest about what went wrong.
+    stats() {
+      let moves = 0;
+      let passes = 0;
+      let exchanges = 0;
+      let invalids = 0;
+      let best = null;
+      for (let i = 1; i <= this.playerCount; i++) {
+        const history = this.gameState?.[`player${i}`]?.history || [];
+        for (const entry of history) {
+          if (entry.action === 'pass') passes++;
+          else if (entry.action === 'exchange') exchanges++;
+          else if (entry.action === 'invalid') invalids++;
+          else {
+            moves++;
+            for (const word of entry.words || []) {
+              if (!best || word.score > best.score) best = word;
+            }
+          }
+        }
+      }
+      const helps = passes + exchanges + invalids;
+      let grade = 'finished';
+      let title = 'Finished';
+      let line = 'That one fought back, and you got it anyway.';
+      if (moves > 0 && invalids === 0 && exchanges === 0 && passes <= 1) {
+        grade = 'flawless';
+        title = 'Flawless';
+        line = 'Played clean, start to finish.';
+      } else if (invalids === 0 && exchanges === 0) {
+        grade = 'strong';
+        line = 'Clean work, start to finish.';
+      } else if (exchanges + invalids <= 2) {
+        grade = 'steady';
+        line = 'A real game, with a few detours.';
+      }
+      return { moves, passes, exchanges, invalids, helps, best, grade, title, line };
+    },
+    title() {
+      if (this.isTie) return 'Tied game';
+      return this.stats.title;
+    },
+    // Sparks per game, with a global budget: a quiet lift for one move,
+    // a few sparks for several, the full set for a flawless sweep (§11.1).
+    sparkCount() {
+      const moves = this.stats.moves;
+      let sparks = moves <= 1 ? 0 : moves <= 4 ? 3 : moves <= 9 ? 6 : 9;
+      if (this.stats.grade === 'flawless' && moves >= 4) sparks = 13;
+      return Math.min(sparks, 160);
+    },
     sortedPlayers() {
       const players = [];
-      
+
       // Collect all player data
       for (let i = 1; i <= this.playerCount; i++) {
-        const finalScore = this.gameState?.finalScores?.[`player${i}`] || 
-                          (i === 1 ? this.finalScore1 : this.finalScore2) || 0;
-        const gameScore = this.gameState?.[`player${i}`]?.score || 
-                         (i === 1 ? this.gameScore1 : this.gameScore2) || 0;
-        const remaining = this.gameState?.finalScores?.[`player${i}Remaining`] || 
-                         (i === 1 ? this.remaining1 : this.remaining2) || 0;
-        
+        const finalScore =
+          this.gameState?.finalScores?.[`player${i}`] ||
+          (i === 1 ? this.finalScore1 : this.finalScore2) ||
+          0;
+        const gameScore =
+          this.gameState?.[`player${i}`]?.score ||
+          (i === 1 ? this.gameScore1 : this.gameScore2) ||
+          0;
+        const remaining =
+          this.gameState?.finalScores?.[`player${i}Remaining`] ||
+          (i === 1 ? this.remaining1 : this.remaining2) ||
+          0;
+
         // Calculate bonus (opponent tiles if this player finished first)
         let bonus = 0;
         if (remaining === 0) {
           // This player might have finished - check if they get opponent tiles
           bonus = Math.max(0, finalScore - gameScore);
         }
-        
+
         players.push({
           playerNum: i,
           finalScore,
           gameScore,
           penalty: remaining,
           bonus,
-          isWinner: this.winner === i
+          isWinner: this.winner === i,
         });
       }
-      
+
       // Sort by final score (descending)
       return players.sort((a, b) => b.finalScore - a.finalScore);
     },
   },
   methods: {
-    getParticleStyle(index) {
-      const delay = Math.random() * 3;
-      const duration = 3 + Math.random() * 4;
-      const left = Math.random() * 100;
-      
+    ordinal(n) {
+      if (n === 1) return '1st';
+      if (n === 2) return '2nd';
+      if (n === 3) return '3rd';
+      return `${n}th`;
+    },
+    // Each spark leaves at its own angle and reach, in the ramp's own
+    // colours (the full 46→332 sweep), so the colours the reader has been
+    // learning are the ones that fall (§11.4). Flat dots: a bright screen
+    // has nothing to bloom.
+    sparkStyle(n) {
+      const angle = (((n * 137.5) % 360) * Math.PI) / 180;
+      const dist = 44 + ((n * 53) % 72);
+      const hue = 46 + ((n * 89) % 287);
+      const size = 2 + (n % 4);
       return {
-        left: `${left}%`,
-        animationDelay: `${delay}s`,
-        animationDuration: `${duration}s`
+        '--dx': `${Math.round(Math.cos(angle) * dist)}px`,
+        '--dy': `${Math.round(Math.sin(angle) * dist)}px`,
+        '--hue': hue,
+        width: `${size}px`,
+        height: `${size}px`,
+        animationDuration: `${800 + ((n * 37) % 400)}ms`,
       };
     },
   },
@@ -181,7 +265,7 @@ export default {
 </script>
 
 <style scoped>
-/* Modal Transitions */
+/* Modal Transitions: one entrance, then rest. */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.3s ease;
@@ -198,9 +282,7 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -208,258 +290,32 @@ export default {
   padding: 20px;
 }
 
-.modal-content {
-  background: linear-gradient(135deg, rgba(26, 26, 46, 0.98), rgba(22, 33, 62, 0.98));
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 50px;
-  max-width: 900px;
+/* The finale card: one floating glass instrument (R10) with a 26px radius.
+   Everything on it is matte; the light comes from the rule and the sparks. */
+.finale {
+  background: color-mix(in oklab, var(--surface-1, #161c24) 76%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid color-mix(in oklab, var(--ink, #f2f2f6) 10%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--surface-glint, #ffffff14),
+    0 18px 40px -18px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 26px;
+  padding: 40px;
+  max-width: 720px;
   width: 95%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 
-    0 30px 80px rgba(0, 0, 0, 0.6),
-    0 0 100px rgba(59, 130, 246, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  animation: modalSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: finaleArrive 420ms cubic-bezier(0.2, 1.35, 0.4, 1);
   text-align: center;
   position: relative;
-  overflow-x: hidden;
 }
 
-@keyframes modalSlideIn {
+@keyframes finaleArrive {
   from {
     opacity: 0;
-    transform: scale(0.8) translateY(50px) rotateX(20deg);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0) rotateX(0deg);
-  }
-}
-
-/* Animated Background */
-.animated-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.particle {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  animation: float 6s infinite ease-in-out;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(100vh) scale(0);
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-20px) scale(1);
-    opacity: 0;
-  }
-}
-
-/* Trophy Section */
-.trophy-container {
-  position: relative;
-  display: inline-block;
-  margin-bottom: 30px;
-  z-index: 1;
-}
-
-.trophy-icon {
-  font-size: 100px;
-  display: inline-block;
-  animation: trophyBounce 1s ease-out, trophyFloat 3s ease-in-out 1s infinite;
-  filter: drop-shadow(0 10px 30px rgba(251, 191, 36, 0.5));
-}
-
-@keyframes trophyBounce {
-  0% {
-    transform: scale(0) rotate(-180deg);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.2) rotate(10deg);
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-@keyframes trophyFloat {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-15px) rotate(5deg);
-  }
-}
-
-.trophy-glow {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 150px;
-  height: 150px;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.4), transparent 70%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  animation: glowPulse 2s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes glowPulse {
-  0%, 100% {
-    opacity: 0.5;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: translate(-50%, -50%) scale(1.2);
-  }
-}
-
-/* Title */
-.title {
-  font-size: 3rem;
-  font-weight: 900;
-  color: #e4e4e7;
-  margin: 0 0 20px 0;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: titleSlide 0.6s ease-out 0.2s backwards;
-  text-shadow: 0 4px 20px rgba(251, 191, 36, 0.3);
-  position: relative;
-  z-index: 1;
-}
-
-@keyframes titleSlide {
-  from {
-    opacity: 0;
-    transform: translateX(-50px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Winner Announcement */
-.winner-announcement {
-  margin: 20px 0 40px;
-  animation: winnerSlide 0.8s ease-out 0.4s backwards;
-  position: relative;
-  z-index: 1;
-}
-
-@keyframes winnerSlide {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.winner-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  padding: 15px 30px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
-  border: 2px solid rgba(251, 191, 36, 0.5);
-  border-radius: 50px;
-  box-shadow: 0 10px 30px rgba(251, 191, 36, 0.4);
-  animation: badgePulse 2s ease-in-out infinite;
-}
-
-@keyframes badgePulse {
-  0%, 100% {
-    box-shadow: 0 10px 30px rgba(251, 191, 36, 0.4);
-  }
-  50% {
-    box-shadow: 0 15px 40px rgba(251, 191, 36, 0.6);
-  }
-}
-
-.crown-icon {
-  font-size: 2rem;
-  animation: rotateCrown 3s linear infinite;
-}
-
-@keyframes rotateCrown {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.winner-name {
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: #fbbf24;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-}
-
-.winner-label {
-  font-size: 1.2rem;
-  color: #e4e4e7;
-  font-weight: 600;
-}
-
-/* Podium Container */
-.podium-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin: 40px 0;
-  position: relative;
-  z-index: 1;
-}
-
-.podium-player {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 25px;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: podiumRise 0.8s ease-out backwards;
-  position: relative;
-  overflow: hidden;
-}
-
-@keyframes podiumRise {
-  from {
-    opacity: 0;
-    transform: translateY(50px) scale(0.9);
+    transform: translateY(24px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -467,302 +323,332 @@ export default {
   }
 }
 
-.podium-player::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+/* The drawn checkmark: stroked once over 700ms, then held. Reduced motion
+   shows it drawn without drawing it. */
+.finale-mark {
+  width: 56px;
+  height: 56px;
+  color: var(--success);
+}
+
+.finale-mark path {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: drawMark 700ms var(--ease-out, ease-out) 150ms forwards;
+}
+
+@keyframes drawMark {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.title {
+  margin: 12px 0 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.finale-rule-wrap {
+  position: relative;
+  margin: 14px auto 0;
+  max-width: 420px;
+}
+
+/* The rainbow rule under the title: the full ramp sweep, at half strength —
+   full strength and wider only for flawless (§11.3). */
+.finale-rule {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    oklch(0.8 0.11 46),
+    oklch(0.8 0.11 100),
+    oklch(0.8 0.11 142),
+    oklch(0.8 0.11 183),
+    oklch(0.8 0.11 230),
+    oklch(0.8 0.11 280),
+    oklch(0.8 0.11 332)
+  );
+  opacity: 0.55;
+}
+
+.finale.flawless .finale-rule {
+  opacity: 1;
   height: 4px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  transform: translateX(-100%);
-  transition: transform 0.6s ease;
 }
 
-.podium-player:hover::before {
-  transform: translateX(100%);
+.finale-line {
+  margin: 12px 0 0;
+  font-size: 1rem;
+  color: var(--ink);
 }
 
-.podium-player:hover {
-  transform: translateY(-10px) scale(1.02);
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+.finale-note {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sparks fire from the rule and fall once (§11.4). */
+.sparks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: oklch(0.8 0.11 var(--hue, 200));
+  animation-name: sparkFly;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+@keyframes sparkFly {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--dx, 0px), var(--dy, -60px)) scale(0.6);
+  }
+}
+
+.winner-announcement {
+  margin-top: 16px;
+}
+
+.winner-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--success-edge);
+  background: var(--success-soft);
+}
+
+.winner-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.winner-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.finale-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.finale-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid var(--surface-edge);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Standings: matte rows; the winner keeps a quiet success wash — a result,
+   not an interaction. Numbers stay tabular so columns never jitter. */
+.podium-container {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.podium-player {
+  display: grid;
+  grid-template-columns: 52px 44px 1fr;
+  grid-template-areas:
+    'medal avatar name'
+    'medal scores scores';
+  gap: 4px 12px;
+  align-items: center;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: 12px;
+  padding: 12px 16px;
 }
 
 .podium-player.is-winner {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
-  border-color: rgba(251, 191, 36, 0.6);
-  box-shadow: 
-    0 15px 40px rgba(251, 191, 36, 0.3),
-    0 0 0 4px rgba(251, 191, 36, 0.1);
-  transform: scale(1.05);
-}
-
-.podium-player.player-1 {
-  border-color: rgba(59, 130, 246, 0.4);
-}
-
-.podium-player.player-2 {
-  border-color: rgba(34, 197, 94, 0.4);
-}
-
-.podium-player.player-3 {
-  border-color: rgba(245, 158, 11, 0.4);
-}
-
-.podium-player.player-4 {
-  border-color: rgba(168, 85, 247, 0.4);
+  border-color: var(--success-edge);
+  background: var(--success-soft);
 }
 
 .place-medal {
-  font-size: 3rem;
-  margin-bottom: 15px;
-  animation: medalSpin 1s ease-out;
+  grid-area: medal;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-@keyframes medalSpin {
-  from {
-    transform: rotateY(0deg);
-  }
-  to {
-    transform: rotateY(720deg);
-  }
+.is-winner .place-medal {
+  color: var(--success);
 }
 
 .player-avatar {
-  font-size: 3.5rem;
-  margin-bottom: 10px;
-  opacity: 0.9;
+  grid-area: avatar;
+  width: 44px;
+  height: 44px;
+  background: var(--surface-3);
+  border: 1px solid var(--surface-edge);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink-muted);
 }
 
 .player-name {
-  font-size: 1.3rem;
+  grid-area: name;
+  font-size: 1rem;
   font-weight: 700;
-  color: #e4e4e7;
-  margin-bottom: 20px;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
+  color: var(--ink);
 }
 
 .score-breakdown {
-  text-align: left;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 15px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  grid-area: scores;
+  display: grid;
+  gap: 2px;
 }
 
 .breakdown-line {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.breakdown-line:last-child {
-  border-bottom: none;
-}
-
-.breakdown-line .label {
-  font-size: 0.9rem;
-  color: #a1a1aa;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
 }
 
 .breakdown-line .value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #e4e4e7;
-}
-
-.penalty-line .value {
-  color: #fca5a5;
-}
-
-.bonus-line .value {
-  color: #86efac;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 .final-line {
-  margin-top: 8px;
-  padding-top: 12px;
-  border-top: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.final-line .label {
-  font-size: 1rem;
-  color: #e4e4e7;
-  font-weight: 600;
+  border-top: 1px solid var(--surface-edge);
+  padding-top: 4px;
+  margin-top: 2px;
 }
 
 .final-value {
-  font-size: 2rem !important;
-  color: #60a5fa !important;
-  text-shadow: 0 2px 10px rgba(96, 165, 250, 0.5);
+  font-weight: 800;
+  color: var(--ink);
 }
 
-/* Explanation */
 .explanation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.95rem;
-  color: #a1a1aa;
-  margin: 30px 0 20px;
-  padding: 12px 20px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 1;
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
 }
 
-.info-icon {
-  font-size: 1.2rem;
-  animation: infoGlow 2s ease-in-out infinite;
-}
-
-@keyframes infoGlow {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* Action Buttons */
 .button-row {
   display: flex;
-  gap: 15px;
-  margin-top: 30px;
-  position: relative;
-  z-index: 1;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 .action-btn {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 16px 28px;
-  font-size: 1rem;
+  padding: 12px;
+  border: 1px solid var(--surface-edge);
+  border-radius: 10px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border: 2px solid;
-  border-radius: 12px;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  position: relative;
-  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
 }
 
-.action-btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  transform: translate(-50%, -50%);
-  transition: width 0.5s ease, height 0.5s ease;
+.action-btn:hover {
+  border-color: var(--accent-edge);
+  transform: translateY(-1px);
 }
 
-.action-btn:hover::before {
-  width: 300px;
-  height: 300px;
-}
-
-.btn-icon {
-  font-size: 1.3rem;
-  position: relative;
-  z-index: 1;
-}
-
-.action-btn span:last-child {
-  position: relative;
-  z-index: 1;
+.action-btn:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 60ms;
 }
 
 .new-game-btn {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(22, 163, 74, 0.3));
-  color: #86efac;
-  border-color: rgba(34, 197, 94, 0.5);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 
 .new-game-btn:hover {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.4), rgba(22, 163, 74, 0.4));
-  border-color: rgba(34, 197, 94, 0.8);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
-.close-btn {
-  background: linear-gradient(135deg, rgba(71, 85, 105, 0.3), rgba(51, 65, 85, 0.3));
-  color: #cbd5e1;
-  border-color: rgba(71, 85, 105, 0.5);
-}
-
-.close-btn:hover {
-  background: linear-gradient(135deg, rgba(71, 85, 105, 0.4), rgba(51, 65, 85, 0.4));
-  border-color: rgba(71, 85, 105, 0.8);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-}
-
-/* Scrollbar */
-.modal-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 10px;
-}
-
-.modal-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-}
-
-.modal-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .modal-content {
-    padding: 30px 20px;
+@media (max-width: 560px) {
+  .finale {
+    padding: 28px 20px;
   }
-  
-  .title {
-    font-size: 2rem;
+
+  .finale-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
-  
-  .trophy-icon {
-    font-size: 70px;
+}
+
+/* Reduced motion removes motion, not light (R17): the mark stands drawn,
+   the card still arrives as state, the sparks never start (§11.5). */
+@media (prefers-reduced-motion: reduce) {
+  .finale-mark path {
+    stroke-dashoffset: 0;
   }
-  
-  .winner-name {
-    font-size: 1.4rem;
-  }
-  
-  .podium-container {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  
-  .button-row {
-    flex-direction: column;
-  }
-  
-  .action-btn {
-    width: 100%;
+
+  .sparks {
+    display: none;
   }
 }
 </style>

@@ -7,7 +7,7 @@ import { safeJsonParse, cleanString, MAX_ACTION_BYTES } from './src/shared/proto
 // Laptop-host mode: a thin HTTP shell around the shared engine. All rules live in src/shared/engine.js, which the
 // phones also run in their browsers for peer-to-peer play. Bodies are size-capped and parsed with safeJsonParse.
 
-const DICTIONARY_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', slovenian: 'SLOVENIAN.txt' };
+const DICTIONARY_FILES = { csw21: 'CSW21.txt', nwl2023: 'NWL2023.txt', enable: 'ENABLE.txt', friendly: 'FRIENDLY.txt', slovenian: 'SLOVENIAN.txt' };
 const MAX_BODY_BYTES = 16 * 1024;
 
 const oddOneOutSessions = new Map(); // sessionId -> sessionState

@@ -10,7 +10,7 @@ export const ok = (message) => console.log('  ✓', message);
 export const heading = (message) => console.log(message);
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const CANDIDATES = [process.env.CHROMIUM, '/opt/pw-browsers/chromium', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
+const CANDIDATES = [process.env.CHROMIUM, '/opt/pw-browsers/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
 
 export function launch(extraArgs = []) {
   const executablePath = CANDIDATES.find((p) => p && fs.existsSync(p));
