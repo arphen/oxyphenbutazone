@@ -410,7 +410,7 @@ export default {
         this.feedback = {
           type: 'info',
           title: 'Not the optimal solution',
-          message: `Scored ${play.score} points. Best listed move is ${bestSolutionScore} points.`,
+          message: `Score: ${play.score} points — a better move worth ${bestSolutionScore} points.`,
           score: play.score,
         };
       }

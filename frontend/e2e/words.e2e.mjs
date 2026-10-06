@@ -25,7 +25,7 @@ run(async () => {
   await card.locator('.status', { hasText: 'Imported' }).waitFor();
   ok('status: "' + (await card.locator('.status').innerText()).replace(/\s+/g, ' ') + '"');
   const state = await hostApi('/api/game-state');
-  assert.deepEqual(state.dictionaries, { csw21: true, nwl2023: false, enable: false, slovenian: false });
+  assert.deepEqual(state.dictionaries, { csw21: true, nwl2023: false, enable: false, friendly: false, slovenian: false });
   assert.equal(state.message, 'CSW21 imported; now using it.'); ok(`importing switched the game to it by itself: "${state.message}"`);
   assert.equal((await hostApi('/api/action', { type: 'validate-word', word: 'zzyzx' })).valid, true);
   assert.equal((await hostApi('/api/action', { type: 'validate-word', word: 'dog' })).valid, false); ok('the host now plays by the imported list ("zzyzx" valid, ENABLE-only "dog" not)');

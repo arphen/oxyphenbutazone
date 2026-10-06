@@ -20,6 +20,9 @@ and the success, abandon (pass) and failure (invalid play) paths of a move.
 | J6  | Invalid play is a verdict      | play non-words, refusal, verdict row           | verdict row with no hue                                   |
 | J7  | The finish                     | two clean moves, both players pass, finale     | finale card, grade, sparks, honest note                   |
 | J8  | Help costs                     | a pass drains the published charge             | dimmed charge after help                                  |
+| J9  | QR modal                       | open the player codes, dismiss                 | modal open with codes, dismissed                          |
+| J10 | Swap modal                     | open the swap picker, dismiss                  | picker open with rack tiles, dismissed                    |
+| J11 | Blank picker                   | a blank tile asks for its letter, dismiss      | picker open with alphabet, dismissed                      |
 
 Design contracts (viewport x theme x view tier, keyboard focus, reduced motion) live in
 `design.spec.mjs` with ids `D1` to `D3`; they are not journeys.

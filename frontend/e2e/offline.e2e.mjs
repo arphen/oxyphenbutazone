@@ -47,9 +47,10 @@ run(async () => {
     csw21: false,
     nwl2023: false,
     enable: true,
+    friendly: true,
     slovenian: false,
   });
-  ok('default selection = ENABLE only');
+  ok('default selection = ENABLE + Friendly');
   assert.equal((await call('/api/action', { type: 'validate-word', word: 'cat' })).valid, true);
   assert.equal((await call('/api/action', { type: 'validate-word', word: 'xyzzy' })).valid, false);
   ok('validate-word: cat valid, xyzzy invalid');
@@ -83,6 +84,7 @@ run(async () => {
     csw21: false,
     nwl2023: false,
     enable: false,
+    friendly: false,
     slovenian: true,
   });
   ok('offline: new Slovenian game started, Slovenian list loaded from cache');

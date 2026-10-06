@@ -40,6 +40,17 @@ by design (§17.4): merge, then run the `update-screenshots` workflow (it
 appears in Actions once the file is on main) and commit its PNGs — same-OS
 generation is self-consistent by construction.
 
+## Custom suites: Friendly-list drift (pre-existing, fixed)
+
+`static`, `words`, `offline`, `practice`, `laptop` failed identically on a clean
+checkout: the Friendly word list landed without updating their expectations.
+Fixed the expectations (not the product): chooser rows include Friendly,
+dictionary states carry the `friendly` key, the English default is ENABLE +
+Friendly, flashcard counts cover the union, the invalid-word probe uses XQ
+(absent from both lists), and stale copy pins were updated to the new honest
+copy. `oddoneout` verdict strings it pins (`Correct!`, `Oops!`, `Next Puzzle`)
+were restored verbatim. All custom suites green.
+
 ## Red herrings encountered (kept for the next agent)
 
 - Phone tap timeout (`[J2]`-class): an unclosed paren in `--charge` dropped every
@@ -69,6 +80,9 @@ generation is self-consistent by construction.
 - `[J2]` flaked in CI: it clicked rack tile 0 before the seeded rack reached the
   screen and staged a random letter from the old rack. Now it waits for the
   tile's letter to read C first, the way the smoke suite already did.
+- `[J10]` flaked on random tiles: the swap modal shows the rack, but the journey
+  never seeded it, so every run dealt different letters. Now it sets a fixed
+  rack first (R31: control the data).
 - Custom suites `static`, `words`, `offline`, `practice`, `laptop` fail
   identically on a clean checkout (proven via `git stash`): the Friendly word
   list landed without updating their expectations (chooser offers 5 lists, not

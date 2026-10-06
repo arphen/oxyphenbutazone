@@ -18,7 +18,7 @@ run(async () => {
   await page.getByText(/Start 2-Player Game/).click();
   await page.waitForURL(/#\/game/); await page.waitForTimeout(1500);
   let g = await call('/api/game-state');
-  assert.equal(g.language, 'slovenian'); assert.equal(g.playerCount, 2); assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, slovenian: true });
+  assert.equal(g.language, 'slovenian'); assert.equal(g.playerCount, 2); assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: true });
   ok(`local engine answered: language=${g.language}, players=${g.playerCount}, dictionaries=${JSON.stringify(g.dictionaries)}`);
 
   console.log('2. Play šola through the same /api/action the UI uses');

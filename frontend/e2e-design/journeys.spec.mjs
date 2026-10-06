@@ -193,3 +193,65 @@ test('[J8] Help visibly costs: a pass drains the charge', async ({ page }) => {
     await expect(page).toHaveScreenshot('j8-drained.png');
   });
 });
+
+test('[J9] The QR modal opens and closes', async ({ page }) => {
+  await seed(page);
+  await test.step('open the player codes', async () => {
+    await page.locator('.sidebar-header').getByTitle('Toggle QR Codes').click();
+    await expect(page.locator('.modal-container')).toBeVisible();
+    await settle(page);
+    await expect(page).toHaveScreenshot('j9-qr.png');
+  });
+  await test.step('dismiss it', async () => {
+    await page.locator('.modal-container .close-button').click();
+    await expect(page.locator('.modal-container')).toBeHidden();
+  });
+});
+
+test('[J10] The swap modal opens and closes', async ({ page }) => {
+  await page.goto(DEBUG_RACK);
+  await applyView(page, cfg, { theme: theme() });
+  await api.ready(page);
+  await api.call(page, '/api/action', { type: 'restart', playerCount: 2, language: 'english' });
+  // Fixed rack: the modal shows the tiles, so random initials would make
+  // every screenshot different (R31: control the data).
+  await api.setRack(page, 1, ['e', 'e', 'b', 'd', 'd', 'i', 'o']);
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="rack"] .tile[data-index="0"] .letter')?.textContent.trim() === 'E'
+  );
+  await test.step('open the swap picker', async () => {
+    await page.getByTestId('swap-btn').click();
+    await expect(page.locator('.modal-content')).toContainText('Swap Tiles');
+    await settle(page);
+    await expect(page).toHaveScreenshot('j10-swap.png');
+  });
+  await test.step('dismiss it', async () => {
+    await page.locator('.modal-content .cancel-btn').click();
+    await expect(page.locator('.modal-content')).toBeHidden();
+  });
+});
+
+test('[J11] The blank picker opens and closes', async ({ page }) => {
+  await page.goto(DEBUG_RACK);
+  await applyView(page, cfg, { theme: theme() });
+  await api.ready(page);
+  await api.call(page, '/api/action', { type: 'restart', playerCount: 2, language: 'english' });
+  await api.setRack(page, 1, ['', 'a', 't', 's', 'x', 'y', 'z']);
+  await test.step('a blank tile asks for its letter', async () => {
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="rack"] .tile[data-index="0"] .letter')
+          ?.textContent.trim() === '★'
+    );
+    await page.locator('[data-testid="rack"] .tile[data-index="0"]').click();
+    await page.locator('[data-board-row="7"][data-board-col="7"]').click();
+    await expect(page.locator('.blank-picker')).toBeVisible();
+    await settle(page);
+    await expect(page).toHaveScreenshot('j11-blank.png');
+  });
+  await test.step('dismiss it', async () => {
+    await page.locator('.blank-picker .close-btn').click();
+    await expect(page.locator('.blank-picker')).toBeHidden();
+  });
+});

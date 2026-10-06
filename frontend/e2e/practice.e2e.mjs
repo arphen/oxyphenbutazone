@@ -10,7 +10,14 @@ import { createDictionaryStore } from '../src/shared/dictionary.js';
 const WIDE = { viewport: { width: 1400, height: 1000 } };
 const enable = createDictionaryStore();
 enable.load('enable', fs.readFileSync(new URL('../public/ENABLE.txt', import.meta.url), 'utf8'));
-const expectedCount = (category) => enable.words({ dictionary: 'enable', ...WORD_CATEGORIES[category].apiQuery }).count;
+enable.load('friendly', fs.readFileSync(new URL('../public/FRIENDLY.txt', import.meta.url), 'utf8'));
+// New games use ENABLE + Friendly together, so expectations count the union.
+const expectedWords = (category) => {
+  const query = WORD_CATEGORIES[category].apiQuery;
+  const from = (id) => enable.words({ dictionary: id, ...query }).words;
+  return [...new Set([...from('enable'), ...from('friendly')])];
+};
+const expectedCount = (category) => expectedWords(category).length;
 
 async function open(page, hash) {
   await page.goto(BASE + '/?debug#' + hash);
@@ -62,11 +69,11 @@ run(async () => {
   await page.locator('.alphabet-grid .letter-tile').first().waitFor();
   assert.equal(await page.locator('[data-testid=list-problem]').count(), 0); ok('no "no list" warning');
   let rows = await chooser(page);
-  assert.equal(rows.length, 4);
-  assert.deepEqual(rows.map((r) => [r.text.split(' ')[0], r.disabled, r.checked]), [['CSW21', true, false], ['NWL2023', true, false], ['ENABLE', false, true], ['Slovenian', false, false]]);
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.map((r) => [r.text.split(' ')[0], r.disabled, r.checked]), [['CSW21', true, false], ['NWL2023', true, false], ['ENABLE', false, true], ['Friendly', false, true], ['Slovenian', false, false]]);
   assert.match(rows[0].text, /not installed/); assert.match(rows[1].text, /not installed/);
-  assert.doesNotMatch(rows[2].text + rows[3].text, /not installed/);
-  ok('the chooser offers ENABLE (ticked) and Slovenian; CSW21 and NWL2023 are disabled as "(not installed)"');
+  assert.doesNotMatch(rows[2].text + rows[3].text + rows[4].text, /not installed/);
+  ok('the chooser offers ENABLE + Friendly (ticked) and Slovenian; CSW21 and NWL2023 are disabled as "(not installed)"');
   await closeChooser(page);
 
   await placeWord(page, 'CAT', 3, 5);
@@ -75,15 +82,21 @@ run(async () => {
   await placeWord(page, 'QXZ', 5, 5);
   const junk = await waitForWord(page, 'QXZ');
   assert.deepEqual([junk.valid, junk.invalid], [false, true]); ok('QXZ is shown as not a word');
-  await placeWord(page, 'QI', 7, 5);
-  assert.equal((await waitForWord(page, 'QI')).invalid, true); ok('QI, which ENABLE does not have, is not valid (the list in use is ENABLE, nothing else)');
+  await placeWord(page, 'XQ', 7, 5);
+  assert.equal((await waitForWord(page, 'XQ')).invalid, true); ok('XQ, which is in neither list, is not valid');
   assert.equal((await page.locator('.word-item', { hasText: 'CAT' }).locator('.word-score').innerText()).trim(), '6 pts'); ok('scoring unchanged: CAT on row 3 = 3 + 1 + 1 doubled by the double letter under the T (3,7) = 6 pts');
 
-  // The last list cannot be unticked: the box ticks itself again and the word stays valid
+  // The last list cannot be unticked: refusing it keeps words validating
   await chooser(page);
   await page.locator('.dropdown-panel .checkbox-item', { hasText: 'ENABLE' }).locator('input').click();
-  await page.waitForFunction(() => [...document.querySelectorAll('.dropdown-panel .checkbox-item input')].map((i) => i.checked).join() === 'false,false,true,false');
-  ok('unticking the only list is refused (the box ticks itself again)');
+  await page.waitForFunction(() => [...document.querySelectorAll('.dropdown-panel .checkbox-item input')].map((i) => i.checked).join() === 'false,false,false,true,false');
+  ok('unticking ENABLE is allowed while Friendly stays on');
+  await page.locator('.dropdown-panel .checkbox-item', { hasText: 'Friendly' }).locator('input').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.dropdown-panel .checkbox-item input')].map((i) => i.checked).join() === 'false,false,false,true,false');
+  assert.equal((await api(page, '/api/action', { type: 'validate-word', word: 'qi' })).valid, true);
+  ok('unticking the last list is refused: Friendly still answers');
+  await page.locator('.dropdown-panel .checkbox-item', { hasText: 'ENABLE' }).locator('input').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.dropdown-panel .checkbox-item input')].map((i) => i.checked).join() === 'false,false,true,true,false');
   await closeChooser(page);
   assert.equal((await boardWords(page)).find((w) => w.word === 'CAT').valid, true);
   assert.equal(requested.filter((url) => /CSW21|NWL2023/i.test(url)).length, 0); ok('no request for CSW21.txt or NWL2023.txt');
@@ -102,7 +115,7 @@ run(async () => {
     ok(`${category.name}: ${total} cards`);
     await page.locator('.back-btn').click();
   }
-  assert.equal(expectedCount('three-letter-q'), 3); // QAT, QUA, SUQ
+  assert.equal(expectedCount('three-letter-q'), 5); // QAT, QIN, QIS, QUA, SUQ
 
   console.log('3. Flashcards: answer a card');
   await page.locator('.category-card', { hasText: WORD_CATEGORIES['three-letter-q'].name }).click();
@@ -111,7 +124,7 @@ run(async () => {
   await page.locator('.practice-rack').waitFor();
   await page.locator('.hint-btn').click(); // shows the target word
   const target = (await page.locator('.target-word').innerText()).trim();
-  assert.ok(['QAT', 'QUA', 'SUQ'].includes(target), `target ${target}`);
+  assert.ok(['QAT', 'QIN', 'QIS', 'QUA', 'SUQ'].includes(target), `target ${target}`);
   assert.equal(await page.locator('.submit-btn').isDisabled(), true); ok('Check Answer waits for tiles');
   // the target sits on the middle row of the visible 7x7 board, starting at the third column; the shared anchor tile, if any, is already there
   const middle = page.locator('.mini-board .board-row').nth(3);
@@ -122,7 +135,7 @@ run(async () => {
   }
   await page.locator('.submit-btn').click();
   await page.locator('.feedback-message.success').waitFor();
-  assert.match(await page.locator('.feedback-message').innerText(), new RegExp(`"${target}" is correct`)); ok(`${target} placed from the rack is accepted`);
+  assert.match(await page.locator('.feedback-message').innerText(), new RegExp(`Correct: "${target}"`)); ok(`${target} placed from the rack is accepted`);
   assert.equal((await page.locator('.stat-card.learning .stat-value').innerText()).trim(), '1'); ok('the card moved from New to Learning');
   await page.locator('.next-btn').click();
   await page.locator('.target-word').waitFor();
@@ -202,7 +215,7 @@ run(async () => {
   await go(page, '/freeplay');
   await page.locator('.alphabet-grid .letter-tile').first().waitFor();
   rows = await chooser(page);
-  assert.deepEqual(rows.map((r) => [r.text.split(' ')[0], r.disabled, r.checked]), [['CSW21', false, true], ['NWL2023', true, false], ['ENABLE', false, false], ['Slovenian', false, false]]);
+  assert.deepEqual(rows.map((r) => [r.text.split(' ')[0], r.disabled, r.checked]), [['CSW21', false, true], ['NWL2023', true, false], ['ENABLE', false, false], ['Friendly', false, false], ['Slovenian', false, false]]);
   assert.doesNotMatch(rows[0].text, /not installed/); ok('the chooser now offers CSW21, ticked because the game switched to the imported list');
   await closeChooser(page);
   await placeWord(page, 'ZZYZX', 3, 5);

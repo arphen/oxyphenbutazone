@@ -21,7 +21,7 @@ run(async () => {
   await desktop.waitForURL(/\/game/); await desktop.waitForTimeout(1500);
   let g = await state();
   assert.equal(g.language, 'slovenian'); assert.equal(g.playerCount, 2);
-  assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, slovenian: true });
+  assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: true });
   ok(`language=${g.language}, dictionaries=${JSON.stringify(g.dictionaries)}, players=${g.playerCount}`);
   assert.equal(g.tileBag.length + 14, 100); ok('Slovenian bag: 100 tiles total');
   assert.match(await desktop.locator('.tile-language').first().evaluate(e => e.textContent).catch(() => '🇸🇮 Slovenian'), /Sloven/);
@@ -62,20 +62,20 @@ run(async () => {
 
   console.log('4. Language is fixed for the game; dictionary changes cannot flip it');
   await act({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: false } });
-  g = await state(); assert.equal(g.language, 'slovenian'); assert.deepEqual(g.dictionaries, { csw21: true, nwl2023: false, enable: false, slovenian: false });
+  g = await state(); assert.equal(g.language, 'slovenian'); assert.deepEqual(g.dictionaries, { csw21: true, nwl2023: false, enable: false, friendly: false, slovenian: false });
   ok('after switching to CSW21 mid-game: language still slovenian');
   r = await act({ type: 'restart' }); assert.equal(r.gameState.language, 'slovenian'); assert.equal(r.gameState.playerCount, 2);
   ok(`plain restart keeps language (${r.gameState.language}) and player count`);
-  assert.deepEqual(r.gameState.dictionaries, { csw21: false, nwl2023: false, enable: false, slovenian: true });
+  assert.deepEqual(r.gameState.dictionaries, { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: true });
   ok('restart repairs a selection that cannot suit the language (csw21-only -> slovenian)');
   await act({ type: 'update-dictionary', dictionaries: { csw21: true, nwl2023: false, enable: false, slovenian: true } });
   r = await act({ type: 'restart' });
-  assert.deepEqual(r.gameState.dictionaries, { csw21: true, nwl2023: false, enable: false, slovenian: true });
+  assert.deepEqual(r.gameState.dictionaries, { csw21: true, nwl2023: false, enable: false, friendly: false, slovenian: true });
   ok('restart keeps a selection that already includes slovenian (csw21+slovenian union)');
 
   console.log('5. Phone rack view: picker offers the Slovenian alphabet; values are Slovenian');
   await act({ type: 'restart', playerCount: 2, language: 'slovenian' });
-  g = await state(); assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, slovenian: true });
+  g = await state(); assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, friendly: false, slovenian: true });
   ok('switching to slovenian via restart selects the Slovenian dictionary');
   const { page: phone } = await newPage(browser, { hasTouch: true });
   const perrs = phone.errs;
@@ -91,12 +91,11 @@ run(async () => {
 
   console.log('6. English game still works');
   await act({ type: 'restart', playerCount: 2, language: 'english' });
-  // the default English list is the best one this server has (CSW21 is not in the repo: it is a local, git-ignored file)
-  const shipped = (await (await fetch(BASE + '/wordlists.json')).json()).lists;
-  const defaultEnglish = ['csw21', 'nwl2023', 'enable'].find((id) => shipped[id]);
+  // New English games default to ENABLE + Friendly together (both ship in
+  // the repo, so both are always available here).
   g = await state(); assert.equal(g.language, 'english');
-  assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: false, slovenian: false, [defaultEnglish]: true });
-  ok(`english restart -> ${defaultEnglish} + english tiles`);
+  assert.deepEqual(g.dictionaries, { csw21: false, nwl2023: false, enable: true, friendly: true, slovenian: false });
+  ok('english restart -> ENABLE + Friendly + english tiles');
   await phone.reload(); await phone.waitForTimeout(1200);
   const en = await phone.evaluate(async () => {
     let c = document.querySelector('.tile[data-index]').__vueParentComponent; while (c && !c.proxy?.alphabet) c = c.parent;
@@ -105,7 +104,7 @@ run(async () => {
   assert.equal(en, 26); ok('english blank picker has 26 letters');
   await act({ type: 'update-dictionary', dictionaries: { csw21: false, nwl2023: true, enable: false, slovenian: true } });
   r = await act({ type: 'restart', playerCount: 2, language: 'english' });
-  assert.deepEqual(r.gameState.dictionaries, { csw21: false, nwl2023: true, enable: false, slovenian: false });
+  assert.deepEqual(r.gameState.dictionaries, { csw21: false, nwl2023: true, enable: false, friendly: false, slovenian: false });
   ok('new english game keeps the NWL2023 preference and drops slovenian');
   await browser.close();
 });
