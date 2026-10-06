@@ -1,6 +1,7 @@
 <template>
   <div class="pair-page">
     <button class="back" @click="$router.push('/')">← Home</button>
+    <p class="pair-eyebrow">Phone to phone</p>
     <h1>Host a game</h1>
 
     <!-- Not hosting yet: choose what to host -->

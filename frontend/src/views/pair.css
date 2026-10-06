@@ -1,5 +1,6 @@
-/* Pairing page. All color comes from the global token layer (style.css);
-   this sheet only handles layout + component states. Works in light/dark. */
+/* Pairing pages (Host, Join, Word lists): arrival screens in the salon
+   register (§13) — Georgia headlines, mono eyebrows, matte cards, quiet
+   controls. Layout and behaviour untouched (R30). */
 .pair-page {
   min-height: 100vh;
   box-sizing: border-box;
@@ -9,10 +10,22 @@
   color: var(--ink);
   background: var(--surface-0);
 }
+.pair-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-muted);
+  margin: 8px 0 0;
+}
 h1 {
-  margin: 8px 0 16px;
-  font-size: 26px;
+  margin: 6px 0 16px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 1.13;
   letter-spacing: -0.01em;
+  color: var(--ink);
 }
 h2 {
   margin: 0 0 8px;
@@ -40,12 +53,14 @@ h2 {
   box-shadow:
     inset 0 1px 0 var(--surface-glint),
     var(--shadow-sm);
-  border-radius: var(--radius-lg);
+  border-radius: 10px;
   padding: 16px;
   margin-bottom: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Arrival screens arrive once, then rest (§9.5). */
+  animation: oxy-arrive 240ms var(--ease-out, ease-out);
 }
 .field {
   font-size: 14px;
@@ -66,10 +81,20 @@ h2 {
   background: var(--surface-2);
   color: var(--ink);
   font-size: 16px;
+  font-variant-numeric: tabular-nums lining-nums;
   cursor: pointer;
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
 }
 .choice:hover:not(:disabled) {
   border-color: var(--accent-edge);
+  transform: translateY(-1px);
+}
+.choice:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 60ms;
 }
 .choice.active {
   background: var(--primary);
@@ -97,9 +122,13 @@ h2 {
   color: var(--on-primary);
   font-size: 17px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
   cursor: pointer;
   padding: 0 18px;
   box-shadow: inset 0 1px 0 var(--surface-glint);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    background-color var(--dur-quick) var(--ease-out);
 }
 .primary:hover:not(:disabled) {
   background: var(--primary-hover);
@@ -108,7 +137,7 @@ h2 {
 }
 .primary:active:not(:disabled) {
   background: var(--primary-pressed);
-  transform: scale(0.98);
+  transform: scale(0.97);
   transition-duration: 60ms;
 }
 .primary:disabled {
@@ -164,17 +193,20 @@ h2 {
   border-radius: var(--radius-md);
   border: 1px solid var(--surface-edge);
   background: var(--surface-2);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
   color: var(--ink);
   font-size: 16px;
   cursor: pointer;
   padding: 0 18px;
-  box-shadow: inset 0 1px 0 var(--surface-glint);
+  transition:
+    transform var(--dur-quick) var(--ease-out),
+    border-color var(--dur-quick) var(--ease-out);
 }
 .secondary:hover:not(:disabled) {
   border-color: var(--accent-edge);
   transform: translateY(-1px);
 }
 .secondary:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: scale(0.97);
   transition-duration: 60ms;
 }

@@ -1,6 +1,7 @@
 <template>
   <div class="pair-page">
     <button class="back" @click="$router.push('/')">← Home</button>
+    <p class="pair-eyebrow">Library</p>
     <h1>Word lists</h1>
 
     <p v-if="!backend" class="hint">

@@ -1,6 +1,7 @@
 <template>
   <div class="pair-page">
     <button class="back" @click="$router.push('/')">← Home</button>
+    <p class="pair-eyebrow">Phone to phone</p>
     <h1>Join a game</h1>
 
     <section v-if="!answer" class="card">

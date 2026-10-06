@@ -26,3 +26,5 @@ dist-ssr
 # Afterglow design suite run artifacts (baselines in __screenshots__ ARE committed)
 e2e-design/test-results
 e2e-design/playwright-report
+playwright-report
+test-results

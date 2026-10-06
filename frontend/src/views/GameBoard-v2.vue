@@ -1292,11 +1292,18 @@ export default {
   border-color: var(--accent-edge);
 }
 
-/* The reader's dials dock at the sidebar's foot; their sheet opens upward. */
+/* The reader's dials dock at the sidebar's foot; their sheet opens upward.
+   Full-width anchor so the 300px sheet always has room (R19). */
 .view-section {
   padding: 10px 15px 16px;
+}
+.view-section .view-cluster {
+  display: block;
+}
+.view-section .view-cluster-summary {
   display: flex;
-  justify-content: flex-end;
+  width: fit-content;
+  margin-left: auto;
 }
 
 /* Narrow widths: stack board over sidebar so the board keeps a usable size

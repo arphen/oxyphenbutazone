@@ -32,7 +32,7 @@
       <!-- Header with stats -->
       <div class="practice-header">
         <button class="back-btn" @click="exitCategory">← Back</button>
-        <h2 class="category-title">{{ categoryInfo.icon }} {{ categoryInfo.name }}</h2>
+        <h2 class="category-title">{{ categoryInfo.name }}</h2>
       </div>
 
       <!-- Bucket Statistics (Karteikarten System) -->
@@ -904,10 +904,23 @@ export default {
 }
 
 .category-icon {
-  font-size: 3rem;
-  text-align: center;
-  margin-bottom: 16px;
-  color: var(--ink);
+  /* A neutral code badge, not an emoji: the name already says what it is,
+     so no hue or picture is spent here (R1). */
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-edge);
+  box-shadow: inset 0 1px 0 var(--surface-glint);
+  border-radius: 8px;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .category-name {
@@ -937,36 +950,19 @@ export default {
    highest interaction tier — reads accent. */
 .difficulty-badge {
   padding: 4px 12px;
-  border-radius: 12px;
+  border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   border: 1px solid var(--surface-edge);
+  background: var(--surface-2);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.difficulty-badge.beginner {
-  background: var(--success-soft);
-  border-color: var(--success-edge);
-  color: var(--success);
-}
-
-.difficulty-badge.intermediate {
-  background: var(--warn-soft);
-  border-color: var(--warn-edge);
-  color: var(--warn);
-}
-
-.difficulty-badge.advanced {
-  background: var(--danger-soft);
-  border-color: var(--danger-edge);
-  color: var(--danger);
-}
-
-.difficulty-badge.expert {
-  background: var(--accent-soft);
-  border-color: var(--accent-edge);
-  color: var(--accent);
-}
+/* Difficulty is one ordered value shown once per card: four hues would be a
+   rainbow with no ranking, so every level shares the same quiet badge (R1).
+   The word itself (beginner … expert) carries the meaning. */
 
 .progress-info {
   font-size: 0.85rem;

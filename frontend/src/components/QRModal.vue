@@ -19,7 +19,6 @@
           <div class="qr-sector qr-top-left" :class="{ active: players[0]?.isCurrentPlayer }">
             <div class="sector-inner">
               <div class="player-badge">
-                <span class="player-seat">P1</span>
                 <span class="player-name">{{ players[0]?.name || 'Player 1' }}</span>
               </div>
               <div class="qr-wrapper">
@@ -65,7 +64,6 @@
           <div class="qr-sector qr-top-right" :class="{ active: players[1]?.isCurrentPlayer }">
             <div class="sector-inner">
               <div class="player-badge">
-                <span class="player-seat">P2</span>
                 <span class="player-name">{{ players[1]?.name || 'Player 2' }}</span>
               </div>
               <div class="qr-wrapper">
@@ -115,7 +113,6 @@
           >
             <div class="sector-inner">
               <div class="player-badge">
-                <span class="player-seat">P3</span>
                 <span class="player-name">{{ players[2]?.name || 'Player 3' }}</span>
               </div>
               <div class="qr-wrapper">
@@ -165,7 +162,6 @@
           >
             <div class="sector-inner">
               <div class="player-badge">
-                <span class="player-seat">P4</span>
                 <span class="player-name">{{ players[3]?.name || 'Player 4' }}</span>
               </div>
               <div class="qr-wrapper">
@@ -491,31 +487,26 @@ export default {
 .player-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 10px 20px;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 8px 16px;
+  width: max-content;
+  max-width: 100%;
   background: var(--surface-3);
-  border-radius: 50px;
+  border-radius: 999px;
   border: 1px solid var(--surface-edge, rgba(255, 255, 255, 0.2));
-}
-
-.player-seat {
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.qr-sector.active .player-seat {
-  color: var(--ink);
+  white-space: nowrap;
 }
 
 .player-name {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--ink);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .qr-wrapper {
